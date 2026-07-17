@@ -1,0 +1,8 @@
+version: 2
+
+sources:
+  - name: raw
+    meta:
+      external_location: "read_json_auto('../data/raw/offres_2026-07-17_1403.json')"
+    tables:
+      - name: ft_offres
