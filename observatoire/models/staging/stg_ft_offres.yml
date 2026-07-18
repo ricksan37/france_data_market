@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: stg_ft_offres
+    description: donnèes brutes des offres de l'observatoire France Travail
+    columns:
+      - name: offre_id
+        description: identifiant unique de l'offre
+        data_tests:
+          - not_null
+          - unique
+
+      - name: intitule
+        description: intitulé du poste
+        data_tests:
+          - not_null
+
+      - name: date_creation
+        description: date de création de l'offre
+        data_tests:
+          - not_null
+
+      - name: rome_code
+        description: code ROME du poste
+        data_tests:
+          - not_null
+
+      - name: type_contrat
+        description: type de contrat de l'offre
