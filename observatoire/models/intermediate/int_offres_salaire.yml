@@ -1,0 +1,25 @@
+unit_tests:
+  - name: test_parsing_salaire
+    description: >
+      Vérifie le parsing regex du salaire et la reclassification
+      Mensuel -> annuel (§4.4, §8.2, décisions Session 3).
+    model: int_offres_salaire
+    given:
+      - input: ref('stg_ft_offres')
+        rows:
+          - {offre_id: "1", salaire_libelle: "Annuel de 45000.0 Euros à 60000.0 Euros"}
+          - {offre_id: "2", salaire_libelle: "Annuel de 60000.0 Euros à 60000.0 Euros"}
+          - {offre_id: "3", salaire_libelle: "Annuel de 37000.0 Euros sur 12.0 mois"}
+          - {offre_id: "4", salaire_libelle: "Horaire de 25.0 Euros sur 12 mois"}
+          - {offre_id: "5", salaire_libelle: "Mensuel de 50000.0 Euros à 59000 Euros sur 12 mois"}
+          - {offre_id: "6", salaire_libelle: "Mensuel de 1900.0 Euros à 2500.0 Euros"}
+          - {offre_id: "7", salaire_libelle: null}
+    expect:
+      rows:
+        - {offre_id: "1", salaire_periode: "annuel", salaire_min: 45000, salaire_max: 60000, salaire_mentionne: true}
+        - {offre_id: "2", salaire_periode: "annuel", salaire_min: 60000, salaire_max: 60000, salaire_mentionne: true}
+        - {offre_id: "3", salaire_periode: "annuel", salaire_min: 37000, salaire_max: 37000, salaire_mentionne: true}
+        - {offre_id: "4", salaire_periode: "horaire", salaire_min: 25, salaire_max: 25, salaire_mentionne: true}
+        - {offre_id: "5", salaire_periode: "annuel", salaire_min: 50000, salaire_max: 59000, salaire_mentionne: true}
+        - {offre_id: "6", salaire_periode: "mensuel", salaire_min: 1900, salaire_max: 2500, salaire_mentionne: true}
+        - {offre_id: "7", salaire_periode: null, salaire_min: null, salaire_max: null, salaire_mentionne: false}
