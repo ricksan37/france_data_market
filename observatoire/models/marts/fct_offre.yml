@@ -1,0 +1,41 @@
+version: 2
+
+models:
+
+  - name: fct_offre
+    description: >
+      Table de faits, grain fin. Une ligne par offre. Assemble stg_ft_offres
+      avec les enrichissements salaire (int_offres_salaire) et classification
+      employeur (int_classification_employeur). Modèle exposé — c'est la
+      table à interroger pour l'analyse, pas les couches staging/intermediate.
+    columns:
+      - name: offre_id
+        description: identifiant unique de l'offre
+        data_tests:
+          - not_null
+          - unique
+
+      - name: intitule
+        description: intitulé du poste
+        data_tests:
+          - not_null
+
+      - name: date_creation
+        description: date de création de l'offre
+        data_tests:
+          - not_null
+
+      - name: rome_code
+        description: code ROME du poste
+        data_tests:
+          - not_null
+          - relationships:
+              to: ref('dim_rome')
+              field: rome_code
+      
+      - name: code_postal
+        description: code postal de la commune de l'offre
+        data_tests:
+          - relationships:
+              to: ref('dim_commune')
+              field: code_postal
