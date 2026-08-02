@@ -39,3 +39,14 @@ models:
           - relationships:
               to: ref('dim_commune')
               field: code_postal
+
+      - name: siren
+        description: >
+          SIREN de l'entreprise employeuse, issu de l'enrichissement DINUM.
+          NULL pour les offres hors périmètre EMPLOYEUR_DIRECT (339) et pour
+          les 42 offres du périmètre non résolues par le matching (80,3 % de
+          taux de matching sur les 213 offres éligibles — voir Session 5).
+        data_tests:
+          - relationships:
+              to: ref('dim_entreprise')
+              field: siren

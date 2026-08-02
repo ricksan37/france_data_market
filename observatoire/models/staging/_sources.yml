@@ -6,3 +6,9 @@ sources:
       external_location: "read_json_auto('../data/raw/offres_2026-07-17_1403.json')"
     tables:
       - name: ft_offres
+
+  - name: dinum
+    meta:
+      external_location: "read_json_auto('../data/raw/enrichissement_dinum_2026-08-01_1727.json')"
+    tables:
+      - name: dinum_entreprises

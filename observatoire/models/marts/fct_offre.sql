@@ -30,7 +30,9 @@ select
     s.salaire_periode,
     s.salaire_mentionne,
 
-    c.categorie_employeur
+    c.categorie_employeur,
+
+    d.siren
 
 from {{ ref('stg_ft_offres') }} as f
 
@@ -39,3 +41,6 @@ left join {{ ref('int_offres_salaire') }} as s
 
 left join {{ ref('int_classification_employeur') }} as c
     on f.offre_id = c.offre_id
+
+left join {{ ref('stg_dinum_entreprises') }} as d
+    on f.offre_id = d.offre_id

@@ -5,3 +5,4 @@ __pycache__/
 *.duckdb
 data/raw/*.json
 docs/
+.DS_Store
