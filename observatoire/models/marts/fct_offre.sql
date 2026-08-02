@@ -24,6 +24,7 @@ select
     f.code_naf,
     f.salaire_libelle,
     f.nombre_postes,
+    f.description,
 
     s.salaire_min,
     s.salaire_max,

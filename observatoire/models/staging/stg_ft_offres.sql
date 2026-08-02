@@ -12,7 +12,8 @@ select
     offre.entreprise.nom as entreprise_nom,
     offre.codeNaf as code_naf,
     offre.salaire.libelle as salaire_libelle,
-    offre.nombrePostes as nombre_postes
+    offre.nombrePostes as nombre_postes,
+    offre.description as description
 from {{ source('raw', 'ft_offres') }},
      unnest(resultats) as t(offre)
      qualify row_number() over (partition by offre_id order by date_actualisation desc) = 1

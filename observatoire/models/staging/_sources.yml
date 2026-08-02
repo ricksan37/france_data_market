@@ -12,3 +12,9 @@ sources:
       external_location: "read_json_auto('../data/raw/enrichissement_dinum_2026-08-01_1727.json')"
     tables:
       - name: dinum_entreprises
+
+  - name: extraction
+    meta:
+      external_location: "read_json_auto('../data/raw/extraction_skills_AAAA-MM-JJ_HHMM.json')"
+    tables:
+      - name: extraction_skills

@@ -50,3 +50,14 @@ models:
           - relationships:
               to: ref('dim_entreprise')
               field: siren
+
+      - name: description
+        description: >
+          Texte intégral de l'annonce, repris de stg_ft_offres. Ajouté en S6
+          comme source de l'extraction LLM (Phase 4). Porté par fct_offre
+          plutôt que lu depuis stg_ft_offres parce que fct_offre est
+          matérialisée en table : elle s'interroge depuis n'importe quel
+          répertoire, là où une vue ne résout son chemin relatif que depuis
+          observatoire/.
+        data_tests:
+          - not_null
