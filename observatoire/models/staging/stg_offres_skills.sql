@@ -13,7 +13,9 @@ select
     t.r.annees_experience_min::integer as annees_experience_min,
     t.r.teletravail as teletravail,
     t.r.anglais_requis::boolean as anglais_requis,
-    t.r.salaire_texte as salaire_texte
+    t.r.salaire_texte as salaire_texte,
+    t.r.entreprise_nom_texte as entreprise_nom_texte,
+    t.r.client_final_masque::boolean as client_final_masque
 
 from {{ source('extraction', 'extraction_skills') }} as s,
     unnest(s.resultats) as t(r)

@@ -15,6 +15,6 @@ sources:
 
   - name: extraction
     meta:
-      external_location: "read_json_auto('../data/raw/extraction_skills_AAAA-MM-JJ_HHMM.json')"
+      external_location: "read_json_auto('../data/raw/extraction_skills_2026-08-02_1843.json')"
     tables:
       - name: extraction_skills
