@@ -95,3 +95,26 @@ class ExtractionOffre(BaseModel):
             "null si aucun montant n'apparaît."
         )
     )
+
+    entreprise_nom_texte: str | None = Field(
+        description=(
+            "Nom de l'entreprise ou du cabinet qui recrute/publie l'annonce, "
+            "tel qu'il apparaît explicitement dans le texte. Utile quand le nom "
+            "structuré de l'offre est vide mais qu'un nom figure dans le corps "
+            "du texte (ex: 'Rejoignez CIMPA...'). "
+            "null si aucun nom d'entreprise n'est mentionné dans le texte."
+        )
+    )
+
+    client_final_masque: bool | None = Field(
+        description=(
+            "true si le texte indique explicitement que l'entreprise qui publie "
+            "l'annonce agit pour le compte d'un client final non nommé (formulations "
+            "comme 'notre client', 'pour le compte de notre client', 'un grand groupe' "
+            "en parlant d'une tierce entreprise cliente). "
+            "false si l'entreprise nommée dans entreprise_nom_texte EST l'employeur "
+            "direct (elle parle d'elle-même, même en utilisant 'un grand groupe' "
+            "pour se décrire elle-même). "
+            "null si le texte ne permet pas de trancher."
+        )
+    )

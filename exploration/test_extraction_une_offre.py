@@ -94,6 +94,24 @@ salaire_texte — UNIQUEMENT s'il y a un MONTANT CHIFFRÉ en euros.
 Les primes, participation, intéressement, PERECO ou "salaire attractif" ne sont
 PAS des montants. En l'absence de montant chiffré, la valeur DOIT être null —
 jamais une phrase expliquant l'absence.
+
+entreprise_nom_texte — le nom de l'entreprise ou du cabinet qui recrute,
+mentionné explicitement dans le texte (raison sociale, pas un acronyme de
+poste). Distingue BIEN qui parle : si un cabinet dit "nous recrutons pour
+notre client", le nom à extraire est celui du CABINET, pas du client (le
+client est justement non nommé).
+null si aucun nom n'apparaît dans le texte.
+
+client_final_masque — true UNIQUEMENT si le texte dit explicitement que
+l'annonceur recrute POUR UNE AUTRE entreprise non nommée ("notre client",
+"pour le compte de", "accompagner un grand groupe" en parlant d'un tiers).
+false si l'entreprise nommée parle d'ELLE-MÊME, même si elle utilise des
+formulations comme "un grand groupe" ou "un acteur majeur" pour se décrire.
+Exemple : "Framatome... les avantages d'un grand groupe" -> false, c'est
+Framatome qui parle de son propre statut, personne n'est masqué.
+Exemple : "CIMPA... accompagner notre client grand industriel Airbus" ->
+true, le client (Airbus) est nommé mais CIMPA agit pour son compte.
+null si le texte ne permet pas de trancher.
 Texte de l'offre :
 ---
 {description}
