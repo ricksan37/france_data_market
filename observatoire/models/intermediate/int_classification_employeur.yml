@@ -2,7 +2,9 @@ unit_tests:
   - name: test_parsing_employeur
     description: >
       Vérifie la classification employeur (EMPLOYEUR_DIRECT / INTERMEDIAIRE /
-      ANONYME) sur la base du code NAF et du nom de l'entreprise (spec §6.1).
+      ANONYME / INTERMEDIAIRE_reclasse) sur la base du code NAF, du nom de
+      l'entreprise (spec §6.1) et, en dernier recours, du signal texte
+      client_final_masque issu de l'extraction Phase 4.
     model: int_classification_employeur
     given:
       - input: ref('stg_ft_offres')
@@ -12,6 +14,10 @@ unit_tests:
           - {offre_id: "3", entreprise_nom: "Crédit Agricole", code_naf: null}
           - {offre_id: "4", entreprise_nom: null, code_naf: null}
           - {offre_id: "5", entreprise_nom: null, code_naf: "69.20Z"}
+          - {offre_id: "6", entreprise_nom: null, code_naf: null}
+      - input: ref('stg_offres_skills')
+        rows:
+          - {offre_id: "6", client_final_masque: true}
     expect:
       rows:
         - {offre_id: "1", categorie_employeur: "INTERMEDIAIRE"}
@@ -19,3 +25,4 @@ unit_tests:
         - {offre_id: "3", categorie_employeur: "EMPLOYEUR_DIRECT"}
         - {offre_id: "4", categorie_employeur: "ANONYME"}
         - {offre_id: "5", categorie_employeur: "ANONYME"}
+        - {offre_id: "6", categorie_employeur: "INTERMEDIAIRE_reclasse"}

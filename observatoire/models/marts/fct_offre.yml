@@ -51,6 +51,21 @@ models:
               to: ref('dim_entreprise')
               field: siren
 
+      - name: entreprise_nom
+        description: >
+          Nom de l'entreprise. Structuré (France Travail) sauf pour les 21
+          offres categorie_employeur = 'INTERMEDIAIRE_reclasse' (Session 7),
+          où il provient d'entreprise_nom_texte, extrait par LLM depuis le
+          texte de l'offre (Phase 4). NULL sur 5/21 de ces offres : le
+          masquage est détecté sans que le nom de l'intermédiaire soit
+          identifiable dans le texte — volontairement non forcé.
+
+      - name: categorie_employeur
+        description: >
+          EMPLOYEUR_DIRECT / INTERMEDIAIRE / ANONYME / INTERMEDIAIRE_reclasse
+          (spec §6.1, Session 7 pour la 4e valeur). Voir
+          int_classification_employeur pour la logique complète.
+
       - name: description
         description: >
           Texte intégral de l'annonce, repris de stg_ft_offres. Ajouté en S6
