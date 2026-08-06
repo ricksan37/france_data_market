@@ -1,0 +1,57 @@
+# .github/workflows/pull_hebdo.yml
+#
+# Phase 5 (spec §13.1) : ingest -> dbt build -> snapshot, automatisé.
+#
+# Le runner GitHub Actions est jetable : rien ne persiste d'un run à l'autre
+# sauf ce qui est explicitement commité. data/warehouse.duckdb et les dumps
+# JSON restent donc éphémères (gitignorés, comme en local) ; seul
+# data/snapshots/marche_hebdo.csv est committé à chaque run, un fichier léger
+# qui accumule l'historique nécessaire à fct_marche_hebdo sans jamais
+# recommitter les 552+ offres brutes (décision Session 2, non rouverte).
+
+name: Pull hebdomadaire
+
+on:
+  schedule:
+    # Lundi 06:00 UTC. Cron GitHub Actions : minute heure jour mois jour_semaine.
+    - cron: '0 6 * * 1'
+  workflow_dispatch: {}  # déclenchement manuel depuis l'onglet Actions, pour tester sans attendre lundi
+
+permissions:
+  contents: write  # nécessaire pour le git push du snapshot en fin de job
+
+jobs:
+  pull-et-snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Ingestion France Travail
+        env:
+          FT_CLIENT_ID: ${{ secrets.FT_CLIENT_ID }}
+          FT_CLIENT_SECRET: ${{ secrets.FT_CLIENT_SECRET }}
+        run: python3 pull_complet.py
+
+      - name: dbt build
+        working-directory: observatoire
+        run: dbt build
+
+      - name: Calcul du snapshot hebdomadaire
+        run: python3 snapshot_hebdo.py
+
+      - name: Commit et push du snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/snapshots/marche_hebdo.csv
+          git diff --staged --quiet && echo "Rien à committer" || git commit -m "Snapshot hebdomadaire automatique"
+          git push
