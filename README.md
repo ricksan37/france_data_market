@@ -8,7 +8,7 @@ Projet de portfolio pour une transition vers l'**Analytics Engineering**. L'acce
 
 ---
 
-## Quatre décisions qui racontent la méthode
+## Quatre décisions qui illustrent la méthode
 
 ### Taux de matching entreprise : 19,2 % → 80,3 %
 
@@ -24,7 +24,7 @@ Pour extraire les compétences techniques du texte libre des annonces, trois mod
 
 ### Une source figée sur un nom de fichier, invisible jusqu'au premier run automatisé
 
-`_sources.yml` pointait sur un dump JSON nommé explicitement (`offres_2026-07-17_1403.json`). En usage manuel, ça ne posait jamais problème : c'était moi qui décidais quand relancer l'ingestion, et je savais qu'il fallait mettre le nom à jour. Automatiser le pull hebdomadaire (GitHub Actions) a exposé ce couplage silencieux : sans intervention, le pipeline aurait reconstruit indéfiniment le même jeu de 552 offres du 17 juillet, quel que soit ce que l'ingestion venait de ramener. Corrigé en passant à un motif (`offres_*.json`) plutôt qu'un nom figé — sans toucher à la règle de dédoublonnage déjà en place (`qualify row_number()... order by date_actualisation desc`, Session 1), qui gérait déjà, par construction, le cas de plusieurs dumps qui se chevauchent, avant même que le besoin existe. Un bug qui n'existe que quand le système tourne sans surveillance — le genre que seul un vrai run automatisé peut révéler.
+`_sources.yml` pointait sur un dump JSON nommé explicitement (`offres_2026-07-17_1403.json`). En usage manuel, ça ne posait jamais problème : c'était moi qui décidais quand relancer l'ingestion, et je savais qu'il fallait mettre le nom à jour. Automatiser le pull hebdomadaire (GitHub Actions) a exposé ce couplage silencieux : sans intervention, le pipeline aurait reconstruit indéfiniment le même jeu de 552 offres du 17 juillet, quel que soit ce que l'ingestion venait de ramener. Corrigé en passant à un motif (`offres_*.json`) plutôt qu'un nom figé — sans toucher à la règle de dédoublonnage déjà en place (`qualify row_number()... order by date_actualisation desc`, Session 1), qui gérait déjà, par construction, le cas de plusieurs dumps qui se chevauchent, avant même que le besoin existe. Un bug qui n'existait que dans un scénario d'exécution non supervisée — visible uniquement lors d'un run automatisé réel, pas à la relecture du code.
 
 ---
 
@@ -207,12 +207,12 @@ L'écart entre offres brutes (1 094) et ID uniques (552) est **attendu** : une m
 |---|---|---|
 | dbt-core | 1.11.7 | |
 | dbt-duckdb | 1.10.1 | |
-| DuckDB | 1.5.4 | OLAP colonnaire in-process, zero-copy Arrow/Pandas. Un projet de cette taille s'exécute en quelques secondes sur un ordinateur portable — un recruteur clone et lance sans setup serveur. |
+| DuckDB | 1.5.4 | OLAP colonnaire in-process, zero-copy Arrow/Pandas. Le pipeline s'exécute en quelques secondes sur une machine locale, sans serveur ni infrastructure à provisionner. |
 | Ollama + Mistral-Nemo 12B | | Extraction de compétences structurées, en local. Coût nul, aucune clé API requise pour reproduire le pipeline. |
 | GitHub Actions | | Automatisation du pull hebdomadaire. Runner jetable : seul le snapshot agrégé persiste entre deux runs. |
 | Python | 3.13 | requests, python-dotenv, duckdb, pydantic, ollama |
 
-**Réserve assumée** : DuckDB 1.5.4 porte un bug connu de l'optimiseur sur `IN()`/`NOT IN()` à plusieurs valeurs à l'intérieur d'une vue interrogée (`INTERNAL Error: Attempted to access index...`). Contournement systématique : conditions `=`/`!=` chaînées par `OR`/`AND`, appliqué à tout le code SQL du projet. Le coût est réel, documenté ici plutôt que caché — c'est le genre de compromis qu'un entretien technique cherche à faire émerger.
+**Réserve assumée** : DuckDB 1.5.4 porte un bug connu de l'optimiseur sur `IN()`/`NOT IN()` à plusieurs valeurs à l'intérieur d'une vue interrogée (`INTERNAL Error: Attempted to access index...`). Contournement systématique : conditions `=`/`!=` chaînées par `OR`/`AND`, appliqué à tout le code SQL du projet. Le coût est réel ; il est documenté ici plutôt que dissimulé.
 
 ---
 
@@ -222,7 +222,7 @@ L'écart entre offres brutes (1 094) et ID uniques (552) est **attendu** : une m
 - [x] **Phase 2 — Socle dbt** — staging, intermediate, marts, tests. `fct_offre` exposée et testée.
 - [x] **Phase 3 — Enrichissement** — matching SIRENE/DINUM (80,3 %), `dim_entreprise`.
 - [x] **Phase 4 — Extraction skills** — schéma d'extraction structuré, comparaison de modèles, `fct_offre_technologie` / `fct_offre_domaine`. Reclassification `INTERMEDIAIRE_reclasse` (21 offres, texte libre) en aval.
-- [~] **Phase 5 — Snapshot & historique** — GitHub Actions opérationnel (cron hebdo + déclenchement manuel), dégradation CI sans LLM vérifiée dans les deux sens, premier run réel réussi. `fct_marche_hebdo` (mart dbt exposant l'historique) pas encore construit — en attente de plusieurs semaines de snapshots pour être utile.
+- [ ] **Phase 5 — Snapshot & historique** (en cours) — GitHub Actions opérationnel (cron hebdo + déclenchement manuel), dégradation CI sans LLM vérifiée dans les deux sens, premier run réel réussi. `fct_marche_hebdo` (mart dbt exposant l'historique) pas encore construit — en attente de plusieurs semaines de snapshots pour être utile.
 - [ ] **Phase 6 — Restitution** — dashboard, tests de qualité continus (Elementary).
 
 ---

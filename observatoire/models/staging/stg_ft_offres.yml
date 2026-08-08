@@ -2,7 +2,7 @@ version: 2
 
 models:
   - name: stg_ft_offres
-    description: donnèes brutes des offres de l'observatoire France Travail
+    description: données brutes des offres de l'observatoire France Travail
     columns:
       - name: offre_id
         description: identifiant unique de l'offre
