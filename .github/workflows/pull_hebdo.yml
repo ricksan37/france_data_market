@@ -43,6 +43,8 @@ jobs:
 
       - name: dbt build
         working-directory: observatoire
+        env:
+          CI_SANS_EXTRACTION: "true"
         run: dbt build
 
       - name: Calcul du snapshot hebdomadaire

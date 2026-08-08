@@ -5,6 +5,10 @@ Objectif : calculer un instantané hebdomadaire du marché (Phase 5, spec §13.1
 et l'ajouter à data/snapshots/marche_hebdo.csv, seul artefact persisté entre
 deux runs CI (le warehouse.duckdb et les dumps JSON restent éphémères/gitignorés).
 
+En mode CI_SANS_EXTRACTION (workflow GitHub Actions), fct_offre_technologie
+est vide -- top_technologie vaut alors "non disponible (CI)" plutôt que
+de planter sur un fetchone() vide.
+
 Lancement : depuis la racine du repo -> python3 snapshot_hebdo.py
 """
 
@@ -46,13 +50,16 @@ def calculer_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
         where salaire_periode = 'annuel'
     """).fetchone()[0]
 
-    top_technologie = con.execute("""
+    resultat_top_technologie = con.execute("""
         select technologie
         from fct_offre_technologie
         group by technologie
         order by count(*) desc
         limit 1
-    """).fetchone()[0]
+    """).fetchone()
+    # None si fct_offre_technologie est vide (mode CI_SANS_EXTRACTION, Session 7) :
+    # fetchone() renvoie None lui-même, pas (None,), quand 0 ligne ne matche.
+    top_technologie = resultat_top_technologie[0] if resultat_top_technologie else "non disponible (CI)"
 
     return {
         "semaine": date.today().isoformat(),
