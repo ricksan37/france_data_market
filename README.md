@@ -4,11 +4,11 @@ Pipeline analytique qui ingère les offres d'emploi data du marché français de
 
 Projet de portfolio pour une transition vers l'**Analytics Engineering**. L'accent est mis sur une chaîne **claire, traçable et honnête sur ses limites** — plus que sur le volume : chaque choix (périmètre, dédoublonnage, matching, modèle LLM) est justifié par une mesure, pas par une intuition, et documenté comme tel.
 
-> **Statut** — Phases 1 à 3 terminées. Phase 4 (extraction de compétences) engagée.
+> **Statut** — Phases 1 à 4 terminées. Phase 5 (automatisation) opérationnelle : premier run réel exécuté avec succès (8 août 2026), cron hebdomadaire actif chaque lundi.
 
 ---
 
-## Trois décisions qui racontent la méthode
+## Quatre décisions qui racontent la méthode
 
 ### Taux de matching entreprise : 19,2 % → 80,3 %
 
@@ -21,6 +21,10 @@ La spécification initiale prévoyait le code postal comme clé de jointure géo
 ### Trois modèles LLM locaux, comparés à l'aveugle sur une tâche réelle
 
 Pour extraire les compétences techniques du texte libre des annonces, trois modèles ont tourné en local (Ollama) sur le même prompt et la même offre de référence : Mistral 7B, Qwen3 8B et Mistral-Nemo 12B. Résultat inattendu — la vitesse et la qualité n'étaient pas liées à la taille de façon simple : Qwen3 en mode "thinking" mettait 258 s/offre pour un gain de qualité marginal ; désactiver ce mode l'a rendu 23× plus rapide *sans perte de qualité*. Seul Nemo distinguait de façon fiable un produit nommé (Azure, Databricks) d'un concept technique (RAG, CI/CD) — un défaut que trois reformulations de prompt n'ont pas réussi à corriger sur les deux modèles plus petits. Le modèle a été choisi sur cette mesure, pas sur sa réputation.
+
+### Une source figée sur un nom de fichier, invisible jusqu'au premier run automatisé
+
+`_sources.yml` pointait sur un dump JSON nommé explicitement (`offres_2026-07-17_1403.json`). En usage manuel, ça ne posait jamais problème : c'était moi qui décidais quand relancer l'ingestion, et je savais qu'il fallait mettre le nom à jour. Automatiser le pull hebdomadaire (GitHub Actions) a exposé ce couplage silencieux : sans intervention, le pipeline aurait reconstruit indéfiniment le même jeu de 552 offres du 17 juillet, quel que soit ce que l'ingestion venait de ramener. Corrigé en passant à un motif (`offres_*.json`) plutôt qu'un nom figé — sans toucher à la règle de dédoublonnage déjà en place (`qualify row_number()... order by date_actualisation desc`, Session 1), qui gérait déjà, par construction, le cas de plusieurs dumps qui se chevauchent, avant même que le besoin existe. Un bug qui n'existe que quand le système tourne sans surveillance — le genre que seul un vrai run automatisé peut révéler.
 
 ---
 
@@ -71,6 +75,19 @@ dbt ne fait ni appel HTTP ni appel LLM. Chaque enrichissement suit le même patt
 - **intermediate** (`int_`) — parsing salaire, classification employeur. Logique métier isolée et testée unitairement.
 - **marts** — tables exposées : `fct_offre` (grain fin, une ligne = une offre), `dim_rome`, `dim_commune`, `dim_entreprise`, `fct_offre_technologie`, `fct_offre_domaine`.
 
+## Automatisation (Phase 5)
+
+Un workflow GitHub Actions (`.github/workflows/pull_hebdo.yml`) reproduit la chaîne complète chaque lundi à 6h UTC (et sur déclenchement manuel) : ingestion → `dbt build` → snapshot. Le seul artefact qui persiste d'un run à l'autre est `data/snapshots/marche_hebdo.csv` — le runner GitHub est une machine jetable, `warehouse.duckdb` et les dumps JSON hebdomadaires restent éphémères, exactement comme en local.
+
+**Une contrainte réelle a forcé une décision d'architecture.** L'extraction de compétences (Ollama, ~3h/552 offres) ne peut pas tourner sur un runner CI. Or `fct_offre` et `int_classification_employeur` dépendent de cette extraction depuis la reclassification `INTERMEDIAIRE_reclasse`. Plutôt que de casser le build en CI, une variable d'environnement (`CI_SANS_EXTRACTION`) fait dégrader `stg_offres_skills` en 0 ligne (même schéma) quand le dump n'existe pas — le `left join` déjà en place absorbe le cas sans modification de logique, vérifié dans les deux sens :
+
+| Mode | ANONYME | INTERMEDIAIRE_reclasse |
+|---|---:|---:|
+| Local (extraction disponible) | 187 | 21 |
+| CI (extraction absente) | 208 | 0 |
+
+Assumé et documenté plutôt que masqué : le snapshot automatique n'inclut jamais `top_technologie` ni la reclassification texte — ces deux métriques restent réservées à un run manuel en local, après une extraction Ollama à jour.
+
 ## Structure du projet
 
 ```
@@ -78,9 +95,15 @@ marche_data/
 ├── auth.py, search.py, pull_complet.py       # Ingestion France Travail (Phase 1)
 ├── enrichissement_dinum.py                    # Enrichissement SIRENE/DINUM (Phase 3)
 ├── extraction_skills.py                       # Extraction LLM (Phase 4)
+├── snapshot_hebdo.py                           # Snapshot hebdomadaire (Phase 5)
 ├── requirements.txt
+├── .github/
+│   └── workflows/
+│       └── pull_hebdo.yml                      # Cron hebdo + déclenchement manuel (Phase 5)
 ├── data/
 │   ├── raw/                                   # Dumps JSON horodatés, source de vérité brute
+│   ├── snapshots/
+│   │   └── marche_hebdo.csv                    # Historique hebdo, seul artefact persisté par la CI
 │   └── warehouse.duckdb                       # Base DuckDB, régénérable, gitignorée
 ├── exploration/                                # Scripts de diagnostic, conservés comme trace de décision
 │   ├── check_codeROME.py, check_rome.py, get_referentiel.py   # Cadrage du périmètre (Phase 1)
@@ -89,6 +112,8 @@ marche_data/
 │   └── check_classification.py                 # Contrôle qualité post-run
 ├── docs/                                       # Spec + comptes rendus de session, journal de bord
 └── observatoire/                               # Projet dbt
+    ├── macros/
+    │   └── environnement_ci.sql                # Drapeau CI_SANS_EXTRACTION (Phase 5)
     ├── models/
     │   ├── staging/       # stg_
     │   ├── intermediate/  # int_
@@ -134,6 +159,11 @@ python3 enrichissement_dinum.py
 # Extraction de compétences (Phase 4) — nécessite Ollama + mistral-nemo, ~3h/552 offres
 ollama pull mistral-nemo
 python3 extraction_skills.py
+
+# Snapshot hebdomadaire (Phase 5) — calcule 8 métriques et les ajoute à
+# data/snapshots/marche_hebdo.csv. Automatisé via GitHub Actions (cron
+# lundi 6h UTC) ; peut aussi être lancé manuellement.
+python3 snapshot_hebdo.py
 ```
 
 Chaque exécution produit un fichier horodaté distinct : rien n'est écrasé, l'historique des runs est conservé.
@@ -179,6 +209,7 @@ L'écart entre offres brutes (1 094) et ID uniques (552) est **attendu** : une m
 | dbt-duckdb | 1.10.1 | |
 | DuckDB | 1.5.4 | OLAP colonnaire in-process, zero-copy Arrow/Pandas. Un projet de cette taille s'exécute en quelques secondes sur un ordinateur portable — un recruteur clone et lance sans setup serveur. |
 | Ollama + Mistral-Nemo 12B | | Extraction de compétences structurées, en local. Coût nul, aucune clé API requise pour reproduire le pipeline. |
+| GitHub Actions | | Automatisation du pull hebdomadaire. Runner jetable : seul le snapshot agrégé persiste entre deux runs. |
 | Python | 3.13 | requests, python-dotenv, duckdb, pydantic, ollama |
 
 **Réserve assumée** : DuckDB 1.5.4 porte un bug connu de l'optimiseur sur `IN()`/`NOT IN()` à plusieurs valeurs à l'intérieur d'une vue interrogée (`INTERNAL Error: Attempted to access index...`). Contournement systématique : conditions `=`/`!=` chaînées par `OR`/`AND`, appliqué à tout le code SQL du projet. Le coût est réel, documenté ici plutôt que caché — c'est le genre de compromis qu'un entretien technique cherche à faire émerger.
@@ -187,11 +218,11 @@ L'écart entre offres brutes (1 094) et ID uniques (552) est **attendu** : une m
 
 ## Roadmap
 
-- [x] **Phase 1 — Ingestion** — API France Travail, OAuth2, dédoublonnage. 552 offres uniques.
+- [x] **Phase 1 — Ingestion** — API France Travail, OAuth2, dédoublonnage. 552 offres uniques (dump de référence).
 - [x] **Phase 2 — Socle dbt** — staging, intermediate, marts, tests. `fct_offre` exposée et testée.
 - [x] **Phase 3 — Enrichissement** — matching SIRENE/DINUM (80,3 %), `dim_entreprise`.
-- [~] **Phase 4 — Extraction skills** — schéma d'extraction structuré, comparaison de modèles, `fct_offre_technologie` / `fct_offre_domaine`.
-- [ ] **Phase 5 — Snapshot & historique** — `fct_marche_hebdo`, automatisation GitHub Actions.
+- [x] **Phase 4 — Extraction skills** — schéma d'extraction structuré, comparaison de modèles, `fct_offre_technologie` / `fct_offre_domaine`. Reclassification `INTERMEDIAIRE_reclasse` (21 offres, texte libre) en aval.
+- [~] **Phase 5 — Snapshot & historique** — GitHub Actions opérationnel (cron hebdo + déclenchement manuel), dégradation CI sans LLM vérifiée dans les deux sens, premier run réel réussi. `fct_marche_hebdo` (mart dbt exposant l'historique) pas encore construit — en attente de plusieurs semaines de snapshots pour être utile.
 - [ ] **Phase 6 — Restitution** — dashboard, tests de qualité continus (Elementary).
 
 ---
@@ -205,9 +236,10 @@ Un projet honnête documente ce qu'il ne sait pas résoudre plutôt que de le ca
 - **EY non matché** (28 offres, 13 %) — sigle commercial absent du répertoire SIRENE, aucun critère fiable pour départager les 5+ entités juridiques du groupe. Non matché volontairement plutôt que par une règle arbitraire.
 - **Consolidation groupe sur homonymes** (27 cas) — les filiales portant un nom identique à leur maison mère sont rattachées à la plus grande structure (`nombre_etablissements` maximal), un choix justifié par l'objectif analytique (caractériser le type de structure qui recrute), pas une approximation cachée. Statut distinct en base pour filtrer ce comportement si besoin.
 - **Extraction LLM sur le champ `domaines`** — le modèle retenu (Mistral-Nemo) sous-extrait ce champ sur les annonces de conseil en stratégie, au bénéfice d'une bien meilleure fiabilité sur le champ `technologies`, jugé prioritaire pour l'objectif du projet.
-- **Bornes de plausibilité salariale** — établies uniquement pour les salaires annuels (152 offres mesurées). Les salaires horaires et mensuels (19 et 1 offres respectivement) sont trop peu nombreux pour fonder une règle statistique défendable ; la question est différée à la Phase 5, quand l'historique aura grossi l'échantillon.
+- **Bornes de plausibilité salariale** — établies uniquement pour les salaires annuels (152 offres mesurées). Les salaires horaires et mensuels (19 et 1 offres respectivement) sont trop peu nombreux pour fonder une règle statistique défendable ; la question reste différée tant que l'échantillon ne grossit pas (revérifié sans changement en Session 7).
+- **Snapshot automatisé sans extraction LLM** — le runner GitHub Actions ne peut pas exécuter Ollama (~3h/552 offres). Le snapshot hebdomadaire produit par le cron ne comporte donc jamais `top_technologie` ni la reclassification `INTERMEDIAIRE_reclasse` (valeurs marquées explicitement "non disponible (CI)" plutôt que silencieusement fausses ou absentes). Ces deux métriques restent disponibles uniquement après un run manuel en local, extraction Ollama à jour.
 
 ## Suite prévue
 
-- **Phase 5** : snapshot hebdomadaire (`fct_marche_hebdo`), automatisation via GitHub Actions.
-- **Phase 6** : dashboard, tests de qualité continus, README enrichi des enseignements finaux.
+- **Phase 5** : `fct_marche_hebdo`, une fois l'historique de snapshots suffisant pour en tirer des comparaisons semaine sur semaine.
+- **Phase 6** : dashboard, tests de qualité continus (Elementary — a besoin de cet historique pour détecter des dérives), README enrichi des enseignements finaux.
