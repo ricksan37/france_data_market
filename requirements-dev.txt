@@ -1,0 +1,13 @@
+# Dépendances de développement — Observatoire du Marché Data France
+# Installation :  pip install -r requirements-dev.txt
+# (installe automatiquement requirements.txt via la ligne -r ci-dessous)
+#
+# Séparées de requirements.txt à dessein : le workflow CI
+# (.github/workflows/pull_hebdo.yml) installe uniquement requirements.txt.
+# Jupyter/matplotlib n'ont aucun usage sur un runner GitHub Actions —
+# les y ajouter ralentirait chaque run hebdomadaire sans bénéfice.
+-r requirements.txt
+
+jupyter==1.1.1               # notebooks/, exploration interactive
+matplotlib==3.10.0            # visualisation dans les notebooks
+pandas==2.2.3               # DataFrames pour l'exploration (con.execute(...).df())
