@@ -47,6 +47,19 @@ jobs:
           CI_SANS_EXTRACTION: "true"
         run: dbt build
 
+      - name: Génération du rapport HTML (Phase 6a)
+        # dashboard/rapport.html est gitignoré (artefact régénérable, comme
+        # warehouse.duckdb) -- jamais commité. Exporté comme artifact GitHub
+        # Actions pour rester consultable depuis l'onglet Actions du run,
+        # sans polluer l'historique git à chaque exécution hebdomadaire.
+        run: python3 dashboard/generer_rapport.py
+      - name: Upload du rapport en artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapport-marche-data
+          path: dashboard/rapport.html
+          retention-days: 90
+
       - name: Calcul du snapshot hebdomadaire
         run: python3 snapshot_hebdo.py
 
