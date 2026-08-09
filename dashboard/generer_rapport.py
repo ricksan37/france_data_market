@@ -4,11 +4,16 @@ actuel du marché data France (552 offres). Lit warehouse.duckdb en lecture
 seule, exécute les 8 requêtes documentées dans requetes.sql, produit une
 figure Plotly par requête, assemble le tout dans template_rapport.html.
 
-Dégradation propre (CI_SANS_EXTRACTION) : détectée par DataFrame vide plutôt
-que par relecture de la variable d'environnement -- plus robuste, mesure
-l'état réel des données plutôt qu'un signal indirect (cf. Session 7).
-Concerne uniquement les 2 requêtes dépendant de stg_offres_skills
-(SKILLS_TOP10, DOMAINES_CLUSTERS).
+Dégradation propre (CI_SANS_EXTRACTION) : détectée par résultat vide (liste
+de longueur 0) plutôt que par relecture de la variable d'environnement --
+plus robuste, mesure l'état réel des données plutôt qu'un signal indirect
+(cf. Session 7). Concerne uniquement les 2 requêtes dépendant de
+stg_offres_skills (SKILLS_TOP10, DOMAINES_CLUSTERS).
+
+Pas de dépendance pandas/numpy (Session 7, correction) : ces paquets sont
+réservés au dev local (requirements-dev.txt, décision Session 6) et absents
+du runner CI. duckdb.execute(sql).fetchall() suffit, aucune conversion
+DataFrame nécessaire pour ce script.
 
 Usage : depuis la racine du repo, venv actif :
     python3 dashboard/generer_rapport.py
@@ -34,11 +39,27 @@ MESSAGE_INDISPONIBLE = (
 
 
 def executer(con: duckdb.DuckDBPyConnection, sql: str):
-    """Exécute une requête et retourne un DataFrame pandas."""
-    return con.execute(sql).df()
+    """
+    Exécute une requête et retourne une liste de dictionnaires (une entrée
+    par ligne), sans dépendre de pandas. pandas/numpy sont volontairement
+    exclus de requirements.txt (Session 6 : réservés au dev local via
+    requirements-dev.txt) -- .df() les importe implicitement et casse sur un
+    runner CI minimal (ModuleNotFoundError: numpy, découvert Session 7).
+    duckdb expose .description (noms de colonnes) et .fetchall() (tuples)
+    nativement, sans dépendance externe.
+    """
+    curseur = con.execute(sql)
+    colonnes = [c[0] for c in curseur.description]
+    lignes = curseur.fetchall()
+    return [dict(zip(colonnes, ligne)) for ligne in lignes]
 
 
-def chart_column(df, x_col: str, y_col: str, titre: str, y_titre: str = "",
+def colonne(lignes: list, nom: str) -> list:
+    """Extrait une colonne d'une liste de dicts, équivalent de df[col]."""
+    return [ligne[nom] for ligne in lignes]
+
+
+def chart_column(lignes: list, x_col: str, y_col: str, titre: str, y_titre: str = "",
                   couleurs_barres=None, hauteur: int = 420):
     """
     Column chart standard : une série, Signal Blue par défaut, labels mono
@@ -53,11 +74,13 @@ def chart_column(df, x_col: str, y_col: str, titre: str, y_titre: str = "",
     Green. Negative delta -> Vermilion.") -- jamais pour varier la couleur
     sans signification, ce qui casse la règle "fixed hue per série".
     """
+    x_vals = colonne(lignes, x_col)
+    y_vals = colonne(lignes, y_col)
     fig = go.Figure(
         go.Bar(
-            x=df[x_col],
-            y=df[y_col],
-            text=df[y_col],
+            x=x_vals,
+            y=y_vals,
+            text=y_vals,
             textposition="outside",
             textfont=dict(family="'SF Mono', 'Consolas', 'Monaco', monospace", size=10),
             marker_color=couleurs_barres if couleurs_barres else BLUE,
@@ -125,7 +148,7 @@ def generer():
             ) as taux_couverture_pct
             from fct_offre_domaine
         """)
-        taux = df_couverture["taux_couverture_pct"].iloc[0]
+        taux = df_couverture[0]["taux_couverture_pct"]
         couverture_html = big_stat_html(
             f"{taux:.1f}%",
             "Taux de couverture du mapping de domaines (longue traîne non mappée volontairement)"
@@ -153,7 +176,7 @@ def generer():
     # E (expérience exigée) représente une progression de +8000€ par rapport
     # à D (débutant accepté) -- pas une variation de couleur arbitraire, un
     # vrai delta mesuré (cf. notebook Session 7).
-    couleurs_exp = [VERMILION if niveau == "D" else GREEN for niveau in df_salaire_exp["experience_exige"]]
+    couleurs_exp = [VERMILION if niveau == "D" else GREEN for niveau in colonne(df_salaire_exp, "experience_exige")]
     fig_salaire_exp = chart_column(df_salaire_exp, "experience_exige", "salaire_median",
                                     "SALAIRE PAR EXPÉRIENCE EXIGÉE", "Salaire médian annuel (€)",
                                     couleurs_barres=couleurs_exp)
@@ -163,7 +186,7 @@ def generer():
         select round(100.0 * count(case when salaire_mentionne then 1 end) / nullif(count(*), 0), 1) as taux_transparence_pct
         from fct_offre
     """)
-    taux_transp = df_transparence_globale["taux_transparence_pct"].iloc[0]
+    taux_transp = df_transparence_globale[0]["taux_transparence_pct"]
     transparence_html = big_stat_html(f"{taux_transp:.1f}%", "Offres avec salaire affiché (552 offres)")
 
     df_transparence_cat = executer(con, """
