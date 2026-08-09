@@ -2,10 +2,11 @@
 __pycache__/
 *.pyc
 *.duckdb
-*.duckdb
 data/raw/*.json
 docs/
 .DS_Store
 .venv/
 logs/
 .ipynb_checkpoints/
+dashboard/rapport.html
+CLAUDE.md

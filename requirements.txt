@@ -14,3 +14,4 @@ dbt-duckdb==1.10.1
 duckdb==1.5.4               # épinglé : bug optimiseur connu, voir commentaire ci-dessus
 pydantic==2.12.5            # schémas d'extraction LLM (Phase 4)
 ollama==0.6.2                # client local pour l'extraction skills (Phase 4)
+plotly==6.9.0
