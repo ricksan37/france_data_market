@@ -4,7 +4,7 @@ Pipeline analytique qui ingère les offres d'emploi data du marché français de
 
 Projet de portfolio pour une transition vers l'**Analytics Engineering**. L'accent est mis sur une chaîne **claire, traçable et honnête sur ses limites** — plus que sur le volume : chaque choix (périmètre, dédoublonnage, matching, modèle LLM) est justifié par une mesure, pas par une intuition, et documenté comme tel.
 
-> **Statut** — Phases 1 à 4 terminées. Phase 5 (automatisation) opérationnelle : premier run réel exécuté avec succès (8 août 2026), cron hebdomadaire actif chaque lundi.
+> **Statut** — Phases 1 à 4 terminées. Phase 5 (automatisation) opérationnelle : cron hebdomadaire actif chaque lundi. Phase 6a (restitution) livrée : rapport HTML statique, régénéré à chaque run.
 
 ---
 
@@ -25,6 +25,15 @@ Pour extraire les compétences techniques du texte libre des annonces, trois mod
 ### Une source figée sur un nom de fichier, invisible jusqu'au premier run automatisé
 
 `_sources.yml` pointait sur un dump JSON nommé explicitement (`offres_2026-07-17_1403.json`). En usage manuel, ça ne posait jamais problème : c'était moi qui décidais quand relancer l'ingestion, et je savais qu'il fallait mettre le nom à jour. Automatiser le pull hebdomadaire (GitHub Actions) a exposé ce couplage silencieux : sans intervention, le pipeline aurait reconstruit indéfiniment le même jeu de 552 offres du 17 juillet, quel que soit ce que l'ingestion venait de ramener. Corrigé en passant à un motif (`offres_*.json`) plutôt qu'un nom figé — sans toucher à la règle de dédoublonnage déjà en place (`qualify row_number()... order by date_actualisation desc`, Session 1), qui gérait déjà, par construction, le cas de plusieurs dumps qui se chevauchent, avant même que le besoin existe. Un bug qui n'existait que dans un scénario d'exécution non supervisée — visible uniquement lors d'un run automatisé réel, pas à la relecture du code.
+
+---
+
+## Restitution : un rapport qui dégrade proprement, jamais silencieusement
+ 
+Le rapport HTML (`dashboard/rapport.html`, régénéré à chaque run dbt) a été tranché contre Streamlit et une SPA React : un fichier statique auto-contenu correspond à l'usage réel (portfolio consultable sans setup) et se construit plus simplement en HTML/CSS natif qu'en la forçant dans un framework qui a son propre système de thème.
+ 
+**Limite assumée, pas cachée** : l'extraction LLM (Ollama, ~5h en local) ne tourne jamais sur le runner GitHub Actions. Deux sections du rapport (Skills Demand, Domaines) dépendent de cette extraction et sont donc **systématiquement
+vides sur tout rapport généré automatiquement** — le pipeline le détecte (résultat de requête vide plutôt qu'une variable d'environnement relue en aval, plus robuste) et affiche un message explicite au lieu d'un graphique cassé ou d'une erreur silencieuse. Ces deux sections sont volontairement placées en fin de rapport plutôt qu'en tête, pour que le rapport généré en CI (le cas le plus fréquent) s'ouvre sur des sections toujours peuplées. Le rapport complet, avec ces deux sections remplies, s'obtient uniquement en le générant en local après un run de `extraction_skills.py`.
 
 ---
 

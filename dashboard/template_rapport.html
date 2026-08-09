@@ -93,6 +93,14 @@
         margin-bottom: 20px;
     }}
 
+    .note-extraction {{
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--paper-muted);
+        margin-bottom: 16px;
+        margin-top: -8px;
+    }}
+
     .grille {{
         display: grid;
         grid-template-columns: repeat(2, 1fr);
@@ -176,24 +184,7 @@
     </header>
 
     <section>
-        <div class="section-kicker">01 — SKILLS DEMAND</div>
-        <h2>Technologies les plus demandées</h2>
-        <div class="grille-pleine">
-            <div class="carte">{chart_skills}</div>
-        </div>
-    </section>
-
-    <section>
-        <div class="section-kicker">02 — DOMAINES</div>
-        <h2>Domaines d'intervention</h2>
-        <div class="grille">
-            <div class="carte">{chart_domaines}</div>
-            {stat_couverture}
-        </div>
-    </section>
-
-    <section>
-        <div class="section-kicker">03 — SALARY INTELLIGENCE</div>
+        <div class="section-kicker">01 — SALARY INTELLIGENCE</div>
         <h2>Rémunération</h2>
         <div class="grille">
             <div class="carte">{chart_salaire_cat}</div>
@@ -202,7 +193,7 @@
     </section>
 
     <section>
-        <div class="section-kicker">04 — TRANSPARENCE SALARIALE</div>
+        <div class="section-kicker">02 — TRANSPARENCE SALARIALE</div>
         <h2>Affichage du salaire dans les offres</h2>
         <div class="grille">
             {stat_transparence}
@@ -211,16 +202,36 @@
     </section>
 
     <section>
-        <div class="section-kicker">05 — GÉOGRAPHIE</div>
+        <div class="section-kicker">03 — GÉOGRAPHIE</div>
         <h2>Répartition géographique des offres</h2>
         <div class="grille-pleine">
             <div class="carte">{chart_geo}</div>
         </div>
     </section>
 
+    <section>
+        <div class="section-kicker">04 — SKILLS DEMAND</div>
+        <h2>Technologies les plus demandées</h2>
+        <p class="note-extraction">Dépend de l'extraction LLM (Ollama, local uniquement) — indisponible sur un run automatisé CI, cf. README.</p>
+        <div class="grille-pleine">
+            <div class="carte">{chart_skills}</div>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-kicker">05 — DOMAINES</div>
+        <h2>Domaines d'intervention</h2>
+        <p class="note-extraction">Dépend de l'extraction LLM (Ollama, local uniquement) — indisponible sur un run automatisé CI, cf. README.</p>
+        <div class="grille">
+            <div class="carte">{chart_domaines}</div>
+            {stat_couverture}
+        </div>
+    </section>
+
     <footer>
         Observatoire du Marché Data France — pipeline dbt + DuckDB, enrichissement SIRENE (DINUM), extraction LLM (Ollama, mistral-nemo).
-        Rapport généré automatiquement, régénéré à chaque run dbt.
+        Rapport généré automatiquement, régénéré à chaque run dbt. Les sections Skills Demand et Domaines nécessitent un run local
+        avec extraction LLM (absente sur runner CI, cf. CI_SANS_EXTRACTION) — toujours vides sur un rapport généré automatiquement.
     </footer>
 
 </div>
