@@ -217,17 +217,23 @@ def generer():
     con.close()
 
     # --- Assemblage ---
+    # include_plotlyjs="inline" sur la PREMIÈRE figure seulement : embarque
+    # le JS Plotly complet directement dans le HTML (pas de CDN, fonctionne
+    # en ouverture file:// -- corrige "Plotly is not defined" observé quand
+    # le fichier est ouvert par double-clic plutôt que servi en HTTP, où un
+    # <script src="cdn..."> ne charge pas de façon fiable avant que les
+    # figures suivantes en aient besoin, cf. Session 7).
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     rendu = template.format(
         date_generation=datetime.now(timezone.utc).strftime("%d/%m/%Y à %H:%M UTC"),
-        chart_skills=pio.to_html(fig_skills, include_plotlyjs="cdn", full_html=False, config={"displayModeBar": False}),
-        chart_domaines=pio.to_html(fig_domaines, include_plotlyjs=False, full_html=False, config={"displayModeBar": False}),
-        stat_couverture=couverture_html,
-        chart_salaire_cat=pio.to_html(fig_salaire_cat, include_plotlyjs=False, full_html=False, config={"displayModeBar": False}),
+        chart_salaire_cat=pio.to_html(fig_salaire_cat, include_plotlyjs="inline", full_html=False, config={"displayModeBar": False}),
         chart_salaire_exp=pio.to_html(fig_salaire_exp, include_plotlyjs=False, full_html=False, config={"displayModeBar": False}),
         stat_transparence=transparence_html,
         chart_transparence_cat=pio.to_html(fig_transparence_cat, include_plotlyjs=False, full_html=False, config={"displayModeBar": False}),
         chart_geo=pio.to_html(fig_geo, include_plotlyjs=False, full_html=False, config={"displayModeBar": False}),
+        chart_skills=pio.to_html(fig_skills, include_plotlyjs=False, full_html=False, config={"displayModeBar": False}),
+        chart_domaines=pio.to_html(fig_domaines, include_plotlyjs=False, full_html=False, config={"displayModeBar": False}),
+        stat_couverture=couverture_html,
     )
 
     SORTIE_PATH.write_text(rendu, encoding="utf-8")
