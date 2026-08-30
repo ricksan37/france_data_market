@@ -66,7 +66,12 @@ def calculer_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
         "nb_offres_total": nb_total,
         "nb_anonyme": nb_par_categorie.get("ANONYME", 0),
         "nb_intermediaire": nb_par_categorie.get("INTERMEDIAIRE", 0),
-        "nb_intermediaire_reclasse": nb_par_categorie.get("INTERMEDIAIRE_reclasse", 0),
+        # En CI_SANS_EXTRACTION, INTERMEDIAIRE_reclasse n'existe pas : la
+        # reclassification dépend des champs d'extraction LLM, absents du runner.
+        # Renvoyer 0 ferait passer une absence pour une mesure nulle -- une courbe
+        # 21 -> 0 -> 0 se lit comme un effondrement. get() sans défaut renvoie None,
+        # que DictWriter écrit en cellule vide : absence explicite, jamais silencieuse.
+        "nb_intermediaire_reclasse": nb_par_categorie.get("INTERMEDIAIRE_reclasse"),
         "nb_employeur_direct": nb_par_categorie.get("EMPLOYEUR_DIRECT", 0),
         "salaire_median_annuel": salaire_median,
         "top_technologie": top_technologie,
