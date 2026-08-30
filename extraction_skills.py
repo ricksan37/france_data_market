@@ -19,7 +19,8 @@ annees_experience_min. Le rapport gain/risque s'inverse — 'technologies' est l
 champ prioritaire du projet et il est fiable.
 
 Lancement : depuis la RACINE du repo -> python3 extraction_skills.py
-Durée attendue : ~3 h pour 552 offres (19 s/offre mesurées sur échantillon).
+Reprise incrémentale : seules les offres absentes des dumps précédents sont
+traitées. Durée mesurée en S6 : 34,5 s/offre (317 min pour 552 offres).
 """
 
 import json
@@ -132,6 +133,50 @@ Texte de l'offre :
 ---"""
 
 
+def charger_ids_deja_extraits() -> set[str]:
+    """Union des offre_id de tous les dumps d'extraction precedents.
+
+    Lit un motif et non un nom fige : c'est ce couplage qui aurait fait
+    reconstruire indefiniment les 552 offres de juillet cote source `raw`
+    (bug Phase 5). Un dump de plus doit enrichir la reprise, jamais la casser.
+    """
+    ids: set[str] = set()
+    for chemin in sorted(DOSSIER_SORTIE.glob("extraction_skills_*.json")):
+        with open(chemin, encoding="utf-8") as fh:
+            dump = json.load(fh)
+        ids.update(
+            resultat["offre_id"]
+            for resultat in dump.get("resultats", [])
+            if resultat.get("offre_id")
+        )
+    return ids
+
+
+def ecrire_dump(chemin: Path, resultats: list, echecs: list, duree: float) -> None:
+    """Ecrit le dump {metadata, resultats}, structure commune aux dumps FT et DINUM.
+
+    Appelee periodiquement et pas seulement en fin de run : un plantage a H+3
+    sur 4 h de traitement ne doit pas couter 4 h. Le fichier partiel est relu
+    au lancement suivant par charger_ids_deja_extraits() -- checkpoint et
+    reprise sont le meme mecanisme, ecrit une fois.
+    """
+    dump = {
+        "metadata": {
+            "date_execution": datetime.now().isoformat(),
+            "modele": MODELE,
+            "population_cible": "fct_offre, offres sans extraction anterieure (reprise incrementale)",
+            "nb_offres": len(resultats),
+            "nb_echecs": len(echecs),
+            "offres_en_echec": echecs,
+            "duree_secondes": round(duree, 1),
+            "duree_moyenne_par_offre": round(duree / len(resultats), 1) if resultats else None,
+        },
+        "resultats": resultats,
+    }
+    with open(chemin, "w", encoding="utf-8") as fh:
+        json.dump(dump, fh, ensure_ascii=False, indent=2)
+
+
 def charger_offres() -> list[tuple[str, str, str]]:
     """Lit fct_offre plutôt que stg_ft_offres.
 
@@ -147,7 +192,18 @@ def charger_offres() -> list[tuple[str, str, str]]:
         order by offre_id
     """).fetchall()
     con.close()
-    return offres
+
+    # Filtre EN PYTHON, jamais par un `not in` SQL : un IN() a plusieurs
+    # centaines de valeurs fait planter l'optimiseur DuckDB (bug Session 3,
+    # version-independant). Une comparaison de sets contourne le sujet.
+    deja_extraites = charger_ids_deja_extraits()
+    nouvelles = [offre for offre in offres if offre[0] not in deja_extraites]
+
+    print(f"fct_offre            : {len(offres)}")
+    print(f"Deja extraites       : {len(deja_extraites)}")
+    print(f"A extraire ce run    : {len(nouvelles)}\n")
+
+    return nouvelles
 
 
 def extraire_une_offre(description: str) -> ExtractionOffre:
@@ -164,9 +220,19 @@ def extraire_une_offre(description: str) -> ExtractionOffre:
 def main() -> None:
     offres = charger_offres()
     total = len(offres)
-    print(f"Offres a traiter : {total}")
+
+    # "Rien a faire" est un etat normal d'un script incremental, pas une
+    # erreur. Sortir ici evite en prime la division par zero du calcul de
+    # duree moyenne en fin de dump.
+    if total == 0:
+        print("Rien a extraire : toutes les offres de fct_offre ont un resultat.")
+        return
+
     print(f"Modele           : {MODELE}")
-    print(f"Duree estimee    : {total * 19 / 60:.0f} minutes\n")
+    print(f"Duree estimee    : {total * 34.5 / 60:.0f} minutes (34,5 s/offre mesurees en S6)\n")
+
+    horodatage = datetime.now().strftime("%Y-%m-%d_%H%M")
+    chemin_sortie = DOSSIER_SORTIE / f"extraction_skills_{horodatage}.json"
 
     resultats = []
     echecs = []
@@ -212,29 +278,13 @@ def main() -> None:
             print(f"[{i:3}/{total}] {ecoule / 60:5.1f} min ecoulees | "
                   f"~{reste / 60:5.1f} min restantes | echecs : {len(echecs)}")
 
+        # Checkpoint toutes les 25 offres (~14 min). Voir ecrire_dump().
+        if i % 25 == 0:
+            ecrire_dump(chemin_sortie, resultats, echecs, time.time() - debut_total)
+
     duree_totale = time.time() - debut_total
 
-    horodatage = datetime.now().strftime("%Y-%m-%d_%H%M")
-    chemin_sortie = DOSSIER_SORTIE / f"extraction_skills_{horodatage}.json"
-
-    # Structure {metadata, resultats} identique aux dumps France Travail et
-    # DINUM : traçabilité de l'exécution, pas seulement des données.
-    dump = {
-        "metadata": {
-            "date_execution": datetime.now().isoformat(),
-            "modele": MODELE,
-            "population_cible": "fct_offre (toutes les offres)",
-            "nb_offres": total,
-            "nb_echecs": len(echecs),
-            "offres_en_echec": echecs,
-            "duree_secondes": round(duree_totale, 1),
-            "duree_moyenne_par_offre": round(duree_totale / total, 1),
-        },
-        "resultats": resultats,
-    }
-
-    with open(chemin_sortie, "w", encoding="utf-8") as fh:
-        json.dump(dump, fh, ensure_ascii=False, indent=2)
+    ecrire_dump(chemin_sortie, resultats, echecs, duree_totale)
 
     print(f"\n{'=' * 70}")
     print(f"Termine en {duree_totale / 60:.1f} minutes")
