@@ -13,6 +13,17 @@ sources:
     tables:
       - name: dinum_entreprises
 
+  # Sortie de snapshot_hebdo.py, donc une SOURCE au meme titre que les dumps
+  # JSON -- pas un seed. Les deux seeds du projet (mapping_domaines,
+  # mapping_communes) sont des tables de correspondance maintenues a la main ;
+  # ce fichier-ci est ecrit par un script a chaque run. Le critere est l'auteur
+  # du fichier, pas son extension.
+  - name: historique
+    meta:
+      external_location: "read_csv_auto('../data/snapshots/marche_hebdo.csv')"
+    tables:
+      - name: marche_hebdo
+
   - name: extraction
     meta:
       external_location: "read_json_auto('../data/raw/extraction_skills_*.json')"

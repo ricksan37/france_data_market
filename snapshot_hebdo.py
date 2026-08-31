@@ -13,7 +13,7 @@ Lancement : depuis la racine du repo -> python3 snapshot_hebdo.py
 """
 
 import csv
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import duckdb
@@ -30,7 +30,21 @@ COLONNES = [
     "nb_employeur_direct",
     "salaire_median_annuel",
     "top_technologie",
+    "extraction_llm",
 ]
+
+
+def lundi_de_la_semaine() -> str:
+    """Cle du snapshot : le lundi de la semaine ISO, pas la date d'execution.
+
+    date.today() faisait de la date du run la cle : trois declenchements
+    manuels le 09/08 ont produit trois lignes distinctes pour une meme
+    semaine, grain que fct_marche_hebdo aurait herite casse. Le lundi reste
+    un axe de dates directement exploitable en graphique, contrairement a
+    une notation "2026-W32".
+    """
+    aujourdhui = date.today()
+    return (aujourdhui - timedelta(days=aujourdhui.weekday())).isoformat()
 
 
 def calculer_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
@@ -62,7 +76,7 @@ def calculer_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
     top_technologie = resultat_top_technologie[0] if resultat_top_technologie else "non disponible (CI)"
 
     return {
-        "semaine": date.today().isoformat(),
+        "semaine": lundi_de_la_semaine(),
         "nb_offres_total": nb_total,
         "nb_anonyme": nb_par_categorie.get("ANONYME", 0),
         "nb_intermediaire": nb_par_categorie.get("INTERMEDIAIRE", 0),
@@ -75,19 +89,41 @@ def calculer_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
         "nb_employeur_direct": nb_par_categorie.get("EMPLOYEUR_DIRECT", 0),
         "salaire_median_annuel": salaire_median,
         "top_technologie": top_technologie,
+        # Deduit du resultat de requete, pas d'une variable d'environnement
+        # relue en aval (meme choix que top_technologie, plus robuste). Sans
+        # cette colonne, une semaine sans champs LLM est indistinguable d'une
+        # semaine ou le LLM n'aurait rien trouve.
+        "extraction_llm": bool(resultat_top_technologie),
     }
 
 
 def ecrire_ligne(snapshot: dict) -> None:
-    """Ajoute une ligne au CSV, en créant le header si le fichier n'existe pas."""
-    CHEMIN_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
-    fichier_existe = CHEMIN_SNAPSHOT.exists()
+    """Upsert par semaine : une semaine = une ligne, la derniere ecriture gagne.
 
-    with open(CHEMIN_SNAPSHOT, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=COLONNES)
-        if not fichier_existe:
-            writer.writeheader()
-        writer.writerow(snapshot)
+    L'ancien mode append laissait trois lignes pour le 09/08 (deux tests
+    workflow_dispatch plus le run reel). Reecrire le fichier entier coute
+    quelques kilo-octets et garantit l'unicite du grain a la source, plutot
+    que de la rattraper par un qualify dans chaque modele aval.
+
+    Une relance en cours de semaine ecrase donc la ligne de la semaine : c'est
+    voulu, la mesure la plus recente est la bonne. Un run local (champs LLM
+    remplis) prend ainsi le pas sur le run CI du lundi, et extraction_llm
+    trace lequel des deux a produit la ligne.
+    """
+    CHEMIN_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
+
+    lignes: dict[str, dict] = {}
+    if CHEMIN_SNAPSHOT.exists():
+        with open(CHEMIN_SNAPSHOT, newline="", encoding="utf-8") as fh:
+            for ligne in csv.DictReader(fh):
+                lignes[ligne["semaine"]] = ligne
+    lignes[snapshot["semaine"]] = snapshot
+
+    with open(CHEMIN_SNAPSHOT, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=COLONNES)
+        writer.writeheader()
+        for semaine in sorted(lignes):
+            writer.writerow(lignes[semaine])
 
 
 def main() -> None:

@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: fct_marche_hebdo
+    description: >
+      Etat hebdomadaire du corpus d'offres. Grain : une ligne par semaine ISO,
+      identifiee par son lundi. Mesure la taille du corpus accumule, PAS le
+      nombre d'offres actives sur le marche a cette date (voir l'en-tete du
+      modele).
+    columns:
+      - name: semaine
+        description: Lundi de la semaine ISO. Cle du grain.
+        data_tests:
+          - unique
+          - not_null
+      - name: nb_offres_total
+        description: Offres dans fct_offre au moment du run, corpus accumule.
+        data_tests:
+          - not_null
+      - name: nb_intermediaire_reclasse
+        description: >
+          Offres reclassees ANONYME vers INTERMEDIAIRE via client_final_masque.
+          NULL (et non 0) sur les semaines produites en CI, ou l'extraction LLM
+          n'a pas tourne : la mesure est indisponible, pas nulle.
+      - name: extraction_llm
+        description: >
+          Vrai si le run qui a produit la ligne disposait des champs
+          d'extraction LLM. Permet de distinguer une mesure absente d'une
+          mesure a zero sur toute colonne qui en depend.

@@ -25,10 +25,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout du repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5  # v5 = Node 24. PAS v6 : v6.0.0 persiste les
+        # identifiants git dans un fichier separe, dont depend le git push final.
 
       - name: Setup Python 3.13
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6  # Node 24
         with:
           python-version: '3.13'
 
@@ -54,7 +55,7 @@ jobs:
         # sans polluer l'historique git à chaque exécution hebdomadaire.
         run: python3 dashboard/generer_rapport.py
       - name: Upload du rapport en artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5  # Node 24
         with:
           name: rapport-marche-data
           path: dashboard/rapport.html
