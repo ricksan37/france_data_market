@@ -55,6 +55,21 @@ jobs:
           CI_SANS_EXTRACTION: "true"
         run: dbt build
 
+      - name: Calcul du snapshot hebdomadaire
+        run: python3 snapshot_hebdo.py
+
+      - name: Rafraîchir le mart d'historique
+        # snapshot_hebdo.py vient d'ajouter la semaine au CSV, que
+        # stg_marche_hebdo lit comme source. Sans ce second build, le rapport
+        # genere juste apres afficherait une serie amputee de la semaine que
+        # le run vient lui-meme de mesurer -- un rapport hebdomadaire en
+        # retard d'une semaine sur lui-meme. Cible restreinte : le reste du
+        # graphe n'a pas bouge depuis le build precedent.
+        working-directory: observatoire
+        env:
+          CI_SANS_EXTRACTION: "true"
+        run: dbt build --select stg_marche_hebdo+
+
       - name: Génération du rapport HTML (Phase 6a)
         # dashboard/rapport.html est gitignoré (artefact régénérable, comme
         # warehouse.duckdb) -- jamais commité. Exporté comme artifact GitHub
@@ -67,9 +82,6 @@ jobs:
           name: rapport-marche-data
           path: dashboard/rapport.html
           retention-days: 90
-
-      - name: Calcul du snapshot hebdomadaire
-        run: python3 snapshot_hebdo.py
 
       - name: Commit et push du snapshot
         run: |
