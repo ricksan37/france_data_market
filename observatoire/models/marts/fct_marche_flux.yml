@@ -27,3 +27,9 @@ models:
         description: >
           Offres presentes la semaine enregistree precedente et absentes de
           celle-ci. NULL sur la premiere semaine : pas de point de comparaison.
+      - name: nb_reapparues
+        description: >
+          Offres presentes cette semaine, absentes de la precedente, mais deja
+          vues plus tot. Elles ne sont ni nouvelles ni survivantes : sans ce
+          terme, le bilan des actives ne se ferme pas. NULL sur la premiere
+          semaine.
