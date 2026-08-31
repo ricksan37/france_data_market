@@ -42,6 +42,13 @@ jobs:
           FT_CLIENT_SECRET: ${{ secrets.FT_CLIENT_SECRET }}
         run: python3 pull_complet.py
 
+      - name: Historique de presence des offres
+        # Doit tourner APRES l'ingestion (il lit le dump fraichement ecrit) et
+        # AVANT dbt build (fct_marche_flux consomme le CSV comme source).
+        # Idempotent : la cle est le couple (semaine, offre_id), donc un
+        # redeclenchement manuel dans la meme semaine n'ajoute aucune ligne.
+        run: python3 presence_offres.py
+
       - name: dbt build
         working-directory: observatoire
         env:
@@ -68,6 +75,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/snapshots/marche_hebdo.csv
+          git add data/snapshots/marche_hebdo.csv data/snapshots/presence_offres.csv
           git diff --staged --quiet && echo "Rien à committer" || git commit -m "Snapshot hebdomadaire automatique"
           git push

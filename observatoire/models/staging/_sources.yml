@@ -24,6 +24,15 @@ sources:
     tables:
       - name: marche_hebdo
 
+  # Sortie de presence_offres.py. Source distincte de `historique` : dans ce
+  # projet, external_location est porte par la source, donc deux fichiers =
+  # deux sources.
+  - name: presence
+    meta:
+      external_location: "read_csv_auto('../data/snapshots/presence_offres.csv')"
+    tables:
+      - name: presence_offres
+
   - name: extraction
     meta:
       external_location: "read_json_auto('../data/raw/extraction_skills_*.json')"

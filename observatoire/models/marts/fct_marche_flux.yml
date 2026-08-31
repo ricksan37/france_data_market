@@ -1,0 +1,29 @@
+version: 2
+
+models:
+  - name: fct_marche_flux
+    description: >
+      Flux hebdomadaire du marche : offres actives, apparues et disparues,
+      mesure sur la presence reelle dans chaque pull France Travail et non sur
+      le corpus accumule de fct_offre. Grain : une semaine enregistree.
+    columns:
+      - name: semaine
+        description: Lundi de la semaine du dump ayant servi a la mesure.
+        data_tests:
+          - unique
+          - not_null
+      - name: semaines_depuis_precedente
+        description: >
+          Ecart en semaines avec la semaine enregistree precedente. A utiliser
+          pour normaliser les taux : un ecart de 6 signifie que taux_sortie_pct
+          couvre six semaines, pas une. NULL sur la premiere semaine.
+      - name: nb_actives
+        description: Offres distinctes presentes dans le pull de cette semaine.
+        data_tests:
+          - not_null
+      - name: nb_nouvelles
+        description: Offres vues pour la premiere fois cette semaine.
+      - name: nb_sorties
+        description: >
+          Offres presentes la semaine enregistree precedente et absentes de
+          celle-ci. NULL sur la premiere semaine : pas de point de comparaison.
