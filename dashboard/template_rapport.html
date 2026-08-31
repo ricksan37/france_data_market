@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Observatoire du Marché Data France — Rapport</title>
 <style>
+{polices}
+
     :root {{
         --void: #0B0C0F;
         --slate: #15171C;
@@ -17,9 +19,9 @@
         --amber: #FFC24B;
         --vermilion: #FF6B5A;
         --green: #4ADE80;
-        --font-titre: 'Arial Black', 'Helvetica Neue', sans-serif;
-        --font-corps: -apple-system, 'Segoe UI', Roboto, sans-serif;
-        --font-mono: 'SF Mono', 'Consolas', 'Monaco', monospace;
+        --font-titre: 'Archivo Black', 'Arial Black', sans-serif;
+        --font-corps: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
     }}
 
     * {{ box-sizing: border-box; margin: 0; padding: 0; }}
@@ -33,17 +35,12 @@
         color: var(--paper);
         font-family: var(--font-corps);
         line-height: 1.65;
-        padding: 48px 24px;
+        padding: 56px 24px;
     }}
 
-    .conteneur {{
-        max-width: 1080px;
-        margin: 0 auto;
-    }}
+    .conteneur {{ max-width: 1080px; margin: 0 auto; }}
 
-    header {{
-        margin-bottom: 48px;
-    }}
+    header {{ margin-bottom: 40px; }}
 
     .kicker {{
         font-family: var(--font-mono);
@@ -51,21 +48,18 @@
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--blue);
-        margin-bottom: 12px;
+        margin-bottom: 14px;
     }}
 
     h1 {{
         font-family: var(--font-titre);
-        font-size: 40px;
+        font-size: 44px;
+        line-height: 1.1;
         letter-spacing: -0.02em;
-        margin-bottom: 8px;
+        margin-bottom: 12px;
     }}
 
-    .sous-titre {{
-        color: var(--paper-muted);
-        font-size: 16px;
-        margin-bottom: 4px;
-    }}
+    .sous-titre {{ color: var(--paper-muted); font-size: 16px; margin-bottom: 6px; }}
 
     .date-generation {{
         font-family: var(--font-mono);
@@ -73,9 +67,7 @@
         color: var(--paper-muted);
     }}
 
-    section {{
-        margin-bottom: 56px;
-    }}
+    section {{ margin-bottom: 52px; }}
 
     .section-kicker {{
         font-family: var(--font-mono);
@@ -83,93 +75,120 @@
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--paper-muted);
-        margin-bottom: 8px;
+        margin-bottom: 6px;
     }}
 
     h2 {{
         font-family: var(--font-titre);
         font-size: 24px;
         letter-spacing: -0.02em;
-        margin-bottom: 20px;
+        margin-bottom: 18px;
     }}
 
-    .note-extraction {{
+    .note-section {{
         font-family: var(--font-mono);
         font-size: 11px;
+        line-height: 1.7;
         color: var(--paper-muted);
-        margin-bottom: 16px;
         margin-top: -8px;
+        margin-bottom: 16px;
     }}
 
-    .grille {{
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 20px;
+    /* Titre de carte. Sorti de la figure Plotly, qui rognait les accents des
+       capitales sur sa propre boite de titre. */
+    .titre-carte {{
+        font-family: var(--font-mono);
+        font-size: 12px;
+        font-weight: 400;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--paper);
+        margin-bottom: 14px;
     }}
 
-    .grille-pleine {{
+    /* align-items: start : sans cela, une carte de statistique se retrouve
+       etiree a la hauteur du graphique voisin et son chiffre flotte au
+       milieu d'un vide. */
+    .grille {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; align-items: start; }}
+    .grille-pleine {{ display: grid; grid-template-columns: 1fr; gap: 20px; }}
+
+    /* Ligne de KPI : quatre grands chiffres avant tout graphique, comme le
+       prescrit la composition dashboard de l'identite. */
+    .grille-kpi {{
         display: grid;
-        grid-template-columns: 1fr;
-        gap: 20px;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 52px;
     }}
 
     .carte {{
         background-color: var(--slate);
         border: 1px solid var(--hairline);
         border-radius: 16px;
-        padding: 24px;
+        padding: 20px 24px;
         overflow: hidden;
     }}
 
-    /* Feature card : une par écran maximum, pour le résultat qui doit
-       ressortir (règle skill "Feature card... one per screen maximum").
-       Ici : le delta salaire par expérience, le signal le plus net du
-       rapport. Bordure plus marquée + fond légèrement relevé, jamais un
+    /* Feature card : une par page au maximum, pour le resultat qui doit
+       ressortir. Fond releve d'un ton et bordure marquee, jamais un
        remplissage accent complet. */
     .carte-feature {{
         background-color: var(--slate-raised);
         border: 1px solid var(--hairline-bright);
     }}
 
+    /* Big stat. Hauteur ajustee au contenu : la version precedente imposait
+       180px de haut a trois lignes de texte, ce qui creusait un vide au
+       milieu de la carte pendant que la carte voisine debordait. */
     .big-stat {{
         background-color: var(--slate);
         border: 1px solid var(--hairline);
         border-radius: 16px;
-        padding: 32px 24px;
-        text-align: center;
+        padding: 22px 20px;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        min-height: 180px;
+        gap: 8px;
     }}
 
     .big-stat-valeur {{
         font-family: var(--font-titre);
-        font-size: 56px;
+        font-size: 40px;
+        line-height: 1;
         letter-spacing: -0.02em;
         color: var(--blue);
-        margin-bottom: 8px;
     }}
 
     .big-stat-libelle {{
         font-family: var(--font-mono);
-        font-size: 11px;
+        font-size: 10px;
+        line-height: 1.6;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
         color: var(--paper-muted);
-        letter-spacing: 0.02em;
     }}
 
+    .big-stat-centre {{ align-items: center; text-align: center; }}
+    .big-stat-centre .big-stat-valeur {{ font-size: 52px; }}
+
     footer {{
-        margin-top: 64px;
-        padding-top: 24px;
+        margin-top: 56px;
+        padding-top: 22px;
         border-top: 1px solid var(--hairline);
         font-family: var(--font-mono);
         font-size: 11px;
+        line-height: 1.8;
         color: var(--paper-muted);
+    }}
+
+    @media (max-width: 860px) {{
+        .grille-kpi {{ grid-template-columns: repeat(2, 1fr); }}
     }}
 
     @media (max-width: 720px) {{
         .grille {{ grid-template-columns: 1fr; }}
-        h1 {{ font-size: 28px; }}
+        .grille-kpi {{ grid-template-columns: 1fr; }}
+        h1 {{ font-size: 30px; }}
     }}
 </style>
 </head>
@@ -179,13 +198,38 @@
     <header>
         <div class="kicker">OBSERVATOIRE — MARCHÉ DATA FRANCE</div>
         <h1>État du marché de l'emploi data en France</h1>
-        <p class="sous-titre">552 offres, France Travail (codes ROME M1405 / M1811), périmètre défini en Phase 1</p>
+        <p class="sous-titre">{nb_offres} offres France Travail, codes ROME M1405 et M1811, périmètre défini en Phase 1</p>
         <p class="date-generation">Généré le {date_generation}</p>
     </header>
 
+    <div class="grille-kpi">
+        {kpi_offres}
+        {kpi_sorties}
+        {kpi_anonymat}
+        {kpi_transparence}
+    </div>
+
     <section>
-        <div class="section-kicker">01 — SALARY INTELLIGENCE</div>
-        <h2>Rémunération</h2>
+        <div class="section-kicker">01 — FLUX DU MARCHÉ</div>
+        <h2>Ce qui apparaît, ce qui disparaît</h2>
+        <p class="note-section">
+            Mesuré sur la présence réelle des offres dans chaque collecte, jamais sur le corpus cumulé.
+            Une offre vue une fois reste dans le corpus pour toujours : sur les 552 offres de juillet, 463 avaient
+            disparu de France Travail six semaines plus tard, et le corpus les comptait encore.
+        </p>
+        <div class="grille">
+            <div class="carte">{chart_flux}</div>
+            <div class="carte">{chart_anonymat}</div>
+        </div>
+    </section>
+
+    <section>
+        <div class="section-kicker">02 — RÉMUNÉRATION</div>
+        <h2>Salaire médian annoncé</h2>
+        <p class="note-section">
+            Calculé sur les seules offres affichant un salaire annuel. La médiane résiste aux valeurs extrêmes,
+            contrairement à la moyenne.
+        </p>
         <div class="grille">
             <div class="carte">{chart_salaire_cat}</div>
             <div class="carte carte-feature">{chart_salaire_exp}</div>
@@ -193,7 +237,7 @@
     </section>
 
     <section>
-        <div class="section-kicker">02 — TRANSPARENCE SALARIALE</div>
+        <div class="section-kicker">03 — TRANSPARENCE SALARIALE</div>
         <h2>Affichage du salaire dans les offres</h2>
         <div class="grille">
             {stat_transparence}
@@ -202,26 +246,31 @@
     </section>
 
     <section>
-        <div class="section-kicker">03 — GÉOGRAPHIE</div>
-        <h2>Répartition géographique des offres</h2>
+        <div class="section-kicker">04 — GÉOGRAPHIE</div>
+        <h2>Répartition géographique</h2>
         <div class="grille-pleine">
             <div class="carte">{chart_geo}</div>
         </div>
     </section>
 
     <section>
-        <div class="section-kicker">04 — SKILLS DEMAND</div>
-        <h2>Technologies les plus demandées</h2>
-        <p class="note-extraction">Dépend de l'extraction LLM (Ollama, local uniquement) — indisponible sur un run automatisé CI, cf. README.</p>
+        <div class="section-kicker">05 — TECHNOLOGIES</div>
+        <h2>Compétences techniques demandées</h2>
+        <p class="note-section">
+            Section alimentée par l'extraction LLM, qui tourne en local et jamais sur un runner CI.
+            Elle est donc systématiquement vide sur un rapport généré automatiquement (voir le README).
+        </p>
         <div class="grille-pleine">
             <div class="carte">{chart_skills}</div>
         </div>
     </section>
 
     <section>
-        <div class="section-kicker">05 — DOMAINES</div>
+        <div class="section-kicker">06 — DOMAINES</div>
         <h2>Domaines d'intervention</h2>
-        <p class="note-extraction">Dépend de l'extraction LLM (Ollama, local uniquement) — indisponible sur un run automatisé CI, cf. README.</p>
+        <p class="note-section">
+            Même dépendance à l'extraction LLM que la section précédente.
+        </p>
         <div class="grille">
             <div class="carte">{chart_domaines}</div>
             {stat_couverture}
@@ -229,9 +278,10 @@
     </section>
 
     <footer>
-        Observatoire du Marché Data France — pipeline dbt + DuckDB, enrichissement SIRENE (DINUM), extraction LLM (Ollama, mistral-nemo).
-        Rapport généré automatiquement, régénéré à chaque run dbt. Les sections Skills Demand et Domaines nécessitent un run local
-        avec extraction LLM (absente sur runner CI, cf. CI_SANS_EXTRACTION) — toujours vides sur un rapport généré automatiquement.
+        Observatoire du Marché Data France. Pipeline dbt et DuckDB, enrichissement SIRENE via l'API Recherche
+        d'entreprises (DINUM), extraction de compétences par LLM local (Ollama, mistral-nemo).
+        Rapport régénéré à chaque exécution du pipeline. Les sections Technologies et Domaines exigent un run local
+        avec extraction LLM, absente du runner CI (CI_SANS_EXTRACTION) : elles restent vides sur tout rapport automatisé.
     </footer>
 
 </div>

@@ -1,208 +1,286 @@
 """
-Génère dashboard/rapport.html : rapport statique Millimeter Dark sur l'état
-actuel du marché data France (552 offres). Lit warehouse.duckdb en lecture
-seule, exécute les 8 requêtes documentées dans requetes.sql, produit une
-figure Plotly par requête, assemble le tout dans template_rapport.html.
+Genere dashboard/rapport.html : rapport statique Millimeter Dark sur l'etat
+du marche data France. Lit warehouse.duckdb en lecture seule, produit une
+figure Plotly par requete, assemble le tout dans template_rapport.html.
 
-Dégradation propre (CI_SANS_EXTRACTION) : détectée par résultat vide (liste
-de longueur 0) plutôt que par relecture de la variable d'environnement --
-plus robuste, mesure l'état réel des données plutôt qu'un signal indirect
-(cf. Session 7). Concerne uniquement les 2 requêtes dépendant de
-stg_offres_skills (SKILLS_TOP10, DOMAINES_CLUSTERS).
+AUCUN CHIFFRE EN DUR (revision Session 8). Le rapport annoncait "552 offres"
+dans son sous-titre et dans un libelle de statistique alors que le corpus en
+comptait 960 : le perimetre etait ecrit en dur a trois endroits. Un projet
+dont l'argument est de mesurer plutot que d'affirmer ne peut pas se permettre
+d'annoncer un chiffre faux sur sa propre page de garde. Tout compte affiche
+vient desormais d'une requete.
 
-Pas de dépendance pandas/numpy (Session 7, correction) : ces paquets sont
-réservés au dev local (requirements-dev.txt, décision Session 6) et absents
-du runner CI. duckdb.execute(sql).fetchall() suffit, aucune conversion
-DataFrame nécessaire pour ce script.
+LIBELLES TRADUITS (revision Session 8). Les axes affichaient les valeurs
+brutes de la base : "D" et "E" pour l'experience, "INTERMEDIAIRE_reclasse"
+pour la categorie d'employeur. La traduction vit ici, en presentation, et
+jamais dans les modeles dbt, qui doivent garder les valeurs canoniques.
 
-Usage : depuis la racine du repo, venv actif :
-    python3 dashboard/generer_rapport.py
+DEGRADATION PROPRE (CI_SANS_EXTRACTION) : detectee par resultat vide plutot
+que par relecture de la variable d'environnement, plus robuste car elle
+mesure l'etat reel des donnees. Concerne uniquement les deux requetes qui
+dependent de stg_offres_skills.
+
+Pas de dependance pandas/numpy : reservees au dev local
+(requirements-dev.txt), absentes du runner CI.
+
+Usage : depuis la racine du repo -> .venv/bin/python3 dashboard/generer_rapport.py
 """
 
-import duckdb
+import base64
 from datetime import datetime, timezone
 from pathlib import Path
 
-from theme_millimeter import figure_vide, BLUE, AMBER, VERMILION, GREEN
+import duckdb
 import plotly.graph_objects as go
 import plotly.io as pio
 
+from theme_millimeter import (
+    figure_vide, chart_barres_horizontales, chart_colonnes,
+    chart_barres_groupees, chart_ligne, BLUE, AMBER,
+)
+
 RACINE = Path(__file__).resolve().parent.parent
+DOSSIER = Path(__file__).resolve().parent
 DB_PATH = RACINE / "data" / "warehouse.duckdb"
-TEMPLATE_PATH = Path(__file__).resolve().parent / "template_rapport.html"
-SORTIE_PATH = Path(__file__).resolve().parent / "rapport.html"
+TEMPLATE_PATH = DOSSIER / "template_rapport.html"
+SORTIE_PATH = DOSSIER / "rapport.html"
+DOSSIER_POLICES = DOSSIER / "fonts"
 
 MESSAGE_INDISPONIBLE = (
     "Section indisponible : extraction LLM non exécutée dans cet environnement "
     "(Ollama ne tourne pas sur un runner CI, cf. CI_SANS_EXTRACTION)"
 )
 
+# Traductions de presentation. Les modeles dbt conservent les valeurs
+# canoniques ; seul l'affichage est humanise.
+LIBELLES_CATEGORIE = {
+    "EMPLOYEUR_DIRECT": "Employeur direct",
+    "INTERMEDIAIRE": "Intermédiaire",
+    "INTERMEDIAIRE_reclasse": "Intermédiaire (reclassé)",
+    "ANONYME": "Employeur masqué",
+}
 
-def executer(con: duckdb.DuckDBPyConnection, sql: str):
+# Nomenclature France Travail du champ experienceExige. Mesure du 31/08 :
+# seules D et E sont presentes dans le corpus, S (souhaitee) est absente.
+LIBELLES_EXPERIENCE = {
+    "D": "Débutant accepté",
+    "E": "Expérience exigée",
+    "S": "Expérience souhaitée",
+}
+
+POLICES_EMBARQUEES = [
+    ("Archivo Black", "ArchivoBlack.woff2", 400),
+    ("Inter", "Inter-Regular.woff2", 400),
+    ("Inter", "Inter-SemiBold.woff2", 600),
+    ("JetBrains Mono", "JetBrainsMono-Regular.woff2", 400),
+]
+
+
+def css_polices() -> str:
+    """Regles @font-face avec les WOFF2 encodes en base64.
+
+    Le rapport doit rester un fichier unique ouvrable hors ligne, et afficher
+    la meme chose partout. Declarer des polices systeme tenait la premiere
+    exigence en sacrifiant la seconde : rendu sur une machine sans Arial
+    Black, les titres de charts perdent leurs accents (mesure du 31/08).
+    Embarquer 50 Ko de WOFF2 tient les deux.
+
+    Absence de fonts/ : on n'echoue pas, on retombe sur les polices systeme
+    en le signalant. Regenerer les polices demande le reseau et fonttools,
+    dont le runner CI ne dispose pas (cf. preparer_polices.py).
     """
-    Exécute une requête et retourne une liste de dictionnaires (une entrée
-    par ligne), sans dépendre de pandas. pandas/numpy sont volontairement
-    exclus de requirements.txt (Session 6 : réservés au dev local via
-    requirements-dev.txt) -- .df() les importe implicitement et casse sur un
-    runner CI minimal (ModuleNotFoundError: numpy, découvert Session 7).
-    duckdb expose .description (noms de colonnes) et .fetchall() (tuples)
-    nativement, sans dépendance externe.
+    regles = []
+    for famille, fichier, graisse in POLICES_EMBARQUEES:
+        chemin = DOSSIER_POLICES / fichier
+        if not chemin.exists():
+            print(f"  ATTENTION : {fichier} absent, repli sur les polices système")
+            return "/* polices non embarquées : dashboard/fonts/ absent */"
+        b64 = base64.b64encode(chemin.read_bytes()).decode("ascii")
+        regles.append(
+            # Accolades simples : cette chaine est passee en argument a
+            # .format(), qui ne retraite pas les valeurs substituees. Les
+            # doubler ici les ferait ressortir litteralement dans le CSS.
+            f"@font-face {{ font-family: '{famille}'; font-weight: {graisse}; "
+            f"font-style: normal; font-display: swap; "
+            f"src: url(data:font/woff2;base64,{b64}) format('woff2'); }}"
+        )
+    return "\n".join(regles)
+
+
+def executer(con, sql: str) -> list:
+    """Execute une requete et retourne une liste de dictionnaires.
+
+    pandas et numpy sont volontairement exclus de requirements.txt : .df()
+    les importe implicitement et casse sur un runner CI minimal (decouvert
+    en Session 7). duckdb expose .description et .fetchall() nativement.
     """
     curseur = con.execute(sql)
     colonnes = [c[0] for c in curseur.description]
-    lignes = curseur.fetchall()
-    return [dict(zip(colonnes, ligne)) for ligne in lignes]
+    return [dict(zip(colonnes, ligne)) for ligne in curseur.fetchall()]
 
 
-def colonne(lignes: list, nom: str) -> list:
-    """Extrait une colonne d'une liste de dicts, équivalent de df[col]."""
-    return [ligne[nom] for ligne in lignes]
+def traduire(lignes: list, colonne: str, dictionnaire: dict) -> list:
+    """Remplace les codes bruts par leurs libelles lisibles."""
+    return [
+        {**ligne, colonne: dictionnaire.get(ligne[colonne], ligne[colonne])}
+        for ligne in lignes
+    ]
 
 
-def chart_column(lignes: list, x_col: str, y_col: str, titre: str, y_titre: str = "",
-                  couleurs_barres=None, hauteur: int = 420):
-    """
-    Column chart standard : une série, Signal Blue par défaut, labels mono
-    au-dessus des barres (règle skill : "Direct labels. Label the data, not
-    a legend"). Hauteur fixée explicitement (plutôt que 100% du conteneur)
-    pour donner à Plotly une zone de dessin stable où calculer ses marges
-    automatiques -- corrige les titres tronqués et le chevauchement observés
-    quand la figure hérite d'une taille trop contrainte par la carte HTML.
-
-    couleurs_barres : liste optionnelle, une couleur par barre. Réservé aux
-    cas où la couleur encode un vrai delta (règle skill : "Positive delta ->
-    Green. Negative delta -> Vermilion.") -- jamais pour varier la couleur
-    sans signification, ce qui casse la règle "fixed hue per série".
-    """
-    x_vals = colonne(lignes, x_col)
-    y_vals = colonne(lignes, y_col)
-    fig = go.Figure(
-        go.Bar(
-            x=x_vals,
-            y=y_vals,
-            text=y_vals,
-            textposition="outside",
-            textfont=dict(family="'SF Mono', 'Consolas', 'Monaco', monospace", size=10),
-            marker_color=couleurs_barres if couleurs_barres else BLUE,
-        )
-    )
-    fig.update_layout(
-        template="millimeter_dark",
-        title=titre,
-        yaxis_title=y_titre,
-        height=hauteur,
-        width=None,  # laisse Plotly s'adapter à la largeur du conteneur HTML
-    )
-    return fig
-
-
-def big_stat_html(valeur: str, libelle: str) -> str:
-    """
-    "Big stat" : pas un chart Plotly, un bloc HTML/CSS direct -- la charte
-    prévoit ce cas pour "un chiffre qui vaut mieux qu'un graphique"
-    (Archivo Black 44-64pt en accent sur carte Slate, jamais accent-remplie).
-    """
+def big_stat_html(valeur: str, libelle: str, centre: bool = False) -> str:
+    """Un chiffre qui vaut mieux qu'un graphique : bloc HTML, pas un chart."""
+    classe = "big-stat big-stat-centre" if centre else "big-stat"
     return f"""
-    <div class="big-stat">
+    <div class="{classe}">
         <div class="big-stat-valeur">{valeur}</div>
         <div class="big-stat-libelle">{libelle}</div>
     </div>
     """
 
 
-def generer():
+def html_figure(fig, premiere: bool = False) -> str:
+    """Titre en HTML puis figure. include_plotlyjs inline sur la premiere seulement.
+
+    Le titre est ecrit hors de la figure, en <h3>, et lu depuis layout.meta ou
+    la fabrique l'a range. Plotly rogne les accents des capitales de son
+    propre titre (mesure du 31/08) ; en HTML, rien ne les rogne, et le
+    libelle prend la meme typographie que le reste de la page.
+
+    Le JS Plotly complet est embarque plutot que charge depuis un CDN : sans
+    cela, l'ouverture par double-clic (file://) donne "Plotly is not defined"
+    (corrige en Session 7).
+    """
+    titre = (fig.layout.meta or {}).get("titre", "")
+    entete = f'<h3 class="titre-carte">{titre}</h3>' if titre else ""
+    return entete + pio.to_html(
+        fig,
+        include_plotlyjs="inline" if premiere else False,
+        full_html=False,
+        config={"displayModeBar": False},
+    )
+
+
+def generer() -> None:
     con = duckdb.connect(str(DB_PATH), read_only=True)
 
-    # --- Section 1 : Skills Demand ---
-    df_skills = executer(con, """
-        select technologie, count(distinct offre_id) as nb_offres
-        from fct_offre_technologie
-        group by technologie
-        order by nb_offres desc
-        limit 10
-    """)
-    if len(df_skills) == 0:
-        fig_skills = figure_vide(MESSAGE_INDISPONIBLE)
-    else:
-        fig_skills = chart_column(df_skills, "technologie", "nb_offres",
-                                   "TOP 10 TECHNOLOGIES DEMANDÉES", "Nombre d'offres")
+    # ---------- Perimetre, mesure et non ecrit en dur ----------
+    nb_offres = executer(con, "select count(*) as n from fct_offre")[0]["n"]
 
-    # --- Section 2 : Domaines ---
-    df_domaines = executer(con, """
-        select domaine_normalise, count(distinct offre_id) as nb_offres
-        from fct_offre_domaine
-        where domaine_normalise in (select distinct domaine_canonique from mapping_domaines)
-        group by domaine_normalise
-        order by nb_offres desc
+    # ---------- KPI ----------
+    taux_transp = executer(con, """
+        select round(100.0 * count(case when salaire_mentionne then 1 end)
+                     / nullif(count(*), 0), 1) as pct
+        from fct_offre
+    """)[0]["pct"]
+
+    hebdo = executer(con, """
+        select semaine, nb_offres_total, taux_anonymat_pct
+        from fct_marche_hebdo
+        order by semaine
     """)
-    if len(df_domaines) == 0:
-        fig_domaines = figure_vide(MESSAGE_INDISPONIBLE)
-        couverture_html = big_stat_html("N/A", "Taux de couverture du mapping (indisponible en CI)")
-    else:
-        fig_domaines = chart_column(df_domaines, "domaine_normalise", "nb_offres",
-                                     "DOMAINES D'INTERVENTION", "Nombre d'offres")
-        df_couverture = executer(con, """
-            select round(
-                100.0 * count(case when domaine_normalise in (select distinct domaine_canonique from mapping_domaines) then 1 end)
-                / nullif(count(*), 0), 1
-            ) as taux_couverture_pct
-            from fct_offre_domaine
-        """)
-        taux = df_couverture[0]["taux_couverture_pct"]
-        couverture_html = big_stat_html(
-            f"{taux:.1f}%",
-            "Taux de couverture du mapping de domaines (longue traîne non mappée volontairement)"
+    taux_anonymat = hebdo[-1]["taux_anonymat_pct"] if hebdo else None
+
+    flux = executer(con, """
+        select semaine, semaines_depuis_precedente, nb_actives,
+               nb_nouvelles, nb_sorties, taux_sortie_pct
+        from fct_marche_flux
+        order by semaine
+    """)
+    # La derniere ligne portant un taux de sortie : NULL sur la premiere
+    # semaine, faute de point de comparaison.
+    sorties = next((l for l in reversed(flux) if l["taux_sortie_pct"] is not None), None)
+
+    kpi_offres = big_stat_html(f"{nb_offres}", "Offres analysées")
+    kpi_transparence = big_stat_html(f"{taux_transp:.1f} %", "Offres affichant un salaire")
+    kpi_anonymat = (
+        big_stat_html(f"{taux_anonymat:.1f} %", "Offres à employeur masqué")
+        if taux_anonymat is not None
+        else big_stat_html("N/A", "Employeur masqué, historique insuffisant")
+    )
+    kpi_sorties = (
+        big_stat_html(
+            f"{sorties['taux_sortie_pct']:.1f} %",
+            f"Offres disparues en {sorties['semaines_depuis_precedente']} semaines",
         )
+        if sorties
+        else big_stat_html("N/A", "Flux, une seule semaine mesurée")
+    )
 
-    # --- Section 3 : Salary Intelligence ---
-    df_salaire_cat = executer(con, """
-        select categorie_employeur, count(offre_id) as nb_offres, median(salaire_min) as salaire_median
+    # ---------- 01 Flux ----------
+    if len(flux) >= 2:
+        # Axe categoriel et non temporel : deux mesures espacees de six
+        # semaines donneraient deux barres filiformes noyees dans du vide.
+        flux_libelle = [{**l, "semaine": l["semaine"].strftime("%d/%m")} for l in flux]
+        fig_flux = chart_barres_groupees(
+            flux_libelle, "semaine",
+            [("nb_nouvelles", "Nouvelles"), ("nb_sorties", "Disparues")],
+            "FLUX HEBDOMADAIRE DES OFFRES",
+        )
+    else:
+        fig_flux = figure_vide("Flux disponible à partir de deux semaines mesurées")
+
+    # Axe categoriel, comme le flux. Sur un axe temporel, Plotly place ses
+    # propres graduations : il affichait "Aug 9, Aug 16, Aug 23, Aug 30" quand
+    # les semaines mesurees sont les 10, 17, 24 et 31 -- des dates fausses,
+    # en anglais, sur un rapport francais.
+    hebdo_libelle = [{**l, "semaine": l["semaine"].strftime("%d/%m")} for l in hebdo]
+    fig_anonymat = chart_ligne(
+        hebdo_libelle, "semaine", "taux_anonymat_pct",
+        "PART DES OFFRES À EMPLOYEUR MASQUÉ", suffixe=" %",
+    )
+
+    # ---------- 02 Remuneration ----------
+    # L'offre 4933945 est exclue : salaire annuel aberrant identifie en
+    # Session 4 (borne de plausibilite, test assert_bornes_salaire_annuel).
+    salaire_cat = traduire(executer(con, """
+        select categorie_employeur, median(salaire_min) as salaire_median
         from fct_offre
         where salaire_periode = 'annuel' and offre_id != '4933945'
         group by categorie_employeur
         order by salaire_median desc
-    """)
-    fig_salaire_cat = chart_column(df_salaire_cat, "categorie_employeur", "salaire_median",
-                                    "SALAIRE PAR CATÉGORIE D'EMPLOYEUR", "Salaire médian annuel (€)")
+    """), "categorie_employeur", LIBELLES_CATEGORIE)
+    fig_salaire_cat = chart_barres_horizontales(
+        salaire_cat, "categorie_employeur", "salaire_median",
+        "SALAIRE MÉDIAN PAR CATÉGORIE D'EMPLOYEUR", suffixe=" €",
+    )
 
-    df_salaire_exp = executer(con, """
-        select experience_exige, count(offre_id) as nb_offres, median(salaire_min) as salaire_median
+    salaire_exp = traduire(executer(con, """
+        select experience_exige, median(salaire_min) as salaire_median
         from fct_offre
         where salaire_periode = 'annuel' and offre_id != '4933945'
         group by experience_exige
-        order by experience_exige
-    """)
-    # Delta encoding légitime (règle skill : "Positive delta -> Green"). Ici
-    # E (expérience exigée) représente une progression de +8000€ par rapport
-    # à D (débutant accepté) -- pas une variation de couleur arbitraire, un
-    # vrai delta mesuré (cf. notebook Session 7).
-    couleurs_exp = [VERMILION if niveau == "D" else GREEN for niveau in colonne(df_salaire_exp, "experience_exige")]
-    fig_salaire_exp = chart_column(df_salaire_exp, "experience_exige", "salaire_median",
-                                    "SALAIRE PAR EXPÉRIENCE EXIGÉE", "Salaire médian annuel (€)",
-                                    couleurs_barres=couleurs_exp)
+        order by salaire_median
+    """), "experience_exige", LIBELLES_EXPERIENCE)
+    # Blue seul : deux barres d'une meme mesure, pas deux series ni un delta.
+    # La version precedente coloriait "debutant" en Vermilion et "experience
+    # exigee" en Green, ce qui detournait le codage positif/negatif de
+    # l'identite pour porter un jugement de valeur sur un niveau d'experience.
+    fig_salaire_exp = chart_colonnes(
+        salaire_exp, "experience_exige", "salaire_median",
+        "SALAIRE MÉDIAN PAR NIVEAU D'EXPÉRIENCE", suffixe=" €", hauteur=364,
+    )
 
-    # --- Section 4 : Transparence salariale ---
-    df_transparence_globale = executer(con, """
-        select round(100.0 * count(case when salaire_mentionne then 1 end) / nullif(count(*), 0), 1) as taux_transparence_pct
-        from fct_offre
-    """)
-    taux_transp = df_transparence_globale[0]["taux_transparence_pct"]
-    transparence_html = big_stat_html(f"{taux_transp:.1f}%", "Offres avec salaire affiché (552 offres)")
-
-    df_transparence_cat = executer(con, """
+    # ---------- 03 Transparence ----------
+    stat_transparence = big_stat_html(
+        f"{taux_transp:.1f} %",
+        f"Offres affichant un salaire, sur {nb_offres} analysées",
+        centre=True,
+    )
+    transparence_cat = traduire(executer(con, """
         select categorie_employeur,
-            count(distinct offre_id) as nb_offres_total,
-            count(distinct case when salaire_mentionne then offre_id end) as nb_avec_salaire,
-            round(100.0 * count(distinct case when salaire_mentionne then offre_id end) / nullif(count(distinct offre_id), 0), 1) as taux_pct
+               round(100.0 * count(distinct case when salaire_mentionne then offre_id end)
+                     / nullif(count(distinct offre_id), 0), 1) as taux_pct
         from fct_offre
         group by categorie_employeur
         order by taux_pct desc
-    """)
-    fig_transparence_cat = chart_column(df_transparence_cat, "categorie_employeur", "taux_pct",
-                                         "TRANSPARENCE PAR CATÉGORIE", "% avec salaire")
+    """), "categorie_employeur", LIBELLES_CATEGORIE)
+    fig_transparence_cat = chart_barres_horizontales(
+        transparence_cat, "categorie_employeur", "taux_pct",
+        "SALAIRE AFFICHÉ, PAR CATÉGORIE", suffixe=" %",
+    )
 
-    # --- Section 5 : Géographie ---
-    df_geo = executer(con, """
+    # ---------- 04 Geographie ----------
+    geo = executer(con, """
         select c.nom_commune, count(distinct o.offre_id) as nb_offres
         from fct_offre o
         left join dim_commune c on c.code_postal = o.code_postal
@@ -211,39 +289,82 @@ def generer():
         order by nb_offres desc
         limit 10
     """)
-    fig_geo = chart_column(df_geo, "nom_commune", "nb_offres",
-                            "TOP 10 COMMUNES PAR NOMBRE D'OFFRES", "Nombre d'offres")
+    fig_geo = chart_barres_horizontales(
+        geo, "nom_commune", "nb_offres", "DIX PREMIÈRES COMMUNES PAR NOMBRE D'OFFRES",
+    )
+
+    # ---------- 05 Technologies ----------
+    skills = executer(con, """
+        select technologie, count(distinct offre_id) as nb_offres
+        from fct_offre_technologie
+        group by technologie
+        order by nb_offres desc
+        limit 10
+    """)
+    fig_skills = (
+        chart_barres_horizontales(skills, "technologie", "nb_offres",
+                                  "DIX TECHNOLOGIES LES PLUS DEMANDÉES")
+        if skills else figure_vide(MESSAGE_INDISPONIBLE)
+    )
+
+    # ---------- 06 Domaines ----------
+    domaines = executer(con, """
+        select domaine_normalise, count(distinct offre_id) as nb_offres
+        from fct_offre_domaine
+        where domaine_normalise in (select distinct domaine_canonique from mapping_domaines)
+        group by domaine_normalise
+        order by nb_offres desc
+    """)
+    if domaines:
+        fig_domaines = chart_barres_horizontales(
+            domaines, "domaine_normalise", "nb_offres", "DOMAINES D'INTERVENTION",
+        )
+        taux_couv = executer(con, """
+            select round(100.0 * count(case when domaine_normalise in
+                       (select distinct domaine_canonique from mapping_domaines)
+                     then 1 end) / nullif(count(*), 0), 1) as pct
+            from fct_offre_domaine
+        """)[0]["pct"]
+        stat_couverture = big_stat_html(
+            f"{taux_couv:.1f} %",
+            "Couverture du mapping de domaines. La longue traîne n'est pas mappée, "
+            "par décision documentée",
+            centre=True,
+        )
+    else:
+        fig_domaines = figure_vide(MESSAGE_INDISPONIBLE)
+        stat_couverture = big_stat_html("N/A", "Couverture du mapping, indisponible en CI",
+                                        centre=True)
 
     con.close()
 
-    # --- Assemblage ---
-    # include_plotlyjs="inline" sur la PREMIÈRE figure seulement : embarque
-    # le JS Plotly complet directement dans le HTML (pas de CDN, fonctionne
-    # en ouverture file:// -- corrige "Plotly is not defined" observé quand
-    # le fichier est ouvert par double-clic plutôt que servi en HTTP, où un
-    # <script src="cdn..."> ne charge pas de façon fiable avant que les
-    # figures suivantes en aient besoin, cf. Session 7).
-    template = TEMPLATE_PATH.read_text(encoding="utf-8")
-    rendu = template.format(
+    rendu = TEMPLATE_PATH.read_text(encoding="utf-8").format(
+        polices=css_polices(),
+        nb_offres=nb_offres,
         date_generation=datetime.now(timezone.utc).strftime("%d/%m/%Y à %H:%M UTC"),
-        chart_salaire_cat=pio.to_html(fig_salaire_cat, include_plotlyjs="inline", full_html=False, config={"displayModeBar": False}),
-        chart_salaire_exp=pio.to_html(fig_salaire_exp, include_plotlyjs=False, full_html=False, config={"displayModeBar": False}),
-        stat_transparence=transparence_html,
-        chart_transparence_cat=pio.to_html(fig_transparence_cat, include_plotlyjs=False, full_html=False, config={"displayModeBar": False}),
-        chart_geo=pio.to_html(fig_geo, include_plotlyjs=False, full_html=False, config={"displayModeBar": False}),
-        chart_skills=pio.to_html(fig_skills, include_plotlyjs=False, full_html=False, config={"displayModeBar": False}),
-        chart_domaines=pio.to_html(fig_domaines, include_plotlyjs=False, full_html=False, config={"displayModeBar": False}),
-        stat_couverture=couverture_html,
+        kpi_offres=kpi_offres,
+        kpi_sorties=kpi_sorties,
+        kpi_anonymat=kpi_anonymat,
+        kpi_transparence=kpi_transparence,
+        chart_flux=html_figure(fig_flux, premiere=True),
+        chart_anonymat=html_figure(fig_anonymat),
+        chart_salaire_cat=html_figure(fig_salaire_cat),
+        chart_salaire_exp=html_figure(fig_salaire_exp),
+        stat_transparence=stat_transparence,
+        chart_transparence_cat=html_figure(fig_transparence_cat),
+        chart_geo=html_figure(fig_geo),
+        chart_skills=html_figure(fig_skills),
+        chart_domaines=html_figure(fig_domaines),
+        stat_couverture=stat_couverture,
     )
-
     SORTIE_PATH.write_text(rendu, encoding="utf-8")
+
     print(f"Rapport généré : {SORTIE_PATH}")
-    print(f"  Skills Demand    : {len(df_skills)} technologies" if len(df_skills) else "  Skills Demand    : indisponible (CI)")
-    print(f"  Domaines         : {len(df_domaines)} clusters" if len(df_domaines) else "  Domaines         : indisponible (CI)")
-    print(f"  Salary (cat.)    : {len(df_salaire_cat)} catégories")
-    print(f"  Salary (exp.)    : {len(df_salaire_exp)} niveaux")
-    print(f"  Transparence     : {taux_transp}% global")
-    print(f"  Géographie       : {len(df_geo)} communes")
+    print(f"  Périmètre       : {nb_offres} offres")
+    print(f"  Semaines flux   : {len(flux)}")
+    print(f"  Semaines corpus : {len(hebdo)}")
+    print(f"  Technologies    : {len(skills) or 'indisponible (CI)'}")
+    print(f"  Domaines        : {len(domaines) or 'indisponible (CI)'}")
 
 
 if __name__ == "__main__":

@@ -11,3 +11,9 @@
 jupyter==1.1.1               # notebooks/, exploration interactive
 matplotlib==3.10.0            # visualisation dans les notebooks
 pandas==2.2.3               # DataFrames pour l'exploration (con.execute(...).df())
+
+# Fabrication des polices embarquees du rapport (dashboard/preparer_polices.py).
+# Dev uniquement : le runner CI lit les .woff2 deja commites, il ne les
+# regenere jamais -- il n'a ni le reseau vers Google Fonts ni ces paquets.
+fonttools==4.60.1
+brotli==1.1.0
