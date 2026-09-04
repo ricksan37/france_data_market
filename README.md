@@ -4,11 +4,11 @@ Pipeline analytique qui ingère les offres d'emploi data du marché français de
 
 Projet de portfolio pour une transition vers l'**Analytics Engineering**. L'accent est mis sur une chaîne **claire, traçable et honnête sur ses limites** — plus que sur le volume : chaque choix (périmètre, dédoublonnage, matching, modèle LLM) est justifié par une mesure, pas par une intuition, et documenté comme tel.
 
-> **Statut** — Phases 1 à 5 terminées. Cron hebdomadaire actif chaque lundi, quatre semaines d'historique de corpus et deux points de flux. Phase 6a livrée : rapport HTML statique dans l'identité Millimeter Dark, régénéré à chaque run. Phase 6b (dashboard interactif) en cours.
+> **Statut** — Phases 1 à 5 terminées. Cron hebdomadaire actif chaque lundi, quatre semaines d'historique de corpus et trois points de flux. Phase 6 en cours : rapport HTML statique livré, README et notebook d'exploration à jour, dashboard interactif et Slim CI restants.
 
 ---
 
-## Six décisions qui illustrent la méthode
+## Sept décisions qui illustrent la méthode
 
 ### Taux de matching entreprise : 19,2 % → 80,3 %
 
@@ -43,6 +43,16 @@ Quinze offres sur 275 portent un salaire annuel implausible : onze à 1 800 €,
 Pire : les onze annonces à 1 800 € étaient toutes classées `ANONYME`. À elles seules, elles créaient un écart salarial apparent de 5 000 € entre employeurs masqués et employeurs directs. Une fois écartées, les trois catégories tombent exactement sur la même médiane, 45 000 €. Ce qui sépare vraiment les catégories n'est pas le salaire, c'est le fait de l'afficher : 53,9 % chez les intermédiaires nommés contre 12,7 % chez les employeurs masqués.
 
 La tentation était de corriger la période, d'autant que la Session 3 avait déjà reclassé « Mensuel > 10 000 € » en annuel sur une zone vide de la distribution, et que la figure symétrique existe ici (rien entre 1 800 et 25 000 €). Mesure du coût avant de céder : reclasser porterait 24 % de la population mensuelle à un seul annonceur, doublerait la population horaire avec la moitié de valeurs nouvelles, et **ne changerait rien à l'annuel**. On abîmerait deux petites populations pour ne rien gagner sur la grande. Un drapeau `salaire_annuel_plausible` exclut donc sans détruire, protégé par un test en `severity: error`.
+
+### Compter des offres ou compter des annonces
+
+Le dédoublonnage de `stg_ft_offres` travaille sur `offre_id` : il écarte les doublons d'index de l'API, pas les campagnes. Or un même poste publié dans plusieurs villes reçoit un identifiant par ville. Mesure : **152 offres sur 960, soit 15,8 % du corpus, partagent leur texte avec au moins une autre**. La plus grosse grappe est un employeur publiant la même annonce dans 24 communes sur sept semaines.
+
+Deux classements de tête s'inversent une fois les campagnes neutralisées. **Python (262) passe devant SQL (235)** alors que les deux semblaient au coude-à-coude, 283 contre 282 — SQL est la compétence la plus générique, donc la plus présente dans les textes standardisés qu'on republie tels quels. Et **l'Analyse de données passe devant la Gouvernance des données**, parce que la plus grosse campagne du corpus était justement un poste de Data Governance Manager.
+
+La signature est l'empreinte du texte normalisé, sans aucun seuil de similarité : deux textes sont identiques ou ils ne le sont pas. Un seuil attraperait davantage — sur onze annonces d'une même campagne, neuf partagent exactement le même texte — mais rien ne permet aujourd'hui d'en défendre un.
+
+Aucune offre n'est supprimée. Trois colonnes exposent le choix, et chaque mesure du rapport déclare lequel elle fait : les technologies, les domaines et les salaires se comptent en annonces, la géographie en offres, parce qu'un poste ouvert dans vingt-quatre communes représente une opportunité dans chacune. L'exception est signalée sous le graphique concerné, jamais implicite.
 
 ---
 
@@ -101,7 +111,7 @@ dbt ne fait ni appel HTTP ni appel LLM. Chaque enrichissement suit le même patt
 ### Couches dbt
 
 - **staging** (`stg_`) — renommage, casting, dédoublonnage. Aucune logique métier.
-- **intermediate** (`int_`) — parsing salaire, classification employeur. Logique métier isolée et testée unitairement.
+- **intermediate** (`int_`) — parsing salaire, plausibilité des montants, classification employeur, regroupement des annonces identiques. Logique métier isolée et testée unitairement.
 - **marts** — tables exposées : `fct_offre` (grain fin, une ligne = une offre), `dim_rome`, `dim_commune`, `dim_entreprise`, `fct_offre_technologie`, `fct_offre_domaine`, `fct_marche_hebdo` (une ligne par semaine, corpus accumulé) et `fct_marche_flux` (une ligne par semaine, flux réel du marché).
 
 ## Automatisation (Phase 5)
@@ -152,6 +162,8 @@ marche_data/
 │   ├── requetes.sql                            # Requêtes documentées hors du Python
 │   ├── preparer_polices.py                     # Fabrique les WOFF2, à relancer si l'identité change
 │   └── fonts/                                  # Polices sous-ensemblées + licences OFL
+├── notebooks/
+│   └── 01_exploration_marche.ipynb             # Exploration commentée du corpus courant
 ├── docs/                                       # Spec + comptes rendus de session, journal de bord
 └── observatoire/                               # Projet dbt
     ├── macros/
@@ -275,7 +287,13 @@ L'écart entre offres brutes (1 094) et ID uniques (552) est **attendu** : une m
 - [x] **Phase 3 — Enrichissement** — matching SIRENE/DINUM (80,3 %), `dim_entreprise`.
 - [x] **Phase 4 — Extraction skills** — schéma d'extraction structuré, comparaison de modèles, `fct_offre_technologie` / `fct_offre_domaine`. Reclassification `INTERMEDIAIRE_reclasse` (33 offres, texte libre) en aval.
 - [x] **Phase 5 — Snapshot & historique** — GitHub Actions opérationnel (cron hebdo + déclenchement manuel), dégradation CI sans LLM vérifiée dans les deux sens. `fct_marche_hebdo` et `fct_marche_flux` construits et testés. Quatre semaines de corpus, deux points de flux.
-- [ ] **Phase 6 — Restitution** (en cours) — 6a livrée : rapport HTML statique Millimeter Dark, polices embarquées, quatre KPI, six sections. 6b : dashboard interactif. Elementary reste bloqué, voir les limites.
+- [ ] **Phase 6 — Restitution** (en cours)
+  - [x] Rapport HTML statique Millimeter Dark : polices embarquées, quatre KPI, six sections, dégradation propre sans extraction LLM
+  - [x] README : architecture, décisions, limites assumées
+  - [x] Notebook d'exploration réécrit sur le corpus courant, 51 blocs de commentaire pour 30 cellules de code
+  - [ ] Slim CI : le workflow reconstruit aujourd'hui le graphe entier à chaque run. Un build incrémental (`state:modified`) suppose de publier un manifest de référence entre deux exécutions, ce que le runner jetable ne conserve pas — à trancher en même temps que la question du warehouse persistant
+  - [ ] Dashboard interactif, stack à arbitrer sur une mesure coût/bénéfice
+  - [ ] ~~Elementary~~ — écarté tant qu'il n'y a pas de warehouse persistant, voir les limites
 
 ---
 
@@ -291,6 +309,8 @@ Un projet honnête documente ce qu'il ne sait pas résoudre plutôt que de le ca
 - **Bornes de plausibilité salariale, annuel seulement** — la règle existe pour les salaires annuels (260 offres plausibles sur 275, drapeau `salaire_annuel_plausible`). Les populations horaire et mensuelle, 4 et 34 offres, restent sans bornes : trop peu nombreuses pour fonder un seuil défendable. C'est aussi ce qui a fait écarter l'idée de reclasser les valeurs aberrantes vers ces périodes plutôt que de les marquer.
 - **Salaire affiché sur moins d'un tiers des offres** — 32,6 % mentionnent un salaire, 27,1 % un salaire annuel exploitable. Toute analyse salariale porte donc sur un quart du corpus, et rien ne dit que ce quart soit représentatif : afficher un salaire est en soi un comportement d'employeur, mesuré ici comme tel.
 - **Salaires en paliers** — 66,1 % des montants annuels sont des multiples de 5 000 €. Aucune précision revendiquée sous ce palier.
+- **Quasi-doublons résiduels** — la détection repose sur l'identité stricte du texte normalisé. Deux annonces d'une même campagne dont le texte diffère de quelques mots restent comptées séparément : mesuré sur une campagne de onze annonces, neuf sont regroupées et deux échappent. Aller plus loin demande un seuil de similarité, que rien ne permet de calibrer sur ce volume.
+- **Le tag ROME de la source n'est pas fiable** — 33 libellés portent une ou deux offres chacun, dont « Assistant comptable » ou « Documentaliste », soit 39 offres et 4,1 % du corpus. Elles sont entrées par les mots-clés ou par un tag erroné. Non filtrées, parce qu'une règle de nettoyage construite sur si peu d'exemples ne serait pas défendable ; visibles et mesurables plutôt que masquées.
 - **Corpus accumulé et marché réel sont deux choses** — `fct_offre` et `fct_marche_hebdo` comptent toutes les offres jamais collectées, y compris celles qui ont disparu de France Travail. Seule `fct_marche_flux` mesure le marché vivant. Les deux tables coexistent avec leur portée documentée en tête de modèle plutôt qu'une seule ambiguë.
 - **Elementary reste hors de portée** — l'outil stocke ses résultats dans le warehouse, or `warehouse.duckdb` est éphémère sur un runner jetable : il repartirait de zéro chaque lundi. La Phase 6 le prévoyait ; il restera écarté tant que le projet n'a pas de warehouse persistant, ce qui sortirait de la contrainte 0 € d'infrastructure.
 - **Snapshot automatisé sans extraction LLM** — le runner GitHub Actions ne peut pas exécuter Ollama (~28 s par offre). Le snapshot hebdomadaire produit par le cron ne comporte donc jamais `top_technologie` ni la reclassification `INTERMEDIAIRE_reclasse` (valeurs marquées explicitement "non disponible (CI)" plutôt que silencieusement fausses ou absentes). Ces deux métriques restent disponibles uniquement après un run manuel en local, extraction Ollama à jour.
@@ -298,5 +318,6 @@ Un projet honnête documente ce qu'il ne sait pas résoudre plutôt que de le ca
 ## Suite prévue
 
 - **Phase 6b** : dashboard interactif, à arbitrer sur une mesure coût/bénéfice plutôt que sur une préférence de stack.
+- **Slim CI** : dépend de la même décision que le warehouse persistant. Un `dbt build --select state:modified+` a besoin d'un manifest de référence que le runner jetable ne conserve pas ; le publier en artifact GitHub Actions est la piste la moins coûteuse à évaluer.
 - **Longue traîne des domaines** : le mapping couvre 19,7 % des mentions, taux identique à celui mesuré sur 552 offres alors que le corpus a presque doublé. La traîne grossit au même rythme que les douze clusters de tête, donc rien à retravailler pour l'instant. À revérifier si le taux décroche.
 - **Phase 6** : dashboard, tests de qualité continus (Elementary — a besoin de cet historique pour détecter des dérives), README enrichi des enseignements finaux.
