@@ -1,0 +1,70 @@
+# .github/workflows/ci.yml
+#
+# Validation du pipeline à chaque poussée de code.
+#
+# POURQUOI PAS UN SLIM CI. La spec (§13, Phase 6) prévoyait un build
+# incrémental `dbt build --select state:modified+ --defer`. Mesure du 04/09 :
+# le build COMPLET prend 1,79 seconde -- 15 modèles, 39 tests, 2 unit tests.
+# Il n'y a rien à économiser. Et `--defer` suppose un environnement de
+# production persistant vers lequel différer les modèles non reconstruits,
+# quand warehouse.duckdb est éphémère sur un runner jetable. La prémisse du
+# Slim CI ne tient pas sur cette architecture : il optimise un coût qui
+# n'existe pas, avec un mécanisme que l'infrastructure ne permet pas.
+#
+# CE QUI MANQUAIT VRAIMENT, c'est une CI tout court. Le seul workflow du dépôt
+# se déclenche le lundi ou à la main : un modèle qui ne compile pas partait sur
+# main et n'était découvert qu'au run hebdomadaire suivant.
+#
+# AUCUN SECRET N'EST NÉCESSAIRE. Le dump France Travail du 17/07, le dump DINUM
+# et les deux CSV de snapshot sont versionnés : le graphe entier se reconstruit
+# sur les seules données du dépôt. Ce workflow vérifie donc à chaque commit une
+# affirmation que le README fait depuis la Phase 2 -- « aucune clé API n'est
+# requise pour reproduire la couche dbt » -- au lieu de la laisser à la
+# confiance. Un tiers qui clone le dépôt obtient ce que la CI obtient.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Une poussée qui en suit une autre annule la précédente : sur une série de
+# commits rapprochés, seul le dernier état compte.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  valider:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du repo
+        uses: actions/checkout@v5
+
+      - name: Setup Python 3.13
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+          cache: pip  # l'installation des dépendances domine la durée du job,
+                      # pas le build dbt qui tient en 2 secondes
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Compiler les scripts Python
+        # dbt ne voit pas les scripts d'ingestion, d'enrichissement et de
+        # restitution : une erreur de syntaxe dans presence_offres.py ne se
+        # révélerait que le lundi suivant, au milieu du run hebdomadaire.
+        run: python3 -m compileall -q *.py dashboard/*.py exploration/*.py
+
+      - name: dbt build sur les données versionnées
+        working-directory: observatoire
+        env:
+          CI_SANS_EXTRACTION: "true"  # le dump d'extraction LLM n'est pas versionné
+        run: dbt build
+
+      - name: Génération du rapport
+        # Valide les requêtes du rapport et son chemin de dégradation : sans
+        # extraction LLM, deux sections doivent sortir vides et non plantées.
+        run: python3 dashboard/generer_rapport.py

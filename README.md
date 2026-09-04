@@ -4,11 +4,11 @@ Pipeline analytique qui ingère les offres d'emploi data du marché français de
 
 Projet de portfolio pour une transition vers l'**Analytics Engineering**. L'accent est mis sur une chaîne **claire, traçable et honnête sur ses limites** — plus que sur le volume : chaque choix (périmètre, dédoublonnage, matching, modèle LLM) est justifié par une mesure, pas par une intuition, et documenté comme tel.
 
-> **Statut** — Phases 1 à 5 terminées. Cron hebdomadaire actif chaque lundi, quatre semaines d'historique de corpus et trois points de flux. Phase 6 en cours : rapport HTML statique livré, README et notebook d'exploration à jour, dashboard interactif et Slim CI restants.
+> **Statut** — Phases 1 à 5 terminées. Cron hebdomadaire actif chaque lundi, CI sur chaque poussée, quatre semaines d'historique de corpus et trois points de flux. Phase 6 en cours : rapport HTML statique livré, README et notebook d'exploration à jour, dashboard interactif restant.
 
 ---
 
-## Sept décisions qui illustrent la méthode
+## Huit décisions qui illustrent la méthode
 
 ### Taux de matching entreprise : 19,2 % → 80,3 %
 
@@ -53,6 +53,14 @@ Deux classements de tête s'inversent une fois les campagnes neutralisées. **Py
 La signature est l'empreinte du texte normalisé, sans aucun seuil de similarité : deux textes sont identiques ou ils ne le sont pas. Un seuil attraperait davantage — sur onze annonces d'une même campagne, neuf partagent exactement le même texte — mais rien ne permet aujourd'hui d'en défendre un.
 
 Aucune offre n'est supprimée. Trois colonnes exposent le choix, et chaque mesure du rapport déclare lequel elle fait : les technologies, les domaines et les salaires se comptent en annonces, la géographie en offres, parce qu'un poste ouvert dans vingt-quatre communes représente une opportunité dans chacune. L'exception est signalée sous le graphique concerné, jamais implicite.
+
+### Le Slim CI optimisait un coût qui n'existait pas
+
+La spécification prévoyait un build incrémental en Phase 6 : `dbt build --select state:modified+ --defer`, pour ne reconstruire que ce qui a changé. Mesure avant de l'écrire : **le build complet prend 1,79 seconde**, quinze modèles, trente-neuf tests et deux unit tests compris. Il n'y a rien à économiser. Et `--defer` suppose un environnement de production persistant vers lequel différer les modèles non reconstruits, quand `warehouse.duckdb` est éphémère sur un runner jetable. Le mécanisme est donc à la fois inutile et inapplicable ici.
+
+La vérification a trouvé autre chose : **il n'y avait aucune intégration continue sur ce dépôt**. Le seul workflow se déclenchait le lundi ou à la main. Un modèle qui ne compile pas partait sur `main` et n'était découvert qu'au run hebdomadaire suivant. Le besoin réel n'était pas d'optimiser une CI, c'était d'en avoir une.
+
+Elle vérifie par ailleurs une affirmation que ce README fait depuis la Phase 2 sans que rien ne la contrôle : le dump France Travail de référence, le dump SIRENE et les deux CSV de snapshot étant versionnés, **le graphe entier se reconstruit sur les seules données du dépôt, sans aucune clé d'API**. Ce qu'obtient la CI est ce qu'obtient un tiers qui clone le projet.
 
 ---
 
@@ -113,6 +121,14 @@ dbt ne fait ni appel HTTP ni appel LLM. Chaque enrichissement suit le même patt
 - **staging** (`stg_`) — renommage, casting, dédoublonnage. Aucune logique métier.
 - **intermediate** (`int_`) — parsing salaire, plausibilité des montants, classification employeur, regroupement des annonces identiques. Logique métier isolée et testée unitairement.
 - **marts** — tables exposées : `fct_offre` (grain fin, une ligne = une offre), `dim_rome`, `dim_commune`, `dim_entreprise`, `fct_offre_technologie`, `fct_offre_domaine`, `fct_marche_hebdo` (une ligne par semaine, corpus accumulé) et `fct_marche_flux` (une ligne par semaine, flux réel du marché).
+
+## Intégration continue
+
+Deux workflows, deux rôles distincts.
+
+`.github/workflows/ci.yml` se déclenche à **chaque poussée et chaque pull request**. Il compile les 34 scripts Python, reconstruit le graphe dbt entier avec ses tests, et génère le rapport. **Aucun secret n'est nécessaire** : le dump France Travail de référence, le dump SIRENE et les deux CSV de snapshot sont versionnés, donc le pipeline se rebâtit sur les seules données du dépôt. La CI vérifie ainsi à chaque commit ce que la section Installation promet.
+
+`.github/workflows/pull_hebdo.yml` se déclenche **le lundi**. Lui produit de la donnée : ingestion, historique de présence, build, snapshot, rapport, commit. Les deux ne se recouvrent pas — l'un valide du code, l'autre rafraîchit des faits.
 
 ## Automatisation (Phase 5)
 
@@ -291,7 +307,8 @@ L'écart entre offres brutes (1 094) et ID uniques (552) est **attendu** : une m
   - [x] Rapport HTML statique Millimeter Dark : polices embarquées, quatre KPI, six sections, dégradation propre sans extraction LLM
   - [x] README : architecture, décisions, limites assumées
   - [x] Notebook d'exploration réécrit sur le corpus courant, 51 blocs de commentaire pour 30 cellules de code
-  - [ ] Slim CI : le workflow reconstruit aujourd'hui le graphe entier à chaque run. Un build incrémental (`state:modified`) suppose de publier un manifest de référence entre deux exécutions, ce que le runner jetable ne conserve pas — à trancher en même temps que la question du warehouse persistant
+  - [x] CI sur chaque poussée — validation du graphe dbt complet, tests compris, sans aucune clé d'API
+  - [ ] ~~Slim CI~~ — écarté par la mesure : le build complet prend 1,79 s, et `--defer` suppose un environnement persistant que l'architecture n'a pas. Voir les décisions
   - [ ] Dashboard interactif, stack à arbitrer sur une mesure coût/bénéfice
   - [ ] ~~Elementary~~ — écarté tant qu'il n'y a pas de warehouse persistant, voir les limites
 
@@ -318,6 +335,6 @@ Un projet honnête documente ce qu'il ne sait pas résoudre plutôt que de le ca
 ## Suite prévue
 
 - **Phase 6b** : dashboard interactif, à arbitrer sur une mesure coût/bénéfice plutôt que sur une préférence de stack.
-- **Slim CI** : dépend de la même décision que le warehouse persistant. Un `dbt build --select state:modified+` a besoin d'un manifest de référence que le runner jetable ne conserve pas ; le publier en artifact GitHub Actions est la piste la moins coûteuse à évaluer.
+- **Warehouse persistant** : seule question encore ouverte côté infrastructure, et elle conditionne Elementary. Un service gratuit type MotherDuck la trancherait, au prix d'une dépendance externe que le projet n'a pas aujourd'hui.
 - **Longue traîne des domaines** : le mapping couvre 19,7 % des mentions, taux identique à celui mesuré sur 552 offres alors que le corpus a presque doublé. La traîne grossit au même rythme que les douze clusters de tête, donc rien à retravailler pour l'instant. À revérifier si le taux décroche.
 - **Phase 6** : dashboard, tests de qualité continus (Elementary — a besoin de cet historique pour détecter des dérives), README enrichi des enseignements finaux.
