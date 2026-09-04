@@ -1,0 +1,23 @@
+version: 2
+
+seeds:
+  - name: mapping_communes
+    description: >
+      Noms de communes résolus depuis geo.api.gouv.fr (enrichir_communes.py).
+      Clé : code postal quand la source en fournit un, code INSEE de commune
+      globale sinon (Paris, Lyon, Marseille).
+    config:
+      # varchar IMPOSÉ, et non laissé à l'inférence. Toutes les valeurs étant
+      # numériques, dbt typait la colonne en INTEGER : 01200 devenait 1200, et
+      # la jointure avec stg_ft_offres, où le code est du texte, ne tenait que
+      # par la conversion implicite de DuckDB. Elle fonctionnait, mais par
+      # accident. Un code postal ou INSEE est un identifiant, pas une quantité :
+      # on ne l'additionne pas, on ne le compare pas à un ordre, et son zéro
+      # initial porte de l'information.
+      column_types:
+        cle_commune: varchar
+    columns:
+      - name: cle_commune
+        data_tests:
+          - unique
+          - not_null

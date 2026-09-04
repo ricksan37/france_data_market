@@ -34,11 +34,33 @@ models:
               field: rome_code
       
       - name: code_postal
-        description: code postal de la commune de l'offre
+        description: >
+          Code postal de la commune, tel que fourni par France Travail. Vide
+          pour Paris, Lyon et Marseille, qui n'en ont pas d'unique : leur
+          arrondissement n'est pas transmis, seul le code INSEE de commune
+          globale l'est. Conservé pour l'audit ; ne pas s'en servir comme clé
+          géographique, utiliser cle_commune.
+
+      - name: cle_commune
+        description: >
+          Clé géographique unifiée : le code postal quand il existe, le code
+          INSEE sinon. Couvre 89,5 % du corpus contre 79,6 % pour le seul code
+          postal. C'est la clé de jointure vers dim_commune.
         data_tests:
           - relationships:
               to: ref('dim_commune')
-              field: code_postal
+              field: cle_commune
+
+      - name: zone_geographique
+        description: >
+          metropole, outre-mer ou inconnue. Dimension et non restriction de
+          périmètre : l'outre-mer pèse 17 offres sur 960 et l'exclure ne
+          déplace aucune métrique, mais la zone reste filtrable à la demande.
+          'inconnue' couvre les 101 offres sans aucune information de lieu, et
+          reste une valeur à part entière plutôt qu'un rattachement par défaut
+          à la métropole.
+        data_tests:
+          - not_null
 
       - name: siren
         description: >

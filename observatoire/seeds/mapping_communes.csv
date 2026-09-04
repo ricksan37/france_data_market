@@ -1,4 +1,4 @@
-code_postal,nom_commune
+cle_commune,nom_commune
 01100,Apremont
 01300,Ambléon
 03000,Avermes
@@ -192,3 +192,103 @@ code_postal,nom_commune
 97140,Capesterre-de-Marie-Galante
 97400,Saint-Denis
 99999,NON_RESOLU
+01200,Valserhône
+01750,Crottet
+02100,Essigny-le-Petit
+06500,Castellar
+08260,Antheny
+10000,Troyes
+10120,Laines-aux-Bois
+13008,Marseille
+13055,Marseille
+13127,Vitrolles
+13220,Châteauneuf-les-Martigues
+17000,La Rochelle
+21110,Aiserey
+25000,Besançon
+27100,Porte-de-Seine
+29200,Brest
+29480,Le Relecq-Kerhuon
+31130,Balma
+31200,Toulouse
+31670,Labège
+33210,Bieujac
+33610,Canéjan
+34170,Castelnau-le-Lez
+34500,Béziers
+34790,Grabels
+35530,Brécé
+36100,Les Bordes
+38120,Fontanil-Cornillon
+38240,Meylan
+40220,Tarnos
+42350,La Talaudière
+44230,Saint-Sébastien-sur-Loire
+44600,Saint-Nazaire
+44800,Saint-Herblain
+46150,Boissières
+49440,Angrie
+51120,Allemant
+54500,Vandœuvre-lès-Nancy
+57310,Bertrange
+59370,Mons-en-Barœul
+59500,Douai
+59700,Marcq-en-Barœul
+60126,Longueil-Sainte-Marie
+60500,Chantilly
+64000,Pau
+67170,Bernolsheim
+67520,Kirchheim
+68000,Colmar
+69008,Lyon
+69123,Lyon
+69570,Dardilly
+69780,Mions
+69970,Chaponnay
+72100,Le Mans
+73300,Albiez-le-Jeune
+75004,Paris
+75006,Paris
+75056,Paris
+76700,Gainneville
+77420,Champs-sur-Marne
+77680,Roissy-en-Brie
+78114,Magny-les-Hameaux
+78120,Clairefontaine-en-Yvelines
+78220,Viroflay
+78240,Aigremont
+78350,Jouy-en-Josas
+78390,Bois-d'Arcy
+78660,Ablis
+78700,Conflans-Sainte-Honorine
+83340,Cabasse
+91170,Viry-Châtillon
+91230,Montgeron
+91400,Gometz-la-Ville
+92150,Suresnes
+92230,Gennevilliers
+92370,Chaville
+92600,Asnières-sur-Seine
+93100,Montreuil
+93120,La Courneuve
+93200,Saint-Denis
+93210,Saint-Denis
+93340,Le Raincy
+93350,Le Bourget
+93500,Pantin
+93700,Drancy
+94700,Maisons-Alfort
+95140,Garges-lès-Gonesse
+95740,Frépillon
+97200,Fort-de-France
+97222,Case-Pilote
+97232,Le Lamentin
+97233,Schœlcher
+97320,Saint-Laurent-du-Maroni
+97330,Camopi
+97380,Ouanary
+97411,Saint-Paul
+97413,Cilaos
+97437,Saint-Benoît
+97442,Saint-Philippe
+97480,Saint-Joseph

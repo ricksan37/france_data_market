@@ -1,0 +1,27 @@
+version: 2
+
+models:
+  - name: dim_commune
+    description: >
+      Référentiel géographique du périmètre. Grain : une ligne par clé
+      géographique, code postal quand il existe, code INSEE sinon.
+    columns:
+      - name: cle_commune
+        description: >
+          Clé du grain. Le test unique manquait jusqu'au 04/09, et son absence
+          se payait : la dimension portait alors deux clés en double (49000 et
+          95000, deux codes postaux couvrant chacun deux communes INSEE), 292
+          lignes pour 290 codes. Le défaut était apparu tout seul quand le
+          corpus est passé de 552 à 960 offres, sans rien casser de visible.
+          C'est le piège de la Session 4 — un distinct sur plusieurs colonnes
+          ne déduplique jamais une seule colonne — revenu par la porte des
+          données plutôt que par celle du code.
+        data_tests:
+          - unique
+          - not_null
+      - name: nom_commune
+        description: >
+          Nom résolu via geo.api.gouv.fr (enrichir_communes.py). NULL tant
+          qu'une clé nouvellement apparue n'a pas été résolue, 'NON_RESOLU'
+          quand l'API ne renvoie rien (99999, sentinelle France Travail pour
+          lieu non renseigné). Jamais de ligne perdue dans les deux cas.

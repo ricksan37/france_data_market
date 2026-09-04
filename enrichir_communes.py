@@ -25,16 +25,31 @@ CHEMIN_SEED = Path("observatoire/seeds/mapping_communes.csv")
 API_URL = "https://geo.api.gouv.fr/communes"
 
 
-def codes_dans_fct_offre() -> set[str]:
-    """Tous les code_postal actuellement présents dans fct_offre."""
+def codes_dans_fct_offre() -> list[tuple[str, str]]:
+    """Toutes les clés géographiques de fct_offre, avec leur nature.
+
+    Deux natures, parce que la source en fournit deux. Paris, Lyon et
+    Marseille sont les trois communes françaises à arrondissements : elles
+    n'ont pas de code postal unique, donc France Travail renvoie leur code
+    INSEE de commune globale (75056, 69123, 13055) avec un code postal vide.
+    Mesuré le 04/09 : 95 offres dans ce cas, dont 77 à Paris, soit plus de la
+    moitié des offres parisiennes du corpus, invisibles dans la dimension
+    géographique tant qu'elle ne s'indexait que sur le code postal.
+
+    Les deux natures sont indiscernables à l'oeil (75056 et 75001 sont deux
+    nombres à cinq chiffres), d'où le drapeau : c'est l'origine de la valeur
+    qui décide du paramètre d'API, jamais sa forme.
+    """
     con = duckdb.connect(CHEMIN_DB, read_only=True)
-    codes = con.execute("""
-        select distinct code_postal
+    lignes = con.execute("""
+        select distinct
+            coalesce(code_postal, commune) as cle,
+            case when code_postal is not null then 'postal' else 'insee' end as nature
         from fct_offre
-        where code_postal is not null
-    """).df()["code_postal"].tolist()
+        where coalesce(code_postal, commune) is not null
+    """).fetchall()
     con.close()
-    return set(codes)
+    return lignes
 
 
 def codes_deja_resolus() -> set[str]:
@@ -43,17 +58,26 @@ def codes_deja_resolus() -> set[str]:
     if not CHEMIN_SEED.exists():
         return set()
     with open(CHEMIN_SEED, encoding="utf-8") as f:
-        return {ligne["code_postal"] for ligne in csv.DictReader(f)}
+        return {ligne["cle_commune"] for ligne in csv.DictReader(f)}
 
 
-def resoudre_code(code_postal: str) -> str:
-    """Interroge l'API. Renvoie le nom de la première commune trouvée, ou
-    la chaîne 'NON_RESOLU' si aucune correspondance (ex. le 99999 sentinelle
-    de France Travail pour lieu non renseigné) -- jamais None, pour que le
-    code reste marqué comme traité et ne soit pas re-questionné au prochain run."""
+def resoudre_code(cle: str, nature: str) -> str:
+    """Interroge l'API selon la nature de la clé.
+
+    Renvoie le nom de la première commune trouvée, ou la chaîne 'NON_RESOLU'
+    si aucune correspondance (ex. le 99999 sentinelle de France Travail pour
+    lieu non renseigné) -- jamais None, pour que la clé reste marquée comme
+    traitée et ne soit pas re-questionnée au prochain run.
+
+    Le paramètre change avec la nature : codePostal pour un code postal, code
+    pour un code INSEE. Les interroger l'un pour l'autre ne lève aucune erreur,
+    ça renvoie simplement une liste vide -- l'échec serait donc silencieux et
+    se lirait comme un code non résolu.
+    """
+    parametre = "codePostal" if nature == "postal" else "code"
     reponse = requests.get(
         API_URL,
-        params={"codePostal": code_postal, "fields": "nom", "format": "json"},
+        params={parametre: cle, "fields": "nom", "format": "json"},
         timeout=10,
     )
     reponse.raise_for_status()
@@ -62,24 +86,26 @@ def resoudre_code(code_postal: str) -> str:
 
 
 def main() -> None:
-    a_resoudre = codes_dans_fct_offre() - codes_deja_resolus()
+    toutes = codes_dans_fct_offre()
+    deja = codes_deja_resolus()
+    a_resoudre = [(cle, nature) for cle, nature in toutes if cle not in deja]
 
     if not a_resoudre:
-        print("Aucun nouveau code postal à résoudre -- seed déjà à jour.")
+        print("Aucune nouvelle clé à résoudre -- seed déjà à jour.")
         return
 
-    print(f"{len(a_resoudre)} nouveau(x) code(s) à résoudre (sur {len(codes_dans_fct_offre())} présents dans fct_offre).")
+    print(f"{len(a_resoudre)} nouvelle(s) clé(s) à résoudre (sur {len(toutes)} présentes dans fct_offre).")
 
     fichier_existe = CHEMIN_SEED.exists()
     with open(CHEMIN_SEED, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["code_postal", "nom_commune"])
+        writer = csv.DictWriter(f, fieldnames=["cle_commune", "nom_commune"])
         if not fichier_existe:
             writer.writeheader()
 
-        for i, code in enumerate(sorted(a_resoudre), start=1):
-            nom = resoudre_code(code)
-            writer.writerow({"code_postal": code, "nom_commune": nom})
-            print(f"[{i}/{len(a_resoudre)}] {code} -> {nom}")
+        for i, (cle, nature) in enumerate(sorted(a_resoudre), start=1):
+            nom = resoudre_code(cle, nature)
+            writer.writerow({"cle_commune": cle, "nom_commune": nom})
+            print(f"[{i}/{len(a_resoudre)}] {cle} ({nature}) -> {nom}")
             time.sleep(0.15)  # courtoisie envers l'API publique
 
     print("\nSeed mis à jour.")

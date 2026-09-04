@@ -100,10 +100,14 @@ order by taux_pct desc;
 -- ============================================================
 
 -- TOP_COMMUNES
+-- Jointure sur cle_commune, pas sur code_postal. Paris, Lyon et Marseille sont
+-- les trois communes à arrondissements : elles n'ont pas de code postal unique
+-- et arrivent avec leur seul code INSEE de commune globale. Avant ce correctif,
+-- le rapport affichait 71 offres parisiennes là où il y en a 148.
 select c.nom_commune, count(distinct o.offre_id) as nb_offres
 from fct_offre o
-left join dim_commune c on c.code_postal = o.code_postal
-where c.nom_commune is not null
+join dim_commune c on c.cle_commune = o.cle_commune
+where c.nom_commune is not null and c.nom_commune != 'NON_RESOLU'
 group by c.nom_commune
 order by nb_offres desc
 limit 10;

@@ -330,11 +330,15 @@ def generer() -> None:
     )
 
     # ---------- 04 Geographie ----------
+    # Jointure sur cle_commune et non sur code_postal : Paris, Lyon et Marseille
+    # arrivent sans code postal, avec leur seul code INSEE de commune globale.
+    # Avant ce correctif le rapport affichait 71 offres parisiennes ; il y en a
+    # 148. Les trois plus grandes villes du pays etaient sous-comptees de moitie.
     geo = executer(con, """
         select c.nom_commune, count(distinct o.offre_id) as nb_offres
         from fct_offre o
-        left join dim_commune c on c.code_postal = o.code_postal
-        where c.nom_commune is not null
+        join dim_commune c on c.cle_commune = o.cle_commune
+        where c.nom_commune is not null and c.nom_commune != 'NON_RESOLU'
         group by c.nom_commune
         order by nb_offres desc
         limit 10
