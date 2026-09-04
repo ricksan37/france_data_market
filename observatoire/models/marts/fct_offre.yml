@@ -102,6 +102,30 @@ models:
           Cohérence garantie par assert_flag_salaire_plausible (severity
           error), volumétrie suivie par assert_bornes_salaire_annuel (warn).
 
+      - name: signature_annonce
+        description: >
+          Empreinte du texte de l'annonce, normalisé en minuscules et espaces
+          réduits. Deux offres qui la partagent sont la même annonce publiée
+          plusieurs fois. 152 offres sur 960 sont dans ce cas au 04/09.
+
+      - name: taille_grappe
+        description: >
+          Nombre d'offres partageant cette signature. 1 pour une annonce
+          publiée une seule fois. Maximum observé : 25, un employeur publiant
+          le même poste dans 24 communes.
+        data_tests:
+          - not_null
+
+      - name: est_annonce_canonique
+        description: >
+          Vrai pour une seule offre par grappe, la plus ancienne. Filtrer
+          dessus compte des ANNONCES (865), ne pas filtrer compte des OFFRES
+          (960). L'écart n'est pas cosmétique : SQL perd 16,7 % de ses
+          mentions et la médiane salariale passe de 45 000 à 43 000 €.
+          Unicité garantie par assert_une_canonique_par_grappe (severity error).
+        data_tests:
+          - not_null
+
       - name: description
         description: >
           Texte intégral de l'annonce, repris de stg_ft_offres. Ajouté en S6

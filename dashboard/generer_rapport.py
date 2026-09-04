@@ -201,14 +201,26 @@ def html_figure(fig, premiere: bool = False) -> str:
 def generer() -> None:
     con = duckdb.connect(str(DB_PATH), read_only=True)
 
-    # ---------- Perimetre, mesure et non ecrit en dur ----------
-    nb_offres = executer(con, "select count(*) as n from fct_offre")[0]["n"]
+    # ---------- Perimetre : deux comptes, parce qu'il y a deux questions ----------
+    # Une meme annonce publiee dans plusieurs villes recoit un identifiant par
+    # ville. "Combien d'offres" et "combien d'annonces" n'ont donc pas la meme
+    # reponse, et le rapport affiche les deux plutot que d'en choisir une.
+    perimetre = executer(con, """
+        select count(*) as offres,
+               count(case when est_annonce_canonique then 1 end) as annonces
+        from fct_offre
+    """)[0]
+    nb_offres, nb_annonces = perimetre["offres"], perimetre["annonces"]
 
     # ---------- KPI ----------
+    # Par annonce : afficher ou non son salaire est un comportement d'employeur,
+    # et un annonceur qui publie 25 fois le meme texte ne le manifeste qu'une
+    # fois. Mesure : 32,6 % par offre contre 30,0 % par annonce.
     taux_transp = executer(con, """
         select round(100.0 * count(case when salaire_mentionne then 1 end)
                      / nullif(count(*), 0), 1) as pct
         from fct_offre
+        where est_annonce_canonique
     """)[0]["pct"]
 
     hebdo = executer(con, """
@@ -228,7 +240,8 @@ def generer() -> None:
     # semaine, faute de point de comparaison.
     sorties = next((l for l in reversed(flux) if l["taux_sortie_pct"] is not None), None)
 
-    kpi_offres = big_stat_html(f"{nb_offres}", "Offres analysées")
+    kpi_offres = big_stat_html(
+        f"{nb_offres}", f"Offres analysées, {nb_annonces} annonces distinctes")
     kpi_transparence = big_stat_html(f"{taux_transp:.1f} %", "Offres affichant un salaire")
     kpi_anonymat = (
         big_stat_html(f"{taux_anonymat:.1f} %", "Offres à employeur masqué")
@@ -238,7 +251,11 @@ def generer() -> None:
     kpi_sorties = (
         big_stat_html(
             f"{sorties['taux_sortie_pct']:.1f} %",
-            f"Offres disparues en {sorties['semaines_depuis_precedente']} semaines",
+            # Accord du pluriel : l'ecart valait six semaines tant qu'il n'y
+            # avait que deux points de mesure, il vaut 1 depuis le troisieme.
+            # Un libelle genere doit rester grammatical quelle que soit la valeur.
+            f"Offres disparues en {sorties['semaines_depuis_precedente']} "
+            f"semaine{'s' if sorties['semaines_depuis_precedente'] > 1 else ''}",
         )
         if sorties
         else big_stat_html("N/A", "Flux, une seule semaine mesurée")
@@ -278,6 +295,7 @@ def generer() -> None:
                median(salaire_min) as salaire_median
         from fct_offre
         where salaire_periode = 'annuel' and salaire_annuel_plausible
+          and est_annonce_canonique
         group by categorie_employeur
         order by salaire_median desc
     """), "categorie_employeur", LIBELLES_CATEGORIE)
@@ -295,6 +313,7 @@ def generer() -> None:
                median(salaire_min) as salaire_median
         from fct_offre
         where salaire_periode = 'annuel' and salaire_annuel_plausible
+          and est_annonce_canonique
         group by experience_exige
         order by salaire_median
     """), "experience_exige", LIBELLES_EXPERIENCE)
@@ -321,6 +340,7 @@ def generer() -> None:
                round(100.0 * count(distinct case when salaire_mentionne then offre_id end)
                      / nullif(count(distinct offre_id), 0), 1) as taux_pct
         from fct_offre
+        where est_annonce_canonique
         group by categorie_employeur
         order by taux_pct desc
     """), "categorie_employeur", LIBELLES_CATEGORIE)
@@ -343,15 +363,24 @@ def generer() -> None:
         order by nb_offres desc
         limit 10
     """)
+    # Seul graphique compté par OFFRE et non par annonce, volontairement : un
+    # poste ouvert dans plusieurs communes represente une opportunite dans
+    # chacune. Le compter une fois, dans la ville de la publication la plus
+    # ancienne, effacerait les autres. L'exception est signalee sous la carte.
     fig_geo = chart_barres_horizontales(
         geo, "nom_commune", "nb_offres", "DIX PREMIÈRES COMMUNES PAR NOMBRE D'OFFRES",
+        note="Compté par offre, et non par annonce comme le reste du rapport : "
+             "un poste ouvert dans plusieurs communes représente une opportunité "
+             "dans chacune.",
     )
 
     # ---------- 05 Technologies ----------
     skills = executer(con, """
-        select technologie, count(distinct offre_id) as nb_offres
-        from fct_offre_technologie
-        group by technologie
+        select t.technologie, count(distinct t.offre_id) as nb_offres
+        from fct_offre_technologie t
+        join fct_offre o using (offre_id)
+        where o.est_annonce_canonique
+        group by t.technologie
         order by nb_offres desc
         limit 10
     """)
@@ -363,10 +392,12 @@ def generer() -> None:
 
     # ---------- 06 Domaines ----------
     domaines = executer(con, """
-        select domaine_normalise, count(distinct offre_id) as nb_offres
-        from fct_offre_domaine
-        where domaine_normalise in (select distinct domaine_canonique from mapping_domaines)
-        group by domaine_normalise
+        select d.domaine_normalise, count(distinct d.offre_id) as nb_offres
+        from fct_offre_domaine d
+        join fct_offre o using (offre_id)
+        where o.est_annonce_canonique
+          and d.domaine_normalise in (select distinct domaine_canonique from mapping_domaines)
+        group by d.domaine_normalise
         order by nb_offres desc
     """)
     if domaines:

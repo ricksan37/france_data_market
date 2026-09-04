@@ -238,8 +238,9 @@
         <div class="section-kicker">02 — RÉMUNÉRATION</div>
         <h2>Salaire médian annoncé</h2>
         <p class="note-section">
-            Calculé sur les seules offres affichant un salaire annuel. La médiane résiste aux valeurs extrêmes,
-            contrairement à la moyenne.
+            Calculé sur les seules offres affichant un salaire annuel plausible, et par annonce distincte.
+            Un employeur qui publie le même poste dans vingt-quatre communes ne pèse ainsi qu'une fois
+            dans la médiane. La médiane résiste par ailleurs aux valeurs extrêmes, contrairement à la moyenne.
         </p>
         <div class="grille">
             <div class="carte">{chart_salaire_cat}</div>
@@ -293,6 +294,9 @@
         d'entreprises (DINUM), extraction de compétences par LLM local (Ollama, mistral-nemo).
         Rapport régénéré à chaque exécution du pipeline. Les sections Technologies et Domaines exigent un run local
         avec extraction LLM, absente du runner CI (CI_SANS_EXTRACTION) : elles restent vides sur tout rapport automatisé.
+        Sauf mention contraire, les mesures portent sur les annonces distinctes et non sur les offres : une même annonce
+        publiée dans plusieurs villes reçoit un identifiant par ville, et compterait sinon autant de fois.
+        La section Géographie fait exception, pour la raison indiquée sous son graphique.
     </footer>
 
 </div>

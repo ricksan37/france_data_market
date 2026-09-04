@@ -60,6 +60,15 @@ select
     s.salaire_periode,
     s.salaire_mentionne,
     s.salaire_annuel_plausible,
+
+    -- Grappes d'annonces identiques. Voir int_grappes_annonces : un même poste
+    -- publié dans plusieurs villes reçoit un identifiant par ville et compte
+    -- donc autant de fois dans tous les agrégats. Filtrer sur
+    -- est_annonce_canonique compte des annonces, ne pas filtrer compte des
+    -- offres. Les deux questions sont légitimes.
+    g.signature_annonce,
+    g.taille_grappe,
+    g.est_annonce_canonique,
     c.categorie_employeur,
     d.siren
 from {{ ref('stg_ft_offres') }} as f
@@ -71,3 +80,5 @@ left join {{ ref('stg_dinum_entreprises') }} as d
     on f.offre_id = d.offre_id
 left join {{ ref('stg_offres_skills') }} as k
     on f.offre_id = k.offre_id
+left join {{ ref('int_grappes_annonces') }} as g
+    on f.offre_id = g.offre_id
