@@ -120,6 +120,11 @@ def chart_barres_horizontales(lignes, cat_col, val_col, titre, suffixe="",
         textfont=_FONT_LABEL,
         marker_color=couleur,
         cliponaxis=False,  # sinon le label de la plus longue barre est rogne
+        # Reutilise `text` (deja formate avec suffixe) plutot que reformater
+        # %{x} : une seule source de verite pour la valeur affichee, sur la
+        # barre et dans l'infobulle. <extra></extra> retire la boite "trace 0"
+        # que Plotly ajoute par defaut a cote de l'infobulle.
+        hovertemplate="<b>%{y}</b><br>%{text}<extra></extra>",
     ))
     fig.update_layout(
         template="millimeter_dark",
@@ -129,12 +134,16 @@ def chart_barres_horizontales(lignes, cat_col, val_col, titre, suffixe="",
                    showticklabels=False, zeroline=False),
         yaxis=dict(showgrid=False, showline=False,
                    tickfont=dict(family=FONT_MONO, color=PAPER_MUTED, size=11)),
-        # Marge droite calculee sur l'etiquette la plus longue et non fixee :
-        # les labels sortent du bout des barres, et une valeur fixe calibree
-        # pour "283" tronquait "45 000 EUR - n=136" des que l'effectif a ete
-        # ajoute. JetBrains Mono a une chasse fixe, la largeur d'une etiquette
-        # est donc exactement proportionnelle a son nombre de caracteres.
-        margin=dict(l=20, r=30 + 7 * max(len(t) for t in textes),
+        # Marges calculees sur la longueur des libelles et non fixees, a
+        # gauche comme a droite. La droite existait deja (etiquettes de
+        # valeur qui sortent du bout des barres) ; la gauche manquait, et un
+        # nom de categorie comme "Databricks" (10 caracteres) se faisait
+        # tronquer par une marge fixe de 20px calibree pour des sigles courts
+        # (mesure du 04/09, cf. compte rendu). JetBrains Mono a une chasse
+        # fixe : la largeur d'un libelle est exactement proportionnelle a son
+        # nombre de caracteres.
+        margin=dict(l=24 + 7 * max(len(str(c)) for c in cats),
+                    r=30 + 7 * max(len(t) for t in textes),
                     t=16, b=16, autoexpand=True),
     )
     return fig
@@ -158,6 +167,7 @@ def chart_colonnes(lignes, cat_col, val_col, titre, y_titre="", suffixe="",
         textfont=_FONT_LABEL,
         marker_color=couleur,
         cliponaxis=False,
+        hovertemplate="<b>%{x}</b><br>%{text}<extra></extra>",
     ))
     fig.update_layout(template="millimeter_dark", meta=dict(titre=titre, note=note),
                       yaxis_title=y_titre, height=hauteur)
@@ -179,6 +189,7 @@ def chart_barres_groupees(lignes, cat_col, series, titre, hauteur=340):
             x=cats, y=vals, name=libelle,
             text=vals, textposition="outside", textfont=_FONT_LABEL,
             marker_color=couleur, cliponaxis=False,
+            hovertemplate=f"<b>%{{x}}</b><br>{libelle} : %{{text}}<extra></extra>",
         ))
     fig.update_layout(template="millimeter_dark", meta=dict(titre=titre, note=None),
                       barmode="group", height=hauteur)
@@ -203,6 +214,7 @@ def chart_ligne(lignes, x_col, y_col, titre, suffixe="", couleur=BLUE, hauteur=3
         text=[f"{v}{suffixe}" for v in ys],
         textposition="top center",
         textfont=_FONT_LABEL,
+        hovertemplate="<b>%{x}</b><br>%{text}<extra></extra>",
     ))
     fig.update_layout(template="millimeter_dark", meta=dict(titre=titre, note=None), height=hauteur)
     return fig
