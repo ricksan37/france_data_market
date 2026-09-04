@@ -8,7 +8,7 @@ Projet de portfolio pour une transition vers l'**Analytics Engineering**. L'acce
 
 ---
 
-## Cinq décisions qui illustrent la méthode
+## Six décisions qui illustrent la méthode
 
 ### Taux de matching entreprise : 19,2 % → 80,3 %
 
@@ -33,6 +33,14 @@ Pour extraire les compétences techniques du texte libre des annonces, trois mod
 D'où deux tables de faits au lieu d'une, chacune avec sa portée écrite en tête du modèle. `fct_marche_hebdo` mesure le corpus accumulé. `fct_marche_flux` mesure la présence réelle des offres dans chaque collecte, et c'est la seule qui sait dire ce qui apparaît et ce qui disparaît. Elle s'appuie sur un historique au grain de l'offre (`data/snapshots/presence_offres.csv`), un couple (semaine, offre_id) par observation, qui préserve les réapparitions et permet de calculer une survie par cohorte, là où un simple couple première vue / dernière vue les aurait écrasées.
 
 Le test qui garde l'ensemble honnête relie trois mesures calculées indépendamment : les offres actives d'une semaine doivent être celles de la semaine précédente, moins les sorties, plus les nouvelles. `552 - 463 + 408 = 497`. Si l'une des trois dérive, l'égalité casse.
+
+### Invisible sur l'agrégat, destructrice sur la tranche
+
+Quinze offres sur 275 portent un salaire annuel implausible : onze à 1 800 €, quatre entre 15 et 40 €. Sur la médiane globale, elles ne changent **rien** : 45 000 € avec ou sans elles, parce que quinze valeurs sur 275 ne déplacent pas une médiane. Sur une tranche, elles la retournent. La médiane des offres mentionnant Tableau affichait **1 800 € au lieu de 37 000 €**, celle d'Excel 1 800 au lieu de 35 000. Ces deux outils sont associés aux profils juniors, donc ils concentraient les annonces au salaire mensuel mal étiqueté.
+
+Pire : les onze annonces à 1 800 € étaient toutes classées `ANONYME`. À elles seules, elles créaient un écart salarial apparent de 5 000 € entre employeurs masqués et employeurs directs. Une fois écartées, les trois catégories tombent exactement sur la même médiane, 45 000 €. Ce qui sépare vraiment les catégories n'est pas le salaire, c'est le fait de l'afficher : 53,9 % chez les intermédiaires nommés contre 12,7 % chez les employeurs masqués.
+
+La tentation était de corriger la période, d'autant que la Session 3 avait déjà reclassé « Mensuel > 10 000 € » en annuel sur une zone vide de la distribution, et que la figure symétrique existe ici (rien entre 1 800 et 25 000 €). Mesure du coût avant de céder : reclasser porterait 24 % de la population mensuelle à un seul annonceur, doublerait la population horaire avec la moitié de valeurs nouvelles, et **ne changerait rien à l'annuel**. On abîmerait deux petites populations pour ne rien gagner sur la grande. Un drapeau `salaire_annuel_plausible` exclut donc sans détruire, protégé par un test en `severity: error`.
 
 ---
 
@@ -278,7 +286,9 @@ Un projet honnête documente ce qu'il ne sait pas résoudre plutôt que de le ca
 - **EY non matché** (28 offres, 13 %) — sigle commercial absent du répertoire SIRENE, aucun critère fiable pour départager les 5+ entités juridiques du groupe. Non matché volontairement plutôt que par une règle arbitraire.
 - **Consolidation groupe sur homonymes** (27 cas) — les filiales portant un nom identique à leur maison mère sont rattachées à la plus grande structure (`nombre_etablissements` maximal), un choix justifié par l'objectif analytique (caractériser le type de structure qui recrute), pas une approximation cachée. Statut distinct en base pour filtrer ce comportement si besoin.
 - **Extraction LLM sur le champ `domaines`** — le modèle retenu (Mistral-Nemo) sous-extrait ce champ sur les annonces de conseil en stratégie, au bénéfice d'une bien meilleure fiabilité sur le champ `technologies`, jugé prioritaire pour l'objectif du projet.
-- **Bornes de plausibilité salariale** — établies uniquement pour les salaires annuels (152 offres mesurées). Les salaires horaires et mensuels (19 et 1 offres respectivement) sont trop peu nombreux pour fonder une règle statistique défendable ; la question reste différée tant que l'échantillon ne grossit pas (revérifié sans changement en Session 7).
+- **Bornes de plausibilité salariale, annuel seulement** — la règle existe pour les salaires annuels (260 offres plausibles sur 275, drapeau `salaire_annuel_plausible`). Les populations horaire et mensuelle, 4 et 34 offres, restent sans bornes : trop peu nombreuses pour fonder un seuil défendable. C'est aussi ce qui a fait écarter l'idée de reclasser les valeurs aberrantes vers ces périodes plutôt que de les marquer.
+- **Salaire affiché sur moins d'un tiers des offres** — 32,6 % mentionnent un salaire, 27,1 % un salaire annuel exploitable. Toute analyse salariale porte donc sur un quart du corpus, et rien ne dit que ce quart soit représentatif : afficher un salaire est en soi un comportement d'employeur, mesuré ici comme tel.
+- **Salaires en paliers** — 66,1 % des montants annuels sont des multiples de 5 000 €. Aucune précision revendiquée sous ce palier.
 - **Corpus accumulé et marché réel sont deux choses** — `fct_offre` et `fct_marche_hebdo` comptent toutes les offres jamais collectées, y compris celles qui ont disparu de France Travail. Seule `fct_marche_flux` mesure le marché vivant. Les deux tables coexistent avec leur portée documentée en tête de modèle plutôt qu'une seule ambiguë.
 - **Elementary reste hors de portée** — l'outil stocke ses résultats dans le warehouse, or `warehouse.duckdb` est éphémère sur un runner jetable : il repartirait de zéro chaque lundi. La Phase 6 le prévoyait ; il restera écarté tant que le projet n'a pas de warehouse persistant, ce qui sortirait de la contrainte 0 € d'infrastructure.
 - **Snapshot automatisé sans extraction LLM** — le runner GitHub Actions ne peut pas exécuter Ollama (~28 s par offre). Le snapshot hebdomadaire produit par le cron ne comporte donc jamais `top_technologie` ni la reclassification `INTERMEDIAIRE_reclasse` (valeurs marquées explicitement "non disponible (CI)" plutôt que silencieusement fausses ou absentes). Ces deux métriques restent disponibles uniquement après un run manuel en local, extraction Ollama à jour.

@@ -90,7 +90,8 @@ _FONT_LABEL = dict(family=FONT_MONO, size=10, color=PAPER)
 
 
 def chart_barres_horizontales(lignes, cat_col, val_col, titre, suffixe="",
-                              couleur=BLUE, hauteur=None):
+                              couleur=BLUE, hauteur=None, note=None,
+                              etiquettes=None):
     """Barres horizontales : le format par defaut des que les libelles sont longs.
 
     Les barres verticales obligeaient a incliner les libelles a 45 degres ;
@@ -106,10 +107,15 @@ def chart_barres_horizontales(lignes, cat_col, val_col, titre, suffixe="",
     cats = [l[cat_col] for l in donnees]
     vals = [l[val_col] for l in donnees]
 
+    if etiquettes:
+        textes = [etiquettes[l[cat_col]] for l in donnees]
+    else:
+        textes = [f"{v:,.0f}{suffixe}".replace(",", " ") for v in vals]
+
     fig = go.Figure(go.Bar(
         x=vals, y=cats,
         orientation="h",
-        text=[f"{v:,.0f}{suffixe}".replace(",", " ") for v in vals],
+        text=textes,
         textposition="outside",
         textfont=_FONT_LABEL,
         marker_color=couleur,
@@ -117,20 +123,25 @@ def chart_barres_horizontales(lignes, cat_col, val_col, titre, suffixe="",
     ))
     fig.update_layout(
         template="millimeter_dark",
-        meta=dict(titre=titre),
+        meta=dict(titre=titre, note=note),
         height=hauteur or max(240, 42 * len(cats) + 60),
         xaxis=dict(showgrid=True, gridcolor=HAIRLINE, showline=False,
                    showticklabels=False, zeroline=False),
         yaxis=dict(showgrid=False, showline=False,
                    tickfont=dict(family=FONT_MONO, color=PAPER_MUTED, size=11)),
-        # De la marge a droite : les labels sortent du bout des barres.
-        margin=dict(l=20, r=70, t=16, b=16, autoexpand=True),
+        # Marge droite calculee sur l'etiquette la plus longue et non fixee :
+        # les labels sortent du bout des barres, et une valeur fixe calibree
+        # pour "283" tronquait "45 000 EUR - n=136" des que l'effectif a ete
+        # ajoute. JetBrains Mono a une chasse fixe, la largeur d'une etiquette
+        # est donc exactement proportionnelle a son nombre de caracteres.
+        margin=dict(l=20, r=30 + 7 * max(len(t) for t in textes),
+                    t=16, b=16, autoexpand=True),
     )
     return fig
 
 
 def chart_colonnes(lignes, cat_col, val_col, titre, y_titre="", suffixe="",
-                   couleur=BLUE, hauteur=340):
+                   couleur=BLUE, hauteur=340, note=None, etiquettes=None):
     """Colonnes verticales : reserve aux categories peu nombreuses et courtes.
 
     Une seule teinte, labels directs au-dessus des barres (regle skill :
@@ -141,13 +152,14 @@ def chart_colonnes(lignes, cat_col, val_col, titre, y_titre="", suffixe="",
 
     fig = go.Figure(go.Bar(
         x=cats, y=vals,
-        text=[f"{v:,.0f}{suffixe}".replace(",", " ") for v in vals],
+        text=([etiquettes[l[cat_col]] for l in lignes] if etiquettes
+              else [f"{v:,.0f}{suffixe}".replace(",", " ") for v in vals]),
         textposition="outside",
         textfont=_FONT_LABEL,
         marker_color=couleur,
         cliponaxis=False,
     ))
-    fig.update_layout(template="millimeter_dark", meta=dict(titre=titre),
+    fig.update_layout(template="millimeter_dark", meta=dict(titre=titre, note=note),
                       yaxis_title=y_titre, height=hauteur)
     return fig
 
@@ -168,7 +180,7 @@ def chart_barres_groupees(lignes, cat_col, series, titre, hauteur=340):
             text=vals, textposition="outside", textfont=_FONT_LABEL,
             marker_color=couleur, cliponaxis=False,
         ))
-    fig.update_layout(template="millimeter_dark", meta=dict(titre=titre),
+    fig.update_layout(template="millimeter_dark", meta=dict(titre=titre, note=None),
                       barmode="group", height=hauteur)
     return fig
 
@@ -192,7 +204,7 @@ def chart_ligne(lignes, x_col, y_col, titre, suffixe="", couleur=BLUE, hauteur=3
         textposition="top center",
         textfont=_FONT_LABEL,
     ))
-    fig.update_layout(template="millimeter_dark", meta=dict(titre=titre), height=hauteur)
+    fig.update_layout(template="millimeter_dark", meta=dict(titre=titre, note=None), height=hauteur)
     return fig
 
 
@@ -207,7 +219,7 @@ def figure_vide(message: str) -> go.Figure:
     fig = go.Figure()
     fig.update_layout(
         template="millimeter_dark",
-        meta=dict(titre=""),
+        meta=dict(titre="", note=None),
         xaxis=dict(visible=False), yaxis=dict(visible=False),
         height=200,
         annotations=[dict(

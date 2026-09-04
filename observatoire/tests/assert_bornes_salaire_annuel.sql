@@ -8,14 +8,25 @@
 -- Limité à salaire_periode = 'annuel' : les bornes horaire/mensuel ne sont
 -- pas mesurées, décision différée (S3/S4).
 --
--- SEVERITY: WARN, décision assumée (S4, 31/07/2026) — pas un contournement
--- silencieux. Ce test attrape un cas connu et documenté depuis la S3
--- ("Annuel de 15.0 Euros", 1 occurrence) jamais corrigé faute d'un 2e
--- exemple pour établir une règle de correction défendable (principe
--- projet §12.3 : ne jamais corriger sur un cas isolé). Le WARN garde le
--- pipeline vert sans effacer le signal — voir §12.3 (FAIL vs ERROR).
--- Si un 2e cas apparaît un jour avec de nouvelles données, ça change la
--- donne : passer en severity: error et traiter comme une vraie règle.
+-- SEVERITY: WARN, et ce test reste volontairement un COMPTEUR. Il mesure
+-- combien de valeurs aberrantes existent ; il n'a jamais eu vocation à les
+-- écarter d'une agrégation.
+--
+-- La condition posée en S4 est remplie. Elle disait : « si un 2e cas
+-- apparaît un jour avec de nouvelles données, ça change la donne ». Au
+-- 03/09/2026, sur 960 offres, il y en a 15, réparties en quatre sources
+-- distinctes et deux mécanismes cohérents : un salaire mensuel étiqueté
+-- annuel (11 annonces d'un même annonceur, toutes à 1800 €) et un taux
+-- horaire étiqueté annuel (4 annonces, 15 à 40 €). La règle a donc été
+-- écrite, mais ailleurs : salaire_annuel_plausible dans
+-- int_offres_salaire, protégé par assert_flag_salaire_plausible en
+-- severity error.
+--
+-- Pourquoi ce test-ci ne passe pas en error pour autant : les 15 lignes
+-- existent et continueront d'exister, puisqu'on a choisi de les marquer
+-- plutôt que de les corriger. Le faire échouer bloquerait le pipeline sur
+-- un état connu et assumé. Son WARN garde le compte visible à chaque run,
+-- ce qui reste utile : si le nombre s'envole, la source a changé.
 --
 -- Contrat dbt : 0 ligne = pass, >= 1 ligne = warn (pas fail).
 

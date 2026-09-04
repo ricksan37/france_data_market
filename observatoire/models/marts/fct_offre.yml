@@ -66,6 +66,20 @@ models:
           (spec §6.1, Session 7 pour la 4e valeur). Voir
           int_classification_employeur pour la logique complète.
 
+      - name: salaire_annuel_plausible
+        description: >
+          Le montant annuel tient-il dans les bornes de plausibilité
+          [10 000, 300 000 €] (spec §12.1). NULL quand la question ne se pose
+          pas : période non annuelle, ou aucun montant. Trois états et non
+          deux, parce que « non applicable » n'est pas « implausible ».
+          Toute agrégation salariale annuelle doit filtrer dessus : au
+          03/09/2026, 15 offres sur 275 sont marquées fausses, et elles
+          suffisent à faire tomber la médiane de Tableau à 1 800 € au lieu
+          de 37 000 €. Invisible sur l'agrégat global, qui vaut 45 000 € dans
+          les deux cas ; destructeur sur une tranche.
+          Cohérence garantie par assert_flag_salaire_plausible (severity
+          error), volumétrie suivie par assert_bornes_salaire_annuel (warn).
+
       - name: description
         description: >
           Texte intégral de l'annonce, repris de stg_ft_offres. Ajouté en S6

@@ -49,14 +49,24 @@ order by semaine;
 
 -- ============================================================
 -- SECTION 02 : RÉMUNÉRATION
--- L'offre 4933945 est exclue : salaire annuel aberrant identifié en Session 4
--- (cf. tests/assert_bornes_salaire_annuel.sql).
+-- Filtre sur salaire_annuel_plausible, pas sur un offre_id écrit en dur.
+-- La version précédente excluait nommément l'offre 4933945, seul cas connu
+-- en Session 4. Au 03/09 il y en a 15, en deux mécanismes : un salaire
+-- mensuel étiqueté annuel (11 annonces à 1800 €, un seul annonceur) et un
+-- taux horaire étiqueté annuel (4 annonces, 15 à 40 €). Une exclusion
+-- nominative ne passe pas à l'échelle, une règle si.
+--
+-- L'effectif est remonté avec la médiane et affiché sur chaque barre. Sous
+-- 10 offres la catégorie est écartée du graphique et nommée en note :
+-- INTERMEDIAIRE_reclasse affichait 65 000 € en tête, calculés sur 3 offres.
 -- ============================================================
 
 -- SALAIRE_PAR_CATEGORIE
-select categorie_employeur, median(salaire_min) as salaire_median
+select categorie_employeur,
+       count(*) as n,
+       median(salaire_min) as salaire_median
 from fct_offre
-where salaire_periode = 'annuel' and offre_id != '4933945'
+where salaire_periode = 'annuel' and salaire_annuel_plausible
 group by categorie_employeur
 order by salaire_median desc;
 
@@ -65,9 +75,11 @@ order by salaire_median desc;
 -- seules D et E sont présentes (540 et 420 offres), S est absente. La
 -- traduction en libellés lisibles vit dans le générateur, jamais ici ni dans
 -- les modèles dbt, qui gardent les valeurs canoniques.
-select experience_exige, median(salaire_min) as salaire_median
+select experience_exige,
+       count(*) as n,
+       median(salaire_min) as salaire_median
 from fct_offre
-where salaire_periode = 'annuel' and offre_id != '4933945'
+where salaire_periode = 'annuel' and salaire_annuel_plausible
 group by experience_exige
 order by salaire_median;
 

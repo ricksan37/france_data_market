@@ -127,6 +127,40 @@ def traduire(lignes: list, colonne: str, dictionnaire: dict) -> list:
     ]
 
 
+# Sous ce seuil, une mediane est portee par une ou deux valeurs : elle se
+# lit comme un resultat alors qu'elle n'en est pas un. Mesure du 03/09 :
+# INTERMEDIAIRE_reclasse affichait 65 000 EUR en tete du graphique, calcules
+# sur 3 offres. Le seuil ecarte la barre du graphique ; la note sous la carte
+# nomme ce qui a ete ecarte et pourquoi -- ecarter en silence serait le
+# contraire du principe du projet.
+SEUIL_EFFECTIF = 10
+
+
+def separer_par_effectif(lignes: list, col_effectif: str = "n") -> tuple[list, list]:
+    """Scinde un jeu de lignes selon SEUIL_EFFECTIF."""
+    gardees = [l for l in lignes if l[col_effectif] >= SEUIL_EFFECTIF]
+    ecartees = [l for l in lignes if l[col_effectif] < SEUIL_EFFECTIF]
+    return gardees, ecartees
+
+
+def note_effectif(ecartees: list, col_libelle: str) -> str | None:
+    """Phrase qui nomme les categories ecartees, ou None s'il n'y en a pas."""
+    if not ecartees:
+        return None
+    details = ", ".join(f"{l[col_libelle]} ({l['n']} offres)" for l in ecartees)
+    return (f"Écarté faute d'effectif : {details}. Sous {SEUIL_EFFECTIF} offres "
+            f"au salaire annuel exploitable, une médiane est portée par une ou "
+            f"deux valeurs.")
+
+
+def etiquettes_mediane(lignes: list, col_libelle: str, col_valeur: str) -> dict:
+    """Etiquette de barre : la mediane ET son effectif, jamais l'une sans l'autre."""
+    return {
+        l[col_libelle]: f"{l[col_valeur]:,.0f} € · n={l['n']}".replace(",", " ")
+        for l in lignes
+    }
+
+
 def big_stat_html(valeur: str, libelle: str, centre: bool = False) -> str:
     """Un chiffre qui vaut mieux qu'un graphique : bloc HTML, pas un chart."""
     classe = "big-stat big-stat-centre" if centre else "big-stat"
@@ -150,8 +184,12 @@ def html_figure(fig, premiere: bool = False) -> str:
     cela, l'ouverture par double-clic (file://) donne "Plotly is not defined"
     (corrige en Session 7).
     """
-    titre = (fig.layout.meta or {}).get("titre", "")
+    meta = fig.layout.meta or {}
+    titre = meta.get("titre", "")
+    note = meta.get("note")
     entete = f'<h3 class="titre-carte">{titre}</h3>' if titre else ""
+    if note:
+        entete += f'<p class="note-carte">{note}</p>'
     return entete + pio.to_html(
         fig,
         include_plotlyjs="inline" if premiere else False,
@@ -230,34 +268,46 @@ def generer() -> None:
     )
 
     # ---------- 02 Remuneration ----------
-    # L'offre 4933945 est exclue : salaire annuel aberrant identifie en
-    # Session 4 (borne de plausibilite, test assert_bornes_salaire_annuel).
+    # Filtre sur salaire_annuel_plausible et non plus sur un offre_id ecrit en
+    # dur. La version precedente excluait nommement l'offre 4933945, seul cas
+    # connu en Session 4 ; il y en a 15 au 03/09. Une exclusion nominative ne
+    # passe pas a l'echelle, une regle si.
     salaire_cat = traduire(executer(con, """
-        select categorie_employeur, median(salaire_min) as salaire_median
+        select categorie_employeur,
+               count(*) as n,
+               median(salaire_min) as salaire_median
         from fct_offre
-        where salaire_periode = 'annuel' and offre_id != '4933945'
+        where salaire_periode = 'annuel' and salaire_annuel_plausible
         group by categorie_employeur
         order by salaire_median desc
     """), "categorie_employeur", LIBELLES_CATEGORIE)
+    cat_gardees, cat_ecartees = separer_par_effectif(salaire_cat)
     fig_salaire_cat = chart_barres_horizontales(
-        salaire_cat, "categorie_employeur", "salaire_median",
-        "SALAIRE MÉDIAN PAR CATÉGORIE D'EMPLOYEUR", suffixe=" €",
+        cat_gardees, "categorie_employeur", "salaire_median",
+        "SALAIRE MÉDIAN PAR CATÉGORIE D'EMPLOYEUR",
+        etiquettes=etiquettes_mediane(cat_gardees, "categorie_employeur", "salaire_median"),
+        note=note_effectif(cat_ecartees, "categorie_employeur"),
     )
 
     salaire_exp = traduire(executer(con, """
-        select experience_exige, median(salaire_min) as salaire_median
+        select experience_exige,
+               count(*) as n,
+               median(salaire_min) as salaire_median
         from fct_offre
-        where salaire_periode = 'annuel' and offre_id != '4933945'
+        where salaire_periode = 'annuel' and salaire_annuel_plausible
         group by experience_exige
         order by salaire_median
     """), "experience_exige", LIBELLES_EXPERIENCE)
+    exp_gardees, exp_ecartees = separer_par_effectif(salaire_exp)
     # Blue seul : deux barres d'une meme mesure, pas deux series ni un delta.
     # La version precedente coloriait "debutant" en Vermilion et "experience
     # exigee" en Green, ce qui detournait le codage positif/negatif de
     # l'identite pour porter un jugement de valeur sur un niveau d'experience.
     fig_salaire_exp = chart_colonnes(
-        salaire_exp, "experience_exige", "salaire_median",
-        "SALAIRE MÉDIAN PAR NIVEAU D'EXPÉRIENCE", suffixe=" €", hauteur=364,
+        exp_gardees, "experience_exige", "salaire_median",
+        "SALAIRE MÉDIAN PAR NIVEAU D'EXPÉRIENCE", hauteur=364,
+        etiquettes=etiquettes_mediane(exp_gardees, "experience_exige", "salaire_median"),
+        note=note_effectif(exp_ecartees, "experience_exige"),
     )
 
     # ---------- 03 Transparence ----------

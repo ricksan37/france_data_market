@@ -38,6 +38,7 @@ select
     s.salaire_max,
     s.salaire_periode,
     s.salaire_mentionne,
+    s.salaire_annuel_plausible,
     c.categorie_employeur,
     d.siren
 from {{ ref('stg_ft_offres') }} as f
