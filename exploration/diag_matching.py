@@ -60,7 +60,7 @@ for i, (nom, code_commune) in enumerate(offres, start=1):
     if code_commune is None or code_commune == '':
         statut, detail = "sans_cle_geo", None
     elif nom.strip().upper() == "EY":
-        # Déjà diagnostiqué (Session 5) : sigle sans correspondance légale.
+        # Déjà diagnostiqué : sigle sans correspondance légale.
         # On ne refait pas l'appel API, la conclusion est connue.
         statut, detail = "pas_de_resultat_sigle_connu", None
     else:

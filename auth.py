@@ -7,7 +7,7 @@ isole l'obtention du jeton pour que le reste du code (search, pull) n'ait
 jamais à manipuler client_id / client_secret directement.
 
 Les identifiants sont lus depuis un fichier .env (jamais commité, cf.
-.gitignore) via python-dotenv — aucun secret n'est écrit en dur dans le code.
+.gitignore) via python-dotenv ; aucun secret n'est écrit en dur dans le code.
 """
 
 import os

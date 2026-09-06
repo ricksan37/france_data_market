@@ -82,7 +82,7 @@ nouvelles as (
 -- Sorties : presentes la semaine enregistree precedente, absentes celle-ci.
 -- Anti-jointure par left join + is null plutot que par NOT IN : un NOT IN a
 -- plusieurs centaines de valeurs fait planter l'optimiseur DuckDB (bug
--- Session 3, version-independant).
+-- connu, version-independant).
 sorties as (
 
     select

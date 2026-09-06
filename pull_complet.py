@@ -3,7 +3,7 @@
 Pull complet du périmètre data (Phase 1, point 4 de la spec).
 
 Stratégie hybride retenue après exploration du référentiel ROME :
-- codeROME entier pour les métiers dédiés à la data (M1405, M1811 — validés
+- codeROME entier pour les métiers dédiés à la data (M1405, M1811, validés
   par inspection directe des intitulés retournés, cf. exploration/)
 - motsCles ciblé pour les intitulés isolés dans des métiers ROME fourre-tout
   (M1403, M1805, M1806, M1868 mélangent data et dizaines de métiers sans rapport)
@@ -11,7 +11,7 @@ Stratégie hybride retenue après exploration du référentiel ROME :
 Limite connue et acceptée : les offres remontées par motsCles ne portent pas,
 dans le JSON brut, de trace du mot-clé qui les a fait matcher (contrairement
 aux offres codeROME, où romeCode est déjà un champ natif de l'offre). On ne
-modifie pas les offres pour ajouter cette info a posteriori — ça violerait
+modifie pas les offres pour ajouter cette info a posteriori : ça violerait
 le principe "raw jamais modifié" (spec §7.2). Seul le compte par catégorie
 est conservé, dans le metadata.
 """
@@ -98,7 +98,7 @@ def pull_complet() -> None:
         json.dump(dump, f, ensure_ascii=False, indent=2)
 
     print(f"\n✅ {len(toutes_les_offres)} offres brutes sauvegardées dans {chemin}")
-    print(f"   ({metadata['total_offres_id_uniques']} ID uniques — "
+    print(f"   ({metadata['total_offres_id_uniques']} ID uniques ; "
           f"le reste sera dédoublonné en dbt)")
 
 

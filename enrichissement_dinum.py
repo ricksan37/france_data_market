@@ -1,12 +1,12 @@
 """
 Enrichissement entreprise via l'API Recherche d'entreprises (DINUM).
-Phase 3 — spec FR-014 / FR-015.
+Phase 3, spec FR-014 / FR-015.
 
 Enrichit les offres EMPLOYEUR_DIRECT avec SIREN, NAF, effectif et date de
 création, en résolvant le nom d'entreprise saisi par l'employeur vers une
 entité légale du répertoire SIRENE.
 
-STRATÉGIE DE MATCHING — construite par paliers mesurés en Session 5
+STRATÉGIE DE MATCHING : construite par paliers mesurés
 (19,2% -> 80,3% de taux de matching) :
 
   Clé géographique : code INSEE commune, PAS le code postal.
@@ -164,7 +164,7 @@ def mots_inclus(nom_court, nom_long):
       inclus dans des dizaines de candidats ;
     - le candidat ne doit pas faire plus du double de mots. Sans cette borne,
       un libellé de service interne comme "FONCTIONS SUPPORTS" se rattachait
-      à "AIDE AUX FONCTIONS SUPPORTS DES ENTREPRISES" — inclusion vraie au
+      à "AIDE AUX FONCTIONS SUPPORTS DES ENTREPRISES" : inclusion vraie au
       sens strict, mais entité sans rapport. Un écart de cette ampleur signale
       qu'on a attrapé une entité satellite, pas l'employeur.
     """
@@ -253,7 +253,7 @@ def _departager(candidats, code_naf_offre, statut_naf, statut_groupe, autoriser_
 
 def selectionner_nom_exact(nom_offre, code_naf_offre, candidats_actifs, autoriser_naf=True):
     """
-    PASSE 1 — correspondance exacte du nom uniquement.
+    PASSE 1 : correspondance exacte du nom uniquement.
 
     Exécutée sur toute la cascade géographique AVANT toute règle souple :
     un nom exact au niveau national vaut mieux qu'une correspondance
@@ -281,7 +281,7 @@ def selectionner_nom_exact(nom_offre, code_naf_offre, candidats_actifs, autorise
 
 def selectionner_souple(nom_offre, code_naf_offre, candidats_actifs, autoriser_naf=True):
     """
-    PASSE 2 — correspondances assouplies, dans l'ordre de fiabilité
+    PASSE 2 : correspondances assouplies, dans l'ordre de fiabilité
     décroissante : préfixe sur frontière de mot, puis inclusion de mots.
 
     N'est tentée qu'après échec de la passe exacte sur TOUS les niveaux
@@ -453,7 +453,7 @@ def main():
     taux = 100 * total_match / len(offres)
 
     # Structure {metadata, resultats}, identique au dump d'ingestion
-    # France Travail — cohérence des sources brutes.
+    # France Travail : cohérence des sources brutes.
     horodatage = datetime.now().strftime("%Y-%m-%d_%H%M")
     chemin_sortie = f"{DOSSIER_SORTIE}/enrichissement_dinum_{horodatage}.json"
 
@@ -481,7 +481,7 @@ def main():
     #   2. mots du candidat absents de l'offre (candidat trop large :
     #      "ASSOCIATION DES ETUDIANTS ... DE L'UNIVERSITE PARIS-SACLAY"
     #      contient tous les mots de "UNIVERSITE PARIS-SACLAY", mais en
-    #      ajoute huit — signe qu'on a attrapé une entité satellite)
+    #      ajoute huit, signe qu'on a attrapé une entité satellite)
     print("\n--- Audit qualité ---")
 
     familles = {}

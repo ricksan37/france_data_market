@@ -6,10 +6,10 @@
 -- Détecte les noms d'entreprise (issus de l'offre brute, avant matching DINUM)
 -- portant un préfixe numérique parasite : un identifiant interne du recruteur
 -- (code de service, référence RH) collé devant le vrai nom, séparé par un tiret.
--- Exemples mesurés en S5 : "751163-DIR STRATEGIE INNOVATION ET TRANSFO",
+-- Exemples mesurés : "751163-DIR STRATEGIE INNOVATION ET TRANSFO",
 -- "929840-PARIS DIRECTION...". Ce n'est pas un nom d'entreprise exploitable tel quel.
 --
--- SEVERITY: WARN, décision assumée (S5, 01/08/2026) — 2 occurrences sur 213,
+-- SEVERITY: WARN, décision assumée le 01/08/2026 : 2 occurrences sur 213,
 -- pas assez pour construire une règle de nettoyage défendable (principe projet :
 -- jamais de correction sur un cas isolé, et 2 cas ne garantissent pas encore que
 -- le motif "chiffres + tiret" est stable, sans faux positif type "3M" ou "42Data").

@@ -4,7 +4,7 @@ enrichir_communes.py
 Objectif : résoudre les codes postaux présents dans fct_offre en noms de
 commune lisibles, via l'API publique geo.api.gouv.fr. Scope dynamique (lit
 fct_offre à chaque run, pas une liste figée) et incrémental (ne re-questionne
-jamais l'API sur un code déjà résolu) — le seed reste correct au fil des pulls
+jamais l'API sur un code déjà résolu) : le seed reste correct au fil des pulls
 hebdomadaires sans intervention manuelle sur le script.
 
 Prérequis : dbt build préalable (lit fct_offre, même contrainte que

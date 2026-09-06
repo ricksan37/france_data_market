@@ -2,7 +2,7 @@
 check_volume_bornes_salariales.py
 
 Objectif : vérifier si le volume horaire/mensuel a évolué depuis la mesure
-de Session 3 (19 offres horaires, 1 mensuelle) avant de statuer sur la
+initiale (19 offres horaires, 1 mensuelle) avant de statuer sur la
 dette différée des bornes de plausibilité salariale.
 
 Lancement : depuis observatoire/ -> python3 ../exploration/check_volume_bornes_salariales.py

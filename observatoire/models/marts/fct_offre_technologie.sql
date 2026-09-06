@@ -6,7 +6,7 @@
 --
 -- Les offres sans aucune technologie (annonces de conseil, ~60 % de
 -- l'échantillon testé) DISPARAISSENT ici : unnest sur une liste vide ne
--- produit aucune ligne. Ce n'est pas une perte de donnée — fct_offre reste
+-- produit aucune ligne. Ce n'est pas une perte de donnée : fct_offre reste
 -- la table de référence pour le compte d'offres. Ce modèle sert à compter
 -- des occurrences de termes, pas des offres.
 select

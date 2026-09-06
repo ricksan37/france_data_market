@@ -4,8 +4,8 @@
 -- (offre, terme) est une transformation de modélisation, donc du ressort des
 -- marts, pas du staging (règle §7.2 : aucune logique métier ici).
 --
--- Branche conditionnelle (Session 7) : en CI (CI_SANS_EXTRACTION=true), le
--- dump d'extraction n'existe pas -- Ollama tourne 3h en local, jamais sur un
+-- Branche conditionnelle : en CI (CI_SANS_EXTRACTION=true), le
+-- dump d'extraction n'existe pas : Ollama tourne 3h en local, jamais sur un
 -- runner GitHub. Le modèle renvoie alors 0 ligne avec le même schéma, plutôt
 -- que d'échouer à la lecture d'un fichier absent. int_classification_employeur
 -- dégrade déjà proprement sur une table vide (client_final_masque toujours

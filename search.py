@@ -24,7 +24,7 @@ def search_offres(params: dict) -> dict:
     Un seul appel de recherche (page unique, max 150 résultats).
 
     params : dict de paramètres de requête, ex. {"motsCles": "data analyst"}
-             ou {"codeROME": "M1405"} — passé tel quel à l'API.
+             ou {"codeROME": "M1405"} : passé tel quel à l'API.
 
     Retourne le JSON complet de la réponse (resultats, filtresPossibles...).
 
@@ -43,7 +43,7 @@ def search_offres(params: dict) -> dict:
     print(f"Offres dans cette page : {len(data.get('resultats', []))}")
 
     # Content-Range renseigne le total disponible (ex: "offres 0-149/1234"),
-    # info clé pour savoir s'il faut paginer — exploitée par get_all_offres.
+    # info clé pour savoir s'il faut paginer, exploitée par get_all_offres.
     content_range = response.headers.get("Content-Range")
     print(f"Content-Range : {content_range}")
 
@@ -61,7 +61,7 @@ def get_all_offres(params: dict, token: str | None = None) -> list[dict]:
             lors d'un pull multi-catégories). Si None, en demande un neuf.
 
     Plafond absolu de l'API : 1150 résultats (range 0-1149). Au-delà,
-    il faudrait affiner la recherche (ex: par date) — hors scope pour l'instant.
+    il faudrait affiner la recherche (ex: par date), hors scope pour l'instant.
 
     Retourne la liste des offres. Doublons possibles inclus (index de
     recherche live, cf. observation précédente) : le dédoublonnage est
@@ -107,12 +107,12 @@ def get_all_offres(params: dict, token: str | None = None) -> list[dict]:
         start += page_size
 
     # Mesure de qualité (spec Phase 1 : "Mesurer : volume réel par métier").
-    # Informatif seulement — on ne filtre rien ici, dédup en aval via dbt.
+    # Informatif seulement : on ne filtre rien ici, dédup en aval via dbt.
     ids = [offre["id"] for offre in all_resultats]
     n_doublons = len(ids) - len(set(ids))
     if n_doublons > 0:
         print(f"⚠ {n_doublons} doublon(s) détecté(s) sur {len(ids)} offres "
-              f"(pagination sur index temps réel — attendu, dédup en aval via dbt)")
+              f"(pagination sur index temps réel, attendu ; dédup en aval via dbt)")
 
     return all_resultats
 

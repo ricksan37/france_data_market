@@ -7,7 +7,7 @@
 # JSON restent donc éphémères (gitignorés, comme en local) ; seul
 # data/snapshots/marche_hebdo.csv est committé à chaque run, un fichier léger
 # qui accumule l'historique nécessaire à fct_marche_hebdo sans jamais
-# recommitter les 552+ offres brutes (décision Session 2, non rouverte).
+# recommitter les 552+ offres brutes (décision assumée, non rouverte).
 
 name: Pull hebdomadaire
 

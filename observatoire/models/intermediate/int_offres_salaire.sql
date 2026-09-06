@@ -27,7 +27,7 @@ select
     -- Reclassification : un montant "Mensuel" > 10000€ n'est pas plausible comme
     -- salaire mensuel (max observé ~5400€ dans l'échantillon) mais l'est comme
     -- salaire annuel (min observé ~30000€). Aucun cas ambigu entre les deux
-    -- (zone vide 5400-30000€). Décision Session 3, voir compte rendu.
+    -- (zone vide 5400-30000€). Décision mesurée, documentée séparément.
     case
         when salaire_periode_brute = 'Mensuel' and salaire_min > 10000 then 'annuel'
         else lower(salaire_periode_brute)
@@ -42,8 +42,8 @@ select
     -- montant. Un booleen a trois etats plutot que deux, parce que "non
     -- applicable" n'est pas "implausible".
     --
-    -- POURQUOI UN DRAPEAU ET NON UNE RECLASSIFICATION DE PERIODE. La S3 a
-    -- reclasse "Mensuel > 10000" en annuel, sur une zone vide de la
+    -- POURQUOI UN DRAPEAU ET NON UNE RECLASSIFICATION DE PERIODE. Une mesure
+    -- anterieure a reclasse "Mensuel > 10000" en annuel, sur une zone vide de la
     -- distribution. La figure symetrique existe ici : rien entre 1800 et
     -- 25000 EUR, soit 23200 EUR de vide, et les 15 valeurs sous la borne
     -- tombent dans les distributions observees des mensuels (506-4000) et

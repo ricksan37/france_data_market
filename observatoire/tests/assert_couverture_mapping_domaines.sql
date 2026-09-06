@@ -11,7 +11,7 @@
 -- mesurés le 02/08/2026 sur les 552 offres réelles). Ce test n'échoue jamais
 -- (WARN uniquement) : son rôle est d'informer, pas de bloquer. Si le taux de
 -- couverture chute nettement en dessous de ce niveau avec de nouvelles
--- données, c'est le signal qu'il faut retravailler le mapping — nouveaux
+-- données, c'est le signal qu'il faut retravailler le mapping : nouveaux
 -- clusters apparus, ou volume qui dilue les 12 existants.
 --
 -- Implémenté comme un test qui échoue TOUJOURS avec le chiffre en message :

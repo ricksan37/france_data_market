@@ -6,7 +6,7 @@ models:
     description: >
       Table de faits, grain fin. Une ligne par offre. Assemble stg_ft_offres
       avec les enrichissements salaire (int_offres_salaire) et classification
-      employeur (int_classification_employeur). Modèle exposé — c'est la
+      employeur (int_classification_employeur). Modèle exposé : c'est la
       table à interroger pour l'analyse, pas les couches staging/intermediate.
     columns:
       - name: offre_id
@@ -67,7 +67,7 @@ models:
           SIREN de l'entreprise employeuse, issu de l'enrichissement DINUM.
           NULL pour les offres hors périmètre EMPLOYEUR_DIRECT (339) et pour
           les 42 offres du périmètre non résolues par le matching (80,3 % de
-          taux de matching sur les 213 offres éligibles — voir Session 5).
+          taux de matching sur les 213 offres éligibles).
         data_tests:
           - relationships:
               to: ref('dim_entreprise')
@@ -76,16 +76,16 @@ models:
       - name: entreprise_nom
         description: >
           Nom de l'entreprise. Structuré (France Travail) sauf pour les 21
-          offres categorie_employeur = 'INTERMEDIAIRE_reclasse' (Session 7),
+          offres categorie_employeur = 'INTERMEDIAIRE_reclasse',
           où il provient d'entreprise_nom_texte, extrait par LLM depuis le
           texte de l'offre (Phase 4). NULL sur 5/21 de ces offres : le
           masquage est détecté sans que le nom de l'intermédiaire soit
-          identifiable dans le texte — volontairement non forcé.
+          identifiable dans le texte : volontairement non forcé.
 
       - name: categorie_employeur
         description: >
           EMPLOYEUR_DIRECT / INTERMEDIAIRE / ANONYME / INTERMEDIAIRE_reclasse
-          (spec §6.1, Session 7 pour la 4e valeur). Voir
+          (spec §6.1). Voir
           int_classification_employeur pour la logique complète.
 
       - name: salaire_annuel_plausible
@@ -128,7 +128,7 @@ models:
 
       - name: description
         description: >
-          Texte intégral de l'annonce, repris de stg_ft_offres. Ajouté en S6
+          Texte intégral de l'annonce, repris de stg_ft_offres. Ajouté
           comme source de l'extraction LLM (Phase 4). Porté par fct_offre
           plutôt que lu depuis stg_ft_offres parce que fct_offre est
           matérialisée en table : elle s'interroge depuis n'importe quel

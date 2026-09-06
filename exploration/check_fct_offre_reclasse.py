@@ -2,7 +2,7 @@
 check_fct_offre_reclasse.py
 
 Objectif : vérifier que fct_offre.entreprise_nom est bien rempli sur les 21
-offres INTERMEDIAIRE_reclasse (chiffre attendu de la Session 7), et vide
+offres INTERMEDIAIRE_reclasse (chiffre attendu), et vide
 nulle part ailleurs par erreur.
 
 Lancement : depuis observatoire/ -> python3 ../exploration/check_fct_offre_reclasse.py

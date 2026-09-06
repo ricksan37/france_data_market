@@ -1,6 +1,6 @@
 """
 Test cible des deux nouveaux champs (entreprise_nom_texte, client_final_masque)
-sur 4 offres à vérité terrain déjà lue manuellement (S6).
+sur 4 offres à vérité terrain déjà lue manuellement.
 
 Attendu :
   5076918 (Framatome)  -> nom="Framatome", masque=False (parle d'elle-même)

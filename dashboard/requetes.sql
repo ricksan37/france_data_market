@@ -51,7 +51,7 @@ order by semaine;
 -- SECTION 02 : RÉMUNÉRATION
 -- Filtre sur salaire_annuel_plausible, pas sur un offre_id écrit en dur.
 -- La version précédente excluait nommément l'offre 4933945, seul cas connu
--- en Session 4. Au 03/09 il y en a 15, en deux mécanismes : un salaire
+-- jusque là. Au 03/09 il y en a 15, en deux mécanismes : un salaire
 -- mensuel étiqueté annuel (11 annonces à 1800 €, un seul annonceur) et un
 -- taux horaire étiqueté annuel (4 annonces, 15 à 40 €). Une exclusion
 -- nominative ne passe pas à l'échelle, une règle si.
@@ -142,8 +142,8 @@ group by domaine_normalise
 order by nb_offres desc;
 
 -- DOMAINES_COUVERTURE
--- Mesuré le 31/08 sur 960 offres : 19,7 %, identique au 19,7 % mesuré en
--- Session 6 sur 552 offres. La longue traîne grossit au même rythme que les
+-- Mesuré le 31/08 sur 960 offres : 19,7 %, identique au 19,7 % mesuré précédemment
+-- sur 552 offres. La longue traîne grossit au même rythme que les
 -- douze clusters de tête, donc le mapping ne se dilue pas.
 select round(100.0 * count(case when domaine_normalise in
              (select distinct domaine_canonique from mapping_domaines)

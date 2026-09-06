@@ -1,7 +1,7 @@
 """
 check_masque_coherence.py
 
-Objectif : expliquer l'écart entre le pattern texte "notre client" (29/208, S6)
+Objectif : expliquer l'écart entre le pattern texte "notre client" (29/208)
 et client_final_masque=true (21/208, mesuré) avant toute décision d'architecture.
 Vérifie aussi la nature des 178 NULL.
 

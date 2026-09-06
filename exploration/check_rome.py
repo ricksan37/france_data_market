@@ -8,7 +8,7 @@ répond à la question : "ce mot-clé tombe-t-il dans un code ROME unique et
 propre, ou est-il éparpillé sur plein de codes ?".
 
 C'est ce comptage qui a montré que certains intitulés data n'ont pas de code
-ROME dédié et sont dispersés dans des métiers fourre-tout — d'où le recours
+ROME dédié et sont dispersés dans des métiers fourre-tout, d'où le recours
 au filtrage par motsCles pour ces cas (stratégie hybride, cf. pull_complet.py).
 
 Script jetable, gardé dans exploration/ pour tracer la démarche.

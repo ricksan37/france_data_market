@@ -5,9 +5,9 @@ du skill millimeter-visual-identity (references/dataviz.md) : fond Slate,
 grille Hairline sur l'axe de valeur uniquement, texte Paper Muted en mono,
 un seul accent qui mene par chart (Signal Blue par defaut).
 
-POLICES (revision Session 8). Le theme declarait des polices systeme pour
+POLICES. Le theme declarait des polices systeme pour
 garder un fichier autonome. Mesure du 31/08 : rendu sur une machine sans
-Arial Black, les titres perdent leurs accents -- le HTML contient bien
+Arial Black, les titres perdent leurs accents : le HTML contient bien
 \\u00c9, l'affichage sort "DEMANDEES". Les trois familles de l'identite sont
 desormais embarquees en base64 (cf. preparer_polices.py) ; ce module ne
 declare plus que leurs noms, avec un repli systeme au cas ou le CSS ne

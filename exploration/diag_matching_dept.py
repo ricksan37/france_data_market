@@ -1,5 +1,5 @@
 """
-Enrichissement DINUM — diagnostic de matching (Phase 3, Session 5).
+Enrichissement DINUM : diagnostic de matching (Phase 3).
 
 Mesure le taux de matching des offres EMPLOYEUR_DIRECT contre l'API
 Recherche d'entreprises (DINUM), conformément à FR-014 / FR-015.
@@ -294,7 +294,7 @@ resultats_audit = []
 for i, (nom, commune, code_naf) in enumerate(offres, start=1):
 
     if nom.strip().upper() == "EY":
-        # Diagnostiqué Session 5 : sigle sans correspondance légale.
+        # Déjà diagnostiqué : sigle sans correspondance légale.
         statut, detail = "pas_de_resultat_sigle_connu", None
     else:
         issue = None

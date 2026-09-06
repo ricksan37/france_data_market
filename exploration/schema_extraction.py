@@ -1,5 +1,5 @@
 """
-Schéma d'extraction des offres — Phase 4 (spec §8.1, §8.2).
+Schéma d'extraction des offres, Phase 4 (spec §8.1, §8.2).
 
 Contrat central : TOUS les champs sont obligatoires, aucun n'a de valeur par
 défaut. Un champ optionnel permettrait au modèle de l'omettre, rendant
@@ -12,7 +12,7 @@ exprime déjà l'absence sans ambiguïté ; ajouter None créerait deux encodage
 de la même information. Les scalaires n'ont pas d'équivalent vide, d'où le
 `| None`.
 
-Ce fichier ne contient QUE le schéma, aucun appel LLM — les deux inconnues
+Ce fichier ne contient QUE le schéma, aucun appel LLM : les deux inconnues
 ("le schéma est-il bon ?" et "l'appel fonctionne-t-il ?") sont isolées.
 """
 
@@ -83,7 +83,7 @@ class ExtractionOffre(BaseModel):
         description=(
             "true si l'annonce exige ou mentionne explicitement la maîtrise de "
             "l'anglais. false si elle précise explicitement qu'il n'est pas "
-            "requis. null si le sujet n'est pas abordé — cas le plus fréquent."
+            "requis. null si le sujet n'est pas abordé, cas le plus fréquent."
         )
     )
 

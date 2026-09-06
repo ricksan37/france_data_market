@@ -64,10 +64,6 @@ body {
   margin: 0;
 }
 
-/* Sous theme: none, Quarto n'emet aucun conteneur autour du corps du
-   document (verifie le 04/09 : aucun element avec un id/class de ce genre
-   apres <body>). Le conteneur est donc injecte nous-memes via
-   include-before-body/after-body (cf. cellule raw) plutot que cible ici. */
 .conteneur-notebook {
   max-width: 1080px;
   margin: 0 auto;
@@ -76,14 +72,13 @@ body {
 
 ::selection { background: var(--blue); color: var(--void); }
 
-/* Le premier bloc markdown du notebook joue deja le role de banniere/titre
-   (identite Millimeter). Le bandeau titre genere par Quarto ferait doublon. */
 #title-block-header, .quarto-title-block { display: none; }
 
 a { color: var(--blue); }
 
-/* Sommaire (toc: true). Quarto sans theme Bootstrap le pose en simple nav
-   flottante : on l'habille pour qu'elle ne detonne pas en blanc. */
+/* Sommaire : carte "chip", rayon 12px conserve (radius-sm), coherent avec
+   la regle "12px pour une carte de la taille d'un chip". Tracking mono
+   aligne sur le token d'identite (0.14em, pas 0.08em). */
 #TOC, nav.toc-active, #toc-title {
   background-color: var(--slate);
   border: 1px solid var(--hairline);
@@ -94,7 +89,7 @@ a { color: var(--blue); }
 }
 #toc-title {
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
   color: var(--paper-muted);
   border: none;
   padding: 0 0 8px 0;
@@ -107,12 +102,14 @@ a { color: var(--blue); }
 #TOC a:hover, nav.toc-active a:hover { color: var(--blue); }
 #TOC .active { color: var(--blue); }
 
-/* Cellules de code : carte Slate, coherente avec le reste de l'identite. */
+/* Cellules de code : le composant CodeBlock de l'identite prescrit un fond
+   Slate Raised (pas Slate) et un rayon de 12px (radius-sm). L'original
+   utilisait le fond Slate et un rayon de 10px, un ecart avec le token. */
 div.cell { margin-bottom: 20px; }
 div.sourceCode {
-  background-color: var(--slate);
+  background-color: var(--slate-raised);
   border: 1px solid var(--hairline);
-  border-radius: 10px;
+  border-radius: 12px;
   padding: 12px 16px;
   overflow-x: auto;
 }
@@ -121,46 +118,49 @@ pre.sourceCode, pre.sourceCode code {
   font-size: 13px;
   background: transparent;
 }
-/* Reprend une base sombre par-dessus le highlight-style pandoc choisi dans le
-   YAML (dracula) : on ne recolore pas les tokens un par un, seulement le fond
-   et la couleur par defaut, pour eviter un texte fonce sur fond fonce. */
 pre.sourceCode { color: var(--paper); }
 
 .cell-output, .cell-output-stdout, .cell-output-stderr {
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--paper-muted);
   background: transparent;
   padding: 4px 2px;
 }
 .cell-output-stderr { color: var(--vermilion); }
 
-/* Tables pandas (df.head(), agregations). Le HTML pandas ne fixe que
-   l'alignement en ligne ; les couleurs restent celles du navigateur (texte
-   noir sur fond blanc) sans cette regle. */
+/* Tables pandas. DataTable (identite) : rayon 12px (radius-sm), fond Slate,
+   entete Slate Raised muette, AUCUNE ligne verticale et AUCUN zebra --
+   l'original posait une bordure sur chaque cellule (lignes verticales) et
+   une teinte alternee ligne sur deux (zebra), deux ecarts explicites avec
+   le composant. Corrige : bordure hairline horizontale entre lignes
+   seulement, pas de zebra, conteneur arrondi. */
 table.dataframe {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  overflow: hidden;
   background-color: var(--slate);
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 13px;
   margin: 8px 0 4px 0;
 }
 table.dataframe th, table.dataframe td {
-  border: 1px solid var(--hairline);
+  border: none;
+  border-top: 1px solid var(--hairline);
   padding: 6px 12px;
   color: var(--paper);
   text-align: right;
 }
+table.dataframe thead tr:first-child th { border-top: none; }
 table.dataframe thead th {
   background-color: var(--slate-raised);
   color: var(--paper-muted);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  font-size: 10px;
   font-weight: 400;
 }
-table.dataframe tbody tr:nth-child(even) { background-color: rgba(255,255,255,0.02); }
 
-/* Figures Plotly : le theme millimeter_dark du projet colore deja le
-   paper_bgcolor des figures ; on evite seulement un cadre blanc autour. */
 .cell-output-display { background: transparent; }

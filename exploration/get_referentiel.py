@@ -24,7 +24,7 @@ def get_referentiel(type_referentiel: str) -> list[dict] | None:
     Récupère un référentiel complet de l'API.
 
     type_referentiel : str, ex. "appellations". Retourne le JSON décodé
-    (liste de dicts) en cas de succès, ou None si l'appel échoue — auquel
+    (liste de dicts) en cas de succès, ou None si l'appel échoue, auquel
     cas le corps de la réponse est affiché pour diagnostic.
     """
     token, _ = get_access_token()

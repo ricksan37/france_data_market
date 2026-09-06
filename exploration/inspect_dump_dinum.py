@@ -2,7 +2,7 @@
 Inventaire du dump d'enrichissement DINUM avant déclaration en source dbt.
 
 Pourquoi ce script : read_json_auto infère un schéma unique pour tout le
-tableau `resultats`. Or ce tableau est hétérogène — 171 lignes portent un
+tableau `resultats`. Or ce tableau est hétérogène : 171 lignes portent un
 résultat d'entreprise, 42 n'en portent aucun. Si les clés entreprise sont
 ABSENTES (et non présentes à null) sur les lignes non matchées, l'inférence
 peut produire un STRUCT incomplet et perdre des champs silencieusement.

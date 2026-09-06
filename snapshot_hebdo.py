@@ -71,7 +71,7 @@ def calculer_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
         order by count(*) desc
         limit 1
     """).fetchone()
-    # None si fct_offre_technologie est vide (mode CI_SANS_EXTRACTION, Session 7) :
+    # None si fct_offre_technologie est vide (mode CI_SANS_EXTRACTION) :
     # fetchone() renvoie None lui-même, pas (None,), quand 0 ligne ne matche.
     top_technologie = resultat_top_technologie[0] if resultat_top_technologie else "non disponible (CI)"
 

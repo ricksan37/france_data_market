@@ -101,8 +101,8 @@ def executer(con, sql: str) -> list:
     """Execute une requete et retourne une liste de dictionnaires.
 
     pandas et numpy sont volontairement exclus de requirements.txt : .df()
-    les importe implicitement et casse sur un runner CI minimal (decouvert
-    en Session 7). duckdb expose .description et .fetchall() nativement.
+    les importe implicitement et casse sur un runner CI minimal. duckdb
+    expose .description et .fetchall() nativement.
     """
     curseur = con.execute(sql)
     colonnes = [c[0] for c in curseur.description]
@@ -172,7 +172,7 @@ def html_figure(fig, premiere: bool = False) -> str:
 
     Le JS Plotly complet est embarque plutot que charge depuis un CDN : sans
     cela, l'ouverture par double-clic (file://) donne "Plotly is not defined"
-    (corrige en Session 7).
+    (corrige depuis).
     """
     meta = fig.layout.meta or {}
     titre = meta.get("titre", "")
@@ -277,7 +277,7 @@ def generer() -> None:
     # ---------- 02 Remuneration ----------
     # Filtre sur salaire_annuel_plausible et non plus sur un offre_id ecrit en
     # dur. La version precedente excluait nommement l'offre 4933945, seul cas
-    # connu en Session 4 ; il y en a 15 au 03/09. Une exclusion nominative ne
+    # connu jusqu'ici ; il y en a 15 au 03/09. Une exclusion nominative ne
     # passe pas a l'echelle, une regle si.
     salaire_cat = traduire(executer(con, """
         select categorie_employeur,

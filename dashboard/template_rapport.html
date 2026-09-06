@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Observatoire du Marché Data France — Rapport</title>
+<title>Observatoire du Marché Data France : Rapport</title>
 <style>
 {polices}
 
@@ -35,25 +35,29 @@
         color: var(--paper);
         font-family: var(--font-corps);
         line-height: 1.65;
-        padding: 56px 24px;
+        padding: 64px 24px;
     }}
 
     .conteneur {{ max-width: 1080px; margin: 0 auto; }}
 
     header {{ margin-bottom: 40px; }}
 
+    /* Tracking mono aligne sur le token d'identite --track-mono (0.14em) :
+       la valeur precedente (0.08em) etait une approximation, pas la valeur
+       du systeme. */
     .kicker {{
         font-family: var(--font-mono);
         font-size: 11px;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--blue);
         margin-bottom: 14px;
     }}
 
+    /* H1 aligne sur le palier d'identite (40px), pas une valeur intermediaire. */
     h1 {{
         font-family: var(--font-titre);
-        font-size: 44px;
+        font-size: 40px;
         line-height: 1.1;
         letter-spacing: -0.02em;
         margin-bottom: 12px;
@@ -67,12 +71,12 @@
         color: var(--paper-muted);
     }}
 
-    section {{ margin-bottom: 52px; }}
+    section {{ margin-bottom: 48px; }}
 
     .section-kicker {{
         font-family: var(--font-mono);
         font-size: 11px;
-        letter-spacing: 0.08em;
+        letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--paper-muted);
         margin-bottom: 6px;
@@ -106,12 +110,13 @@
     }}
 
     /* Titre de carte. Sorti de la figure Plotly, qui rognait les accents des
-       capitales sur sa propre boite de titre. */
+       capitales sur sa propre boite de titre. Taille et tracking alignes sur
+       le token mono de l'identite plutot qu'une valeur ad hoc. */
     .titre-carte {{
         font-family: var(--font-mono);
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 400;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.14em;
         text-transform: uppercase;
         color: var(--paper);
         margin-bottom: 14px;
@@ -120,8 +125,8 @@
     /* align-items: start : sans cela, une carte de statistique se retrouve
        etiree a la hauteur du graphique voisin et son chiffre flotte au
        milieu d'un vide. */
-    .grille {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; align-items: start; }}
-    .grille-pleine {{ display: grid; grid-template-columns: 1fr; gap: 20px; }}
+    .grille {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; align-items: start; }}
+    .grille-pleine {{ display: grid; grid-template-columns: 1fr; gap: 24px; }}
 
     /* Ligne de KPI : quatre grands chiffres avant tout graphique, comme le
        prescrit la composition dashboard de l'identite. */
@@ -129,7 +134,7 @@
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 16px;
-        margin-bottom: 52px;
+        margin-bottom: 48px;
     }}
 
     .carte {{
@@ -155,17 +160,19 @@
         background-color: var(--slate);
         border: 1px solid var(--hairline);
         border-radius: 16px;
-        padding: 22px 20px;
+        padding: 20px 22px;
         display: flex;
         flex-direction: column;
         justify-content: center;
-        gap: 8px;
+        gap: 10px;
     }}
 
+    /* Taille alignee sur le palier --size-stat-sm (44px) du token de
+       l'identite : la ligne de KPI est le cas "size=sm" du composant StatCard. */
     .big-stat-valeur {{
         font-family: var(--font-titre);
-        font-size: 40px;
-        line-height: 1;
+        font-size: 44px;
+        line-height: 0.9;
         letter-spacing: -0.02em;
         color: var(--blue);
     }}
@@ -175,12 +182,14 @@
         font-size: 10px;
         line-height: 1.6;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.14em;
         color: var(--paper-muted);
     }}
 
+    /* Stat centree et seule sur sa carte : palier --size-stat (56px), la
+       taille pleine du composant plutot que sa variante "sm". */
     .big-stat-centre {{ align-items: center; text-align: center; }}
-    .big-stat-centre .big-stat-valeur {{ font-size: 52px; }}
+    .big-stat-centre .big-stat-valeur {{ font-size: 56px; }}
 
     footer {{
         margin-top: 56px;
@@ -207,7 +216,7 @@
 <div class="conteneur">
 
     <header>
-        <div class="kicker">OBSERVATOIRE — MARCHÉ DATA FRANCE</div>
+        <div class="kicker">OBSERVATOIRE : MARCHÉ DATA FRANCE</div>
         <h1>État du marché de l'emploi data en France</h1>
         <p class="sous-titre">{nb_offres} offres France Travail, codes ROME M1405 et M1811, périmètre défini en Phase 1</p>
         <p class="date-generation">Généré le {date_generation}</p>
@@ -221,7 +230,7 @@
     </div>
 
     <section>
-        <div class="section-kicker">01 — FLUX DU MARCHÉ</div>
+        <div class="section-kicker">01 : FLUX DU MARCHÉ</div>
         <h2>Ce qui apparaît, ce qui disparaît</h2>
         <p class="note-section">
             Mesuré sur la présence réelle des offres dans chaque collecte, jamais sur le corpus cumulé.
@@ -235,7 +244,7 @@
     </section>
 
     <section>
-        <div class="section-kicker">02 — RÉMUNÉRATION</div>
+        <div class="section-kicker">02 : RÉMUNÉRATION</div>
         <h2>Salaire médian annoncé</h2>
         <p class="note-section">
             Calculé sur les seules offres affichant un salaire annuel plausible, et par annonce distincte.
@@ -249,7 +258,7 @@
     </section>
 
     <section>
-        <div class="section-kicker">03 — TRANSPARENCE SALARIALE</div>
+        <div class="section-kicker">03 : TRANSPARENCE SALARIALE</div>
         <h2>Affichage du salaire dans les offres</h2>
         <div class="grille">
             {stat_transparence}
@@ -258,7 +267,7 @@
     </section>
 
     <section>
-        <div class="section-kicker">04 — GÉOGRAPHIE</div>
+        <div class="section-kicker">04 : GÉOGRAPHIE</div>
         <h2>Répartition géographique</h2>
         <div class="grille-pleine">
             <div class="carte">{chart_geo}</div>
@@ -266,7 +275,7 @@
     </section>
 
     <section>
-        <div class="section-kicker">05 — TECHNOLOGIES</div>
+        <div class="section-kicker">05 : TECHNOLOGIES</div>
         <h2>Compétences techniques demandées</h2>
         <p class="note-section">
             Section alimentée par l'extraction LLM, qui tourne en local et jamais sur un runner CI.
@@ -278,7 +287,7 @@
     </section>
 
     <section>
-        <div class="section-kicker">06 — DOMAINES</div>
+        <div class="section-kicker">06 : DOMAINES</div>
         <h2>Domaines d'intervention</h2>
         <p class="note-section">
             Même dépendance à l'extraction LLM que la section précédente.

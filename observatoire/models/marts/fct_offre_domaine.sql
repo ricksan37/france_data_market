@@ -1,15 +1,15 @@
 {{ config(materialized='table') }}
 -- Table de faits, grain fin : 1 ligne = 1 couple (offre, domaine).
 -- Modèle distinct de fct_offre_technologie plutôt qu'une table unique avec
--- une colonne type_skill : décision explicite (S6). Coût assumé — une
+-- une colonne type_skill : décision explicite. Coût assumé : une
 -- question portant sur tous les termes confondus demandera un union all.
 --
 -- LIMITE CONNUE : le modèle d'extraction (mistral-nemo) sous-extrait ce
 -- champ sur les annonces de conseil. Les comptages de domaines sont donc
 -- des planchers, pas des mesures exactes. Voir extraction_skills.py.
 --
--- NORMALISATION (S6) : sur les 552 offres réelles, 1473 valeurs de domaine
--- distinctes pour 3489 mentions — fragmentation lexicale (casse, langue,
+-- NORMALISATION : sur les 552 offres réelles, 1473 valeurs de domaine
+-- distinctes pour 3489 mentions : fragmentation lexicale (casse, langue,
 -- sigles : "BI"/"Business Intelligence", "Data Governance"/"gouvernance des
 -- données") qui rend le champ brut inexploitable pour un group by. Un
 -- mapping (seeds/mapping_domaines.csv) normalise les 12 clusters les plus

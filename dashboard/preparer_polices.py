@@ -7,9 +7,9 @@ dans le rapport.
 
 POURQUOI EMBARQUER PLUTOT QUE DECLARER. Le rapport declarait des polices
 systeme ('Arial Black', -apple-system, 'SF Mono') pour rester un fichier
-autonome, consultable hors ligne (decision Session 7). L'intention etait
+autonome, consultable hors ligne. L'intention etait
 bonne, la consequence ne l'etait pas : rendu sur une machine sans Arial
-Black, les titres de charts perdent leurs accents -- mesure du 31/08, les
+Black, les titres de charts perdent leurs accents : mesure du 31/08, les
 titres contiennent bien \\u00c9 dans le HTML mais s'affichent "DEMANDEES".
 Un livrable de portfolio ne peut pas dependre des polices installees chez
 celui qui l'ouvre. Embarquer en base64 tient les deux exigences a la fois :
@@ -30,7 +30,7 @@ configuration de la machine.
 Dependances : pip install -r requirements-dev.txt
 Lancement   : depuis la racine, avec l'interpreteur du venv EXPLICITE
               (le cache de resolution zsh peut renvoyer le python systeme
-              malgre un venv actif, piege Session 6) ->
+              malgre un venv actif) ->
                   .venv/bin/python3 dashboard/preparer_polices.py
 """
 

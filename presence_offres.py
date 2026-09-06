@@ -54,7 +54,7 @@ def ids_du_dump(chemin: Path) -> set[str]:
     """offre_id distincts d'un dump brut France Travail.
 
     Le dump contient des doublons structurels (index instable de l'API,
-    constate des la Session 1 : 1094 lignes pour 552 offres). Le set les
+    constate des le premier pull : 1094 lignes pour 552 offres). Le set les
     absorbe, comme le qualify row_number() de stg_ft_offres cote dbt.
     """
     with open(chemin, encoding="utf-8") as fh:

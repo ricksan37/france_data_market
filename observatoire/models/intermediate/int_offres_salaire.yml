@@ -2,7 +2,7 @@ unit_tests:
   - name: test_parsing_salaire
     description: >
       Vérifie le parsing regex du salaire et la reclassification
-      Mensuel -> annuel (§4.4, §8.2, décisions Session 3).
+      Mensuel -> annuel (§4.4, §8.2).
     model: int_offres_salaire
     given:
       - input: ref('stg_ft_offres')

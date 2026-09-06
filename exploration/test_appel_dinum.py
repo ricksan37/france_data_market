@@ -1,10 +1,10 @@
 """
-Enrichissement DINUM — exploration Phase 3.
+Enrichissement DINUM : exploration Phase 3.
 
 Mesure le taux de matching des offres EMPLOYEUR_DIRECT contre l'API
 Recherche d'entreprises (DINUM), conformément à la spec FR-014 / FR-015.
 
-Décision d'architecture (Session 5) : le filtre géographique utilise le
+Décision d'architecture : le filtre géographique utilise le
 code INSEE (lieuTravail.commune) et non le code postal, contrairement à
 ce qu'indiquait §7.5. Justification mesurée sur les 213 offres cibles :
   - code_postal renseigné      : 166 / 213

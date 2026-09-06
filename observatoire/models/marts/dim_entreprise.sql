@@ -1,6 +1,6 @@
 {{ config(materialized='table') }}
 
--- dim_entreprise — grain = 1 SIREN.
+-- dim_entreprise : grain = 1 SIREN.
 -- age_annees est une mesure brute (date_creation -> aujourd'hui), pas un jugement.
 -- Volontairement pas de flag is_startup : le triptyque ancienneté + NAF + effectif
 -- ne distingue pas fiablement une startup d'une PME quelconque (spec §11), et un

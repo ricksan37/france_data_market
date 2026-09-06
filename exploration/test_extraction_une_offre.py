@@ -1,7 +1,7 @@
 """
 Premier appel d'extraction réel : une offre, un modèle, le schéma complet.
 
-DÉCOUVERTE (S6) : les `description` des Field Pydantic ne parviennent PAS au
+DÉCOUVERTE : les `description` des Field Pydantic ne parviennent PAS au
 modèle. Ollama compile le JSON Schema en grammaire, laquelle n'encode que la
 structure (clés, types, imbrication) ; les descriptions sont écartées. Toute
 consigne de SENS doit donc vivre dans le prompt. Les descriptions du schéma
@@ -33,7 +33,7 @@ vide pour les champs de type liste).
 
 Consignes par champ :
 
-technologies — noms propres de produits, langages, logiciels, services.
+technologies : noms propres de produits, langages, logiciels, services.
 Exemples valides : Python, SQL, PostgreSQL, Docker, Git, Azure, Databricks.
 RÈGLE ABSOLUE : un élément = exactement UN produit.
   "SQL/PostgreSQL" donne deux éléments : "SQL", "PostgreSQL"
@@ -48,14 +48,14 @@ vont dans domaines s'ils y ont leur place) : RAG, fine-tuning, streaming,
 CI/CD, Data Lake, Lakehouse, RGPD, AI Act, agents autonomes, orchestration
 multi-modèles, Machine Learning, algorithmes, gouvernance. ID/CD est une
 pratique, RGPD/AI Act sont des réglementations, Data Lake/Lakehouse sont des
-architectures — aucun n'a d'éditeur unique.
+architectures, aucun n'a d'éditeur unique.
 Un terme placé dans 'technologies' ne doit JAMAIS apparaître aussi dans
 'domaines' : les deux listes sont mutuellement exclusives.
-Liste vide si l'annonce ne nomme aucune technologie — c'est un résultat
+Liste vide si l'annonce ne nomme aucune technologie : c'est un résultat
 normal et attendu pour les annonces de conseil en stratégie, qui décrivent
 des missions sans jamais citer d'outil (cabinets comme EY, McKinsey...).
 
-domaines — concepts, méthodes, disciplines, pratiques techniques.
+domaines : concepts, méthodes, disciplines, pratiques techniques.
 Exemples valides : ETL, ELT, Machine Learning, Deep Learning, IA générative,
 NLP, vision par ordinateur, gouvernance des données, architecture data,
 gestion de projet, agilité, CI/CD, qualité des données, RAG, fine-tuning,
@@ -71,38 +71,38 @@ N'y mets PAS les produits nommés, ni les secteurs d'activité (aéronautique,
 banque, santé), ni les qualités personnelles (rigueur, autonomie, curiosité,
 sens du relationnel, gestion des priorités).
 
-niveau_etudes — normalise STRICTEMENT au format "Bac+N", rien d'autre.
+niveau_etudes : normalise STRICTEMENT au format "Bac+N", rien d'autre.
   "Bac+5 ou plus en Informatique" donne "Bac+5"
   "BAC + 2" donne "Bac+2"
 null si aucun niveau n'est exigé.
 
-annees_experience_min — entier, années.
+annees_experience_min : entier, années.
   "3 ans minimum" donne 3 ; "entre 3 et 5 ans" donne 3
   "jeune diplômé" ou "débutant accepté" donne 0
 null si aucune durée chiffrée.
 
-teletravail — reformule en une expression COURTE, 5 mots maximum.
+teletravail : reformule en une expression COURTE, 5 mots maximum.
   "Jusqu'à 10 jours de télétravail par mois" donne "10 jours par mois"
   "Télétravail hybride" donne "hybride"
 null si le sujet n'est pas abordé.
 
-anglais_requis — true seulement si l'anglais est explicitement exigé ou mentionné
+anglais_requis : true seulement si l'anglais est explicitement exigé ou mentionné
 comme nécessaire. null si le sujet n'est pas abordé (cas le plus fréquent).
 
-salaire_texte — UNIQUEMENT s'il y a un MONTANT CHIFFRÉ en euros.
+salaire_texte : UNIQUEMENT s'il y a un MONTANT CHIFFRÉ en euros.
   "Le salaire est de 54900EUR selon profil" donne "54900 EUR selon profil"
 Les primes, participation, intéressement, PERECO ou "salaire attractif" ne sont
-PAS des montants. En l'absence de montant chiffré, la valeur DOIT être null —
+PAS des montants. En l'absence de montant chiffré, la valeur DOIT être null,
 jamais une phrase expliquant l'absence.
 
-entreprise_nom_texte — le nom de l'entreprise ou du cabinet qui recrute,
+entreprise_nom_texte : le nom de l'entreprise ou du cabinet qui recrute,
 mentionné explicitement dans le texte (raison sociale, pas un acronyme de
 poste). Distingue BIEN qui parle : si un cabinet dit "nous recrutons pour
 notre client", le nom à extraire est celui du CABINET, pas du client (le
 client est justement non nommé).
 null si aucun nom n'apparaît dans le texte.
 
-client_final_masque — true UNIQUEMENT si le texte dit explicitement que
+client_final_masque : true UNIQUEMENT si le texte dit explicitement que
 l'annonceur recrute POUR UNE AUTRE entreprise non nommée ("notre client",
 "pour le compte de", "accompagner un grand groupe" en parlant d'un tiers).
 false si l'entreprise nommée parle d'ELLE-MÊME, même si elle utilise des
@@ -120,7 +120,7 @@ Texte de l'offre :
 
 def main() -> None:
     # read_only=True : ne jamais verrouiller la base pendant la lecture
-    # (piège du verrou mono-écrivain DuckDB, S4).
+    # (piège du verrou mono-écrivain DuckDB).
     con = duckdb.connect(CHEMIN_DB, read_only=True)
     offre_id, intitule, description = con.execute("""
         select offre_id, intitule, description
@@ -129,7 +129,7 @@ def main() -> None:
     """).fetchone()
     con.close()
 
-    print(f"Offre : {offre_id} — {intitule}")
+    print(f"Offre : {offre_id} ({intitule})")
     print(f"Longueur description : {len(description)} caracteres\n")
 
     debut = time.time()

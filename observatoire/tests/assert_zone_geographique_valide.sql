@@ -1,6 +1,6 @@
 -- zone_geographique ne prend que trois valeurs. Test singulier plutôt que
 -- accepted_values : le test générique compile un IN() à plusieurs valeurs, que
--- le bug d'optimiseur DuckDB fait planter dans une vue interrogée (Session 3).
+-- le bug d'optimiseur DuckDB fait planter dans une vue interrogée.
 -- Convention du projet depuis, pour tout contrôle sur un ensemble de valeurs.
 --
 -- 'inconnue' est une valeur à part entière, pas un trou : 101 offres sur 960

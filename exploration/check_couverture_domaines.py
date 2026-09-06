@@ -2,7 +2,7 @@
 check_couverture_domaines.py
 
 Objectif : lire le taux de couverture réel du mapping_domaines (mesuré à
-19,7% en Session 6), pour vérifier s'il a dérivé avant de rouvrir la
+19,7%), pour vérifier s'il a dérivé avant de rouvrir la
 décision de ne pas mapper la longue traîne.
 
 Lancement : depuis observatoire/ -> python3 ../exploration/check_couverture_domaines.py
@@ -29,6 +29,6 @@ total, couvertes, taux = res
 print(f"  Total mentions   : {total}")
 print(f"  Mentions couvertes : {couvertes}")
 print(f"  Taux couverture  : {taux}%")
-print(f"  Attendu (S6)     : 19.7%")
+print(f"  Attendu           : 19.7%")
 
 con.close()

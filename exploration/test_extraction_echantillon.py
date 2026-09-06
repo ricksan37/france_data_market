@@ -2,8 +2,8 @@
 Validation du prompt sur un échantillon avant le run complet.
 
 Pourquoi un échantillon : le prompt n'a été validé que sur UNE offre, riche et
-bien structurée (Opteven). Les 552 offres contiennent des cas très différents —
-annonces courtes, offres non-data mal taguées par ROME (limite connue depuis S1),
+bien structurée (Opteven). Les 552 offres contiennent des cas très différents :
+annonces courtes, offres non-data mal taguées par ROME (limite connue),
 annonces d'intermédiaires sans aucune technologie. Vingt offres coûtent 4 minutes
 et évitent de découvrir un défaut systématique après 1h45 de calcul.
 
@@ -58,7 +58,7 @@ def main() -> None:
             extraction = ExtractionOffre.model_validate_json(reponse.message.content)
             duree = time.time() - debut
 
-            print(f"[{i:2}/{len(offres)}] {offre_id} — {intitule[:45]}")
+            print(f"[{i:2}/{len(offres)}] {offre_id} ({intitule[:45]})")
             print(f"        {duree:5.1f}s | techs: {len(extraction.technologies):2} "
                   f"| domaines: {len(extraction.domaines):2} "
                   f"| etudes: {extraction.niveau_etudes} "
@@ -70,7 +70,7 @@ def main() -> None:
             # Un échec de validation est un fait à compter, pas une raison
             # d'interrompre : on veut connaître le TAUX d'échec sur l'échantillon.
             echecs.append((offre_id, str(err)[:120]))
-            print(f"[{i:2}/{len(offres)}] {offre_id} — ECHEC : {str(err)[:120]}")
+            print(f"[{i:2}/{len(offres)}] {offre_id} -> ECHEC : {str(err)[:120]}")
 
     duree_totale = time.time() - debut_total
     moyenne = duree_totale / len(offres)
