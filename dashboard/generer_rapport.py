@@ -3,17 +3,7 @@ Genere dashboard/rapport.html : rapport statique Millimeter Dark sur l'etat
 du marche data France. Lit warehouse.duckdb en lecture seule, produit une
 figure Plotly par requete, assemble le tout dans template_rapport.html.
 
-AUCUN CHIFFRE EN DUR (revision Session 8). Le rapport annoncait "552 offres"
-dans son sous-titre et dans un libelle de statistique alors que le corpus en
-comptait 960 : le perimetre etait ecrit en dur a trois endroits. Un projet
-dont l'argument est de mesurer plutot que d'affirmer ne peut pas se permettre
-d'annoncer un chiffre faux sur sa propre page de garde. Tout compte affiche
-vient desormais d'une requete.
-
-LIBELLES TRADUITS (revision Session 8). Les axes affichaient les valeurs
-brutes de la base : "D" et "E" pour l'experience, "INTERMEDIAIRE_reclasse"
-pour la categorie d'employeur. La traduction vit ici, en presentation, et
-jamais dans les modeles dbt, qui doivent garder les valeurs canoniques.
+AUCUN CHIFFRE EN DUR. Tout compte affiche vient desormais d'une requete.
 
 DEGRADATION PROPRE (CI_SANS_EXTRACTION) : detectee par resultat vide plutot
 que par relecture de la variable d'environnement, plus robuste car elle
