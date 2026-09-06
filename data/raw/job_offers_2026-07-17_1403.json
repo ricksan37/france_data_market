@@ -1,52 +1,52 @@
 {
   "metadata": {
-    "date_extraction": "2026-07-17T14:03:17.254589",
+    "extraction_date": "2026-07-17T14:03:17.254589",
     "categories": [
       {
-        "nom": "Data scientist (M1405)",
-        "type_parametre": "codeROME",
-        "valeur": "M1405",
-        "total_recupere": 125,
-        "doublons_internes": 0
+        "name": "Data scientist (M1405)",
+        "parameter_type": "codeROME",
+        "value": "M1405",
+        "total_fetched": 125,
+        "internal_duplicates": 0
       },
       {
-        "nom": "Data engineer (M1811)",
-        "type_parametre": "codeROME",
-        "valeur": "M1811",
-        "total_recupere": 450,
-        "doublons_internes": 299
+        "name": "Data engineer (M1811)",
+        "parameter_type": "codeROME",
+        "value": "M1811",
+        "total_fetched": 450,
+        "internal_duplicates": 299
       },
       {
-        "nom": "Data analyst",
-        "type_parametre": "motsCles",
-        "valeur": "data analyst",
-        "total_recupere": 300,
-        "doublons_internes": 150
+        "name": "Data analyst",
+        "parameter_type": "motsCles",
+        "value": "data analyst",
+        "total_fetched": 300,
+        "internal_duplicates": 150
       },
       {
-        "nom": "Data architect",
-        "type_parametre": "motsCles",
-        "valeur": "data architect",
-        "total_recupere": 45,
-        "doublons_internes": 0
+        "name": "Data architect",
+        "parameter_type": "motsCles",
+        "value": "data architect",
+        "total_fetched": 45,
+        "internal_duplicates": 0
       },
       {
-        "nom": "Décisionnel",
-        "type_parametre": "motsCles",
-        "valeur": "décisionnel",
-        "total_recupere": 85,
-        "doublons_internes": 0
+        "name": "Décisionnel",
+        "parameter_type": "motsCles",
+        "value": "décisionnel",
+        "total_fetched": 85,
+        "internal_duplicates": 0
       },
       {
-        "nom": "Business Intelligence",
-        "type_parametre": "motsCles",
-        "valeur": "business intelligence",
-        "total_recupere": 89,
-        "doublons_internes": 0
+        "name": "Business Intelligence",
+        "parameter_type": "motsCles",
+        "value": "business intelligence",
+        "total_fetched": 89,
+        "internal_duplicates": 0
       }
     ],
-    "total_offres_brutes": 1094,
-    "total_offres_id_uniques": 552
+    "total_raw_offers": 1094,
+    "total_unique_offer_ids": 552
   },
   "resultats": [
     {
