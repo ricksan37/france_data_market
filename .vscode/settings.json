@@ -1,3 +1,4 @@
 {
-    "dbt.dbtMajorVersion": "v1"
+    "dbt.dbtMajorVersion": "v1",
+    "python.analysis.extraPaths": ["dashboard"]
 }
