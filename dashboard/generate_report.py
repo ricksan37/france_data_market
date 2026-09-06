@@ -20,6 +20,7 @@ Usage: from the repo root -> .venv/bin/python3 dashboard/generate_report.py
 import base64
 from datetime import datetime, timezone
 from pathlib import Path
+import string
 
 import duckdb
 import plotly.graph_objects as go
@@ -37,10 +38,6 @@ TEMPLATE_PATH = DASHBOARD_DIR / "report_template.html"
 OUTPUT_PATH = DASHBOARD_DIR / "report.html"
 FONTS_DIR = DASHBOARD_DIR / "fonts"
 
-UNAVAILABLE_MESSAGE = (
-    "Section unavailable: LLM extraction not run in this environment "
-    "(Ollama doesn't run on a CI runner, see CI_WITHOUT_EXTRACTION)"
-)
 
 # Display translations. The dbt models keep the canonical values; only the
 # display is humanized.
@@ -367,57 +364,12 @@ def generate() -> None:
              "opportunity in each.",
     )
 
-    # ---------- 05 Technologies ----------
-    skills = execute(con, """
-        select t.technology, count(distinct t.job_offer_id) as offer_count
-        from fct_job_offer_technology t
-        join fct_job_offer o using (job_offer_id)
-        where o.is_canonical_listing
-        group by t.technology
-        order by offer_count desc
-        limit 10
-    """)
-    skills_fig = (
-        horizontal_bar_chart(skills, "technology", "offer_count",
-                              "TOP 10 MOST REQUESTED TECHNOLOGIES")
-        if skills else empty_figure(UNAVAILABLE_MESSAGE)
-    )
-
-    # ---------- 06 Domains ----------
-    domains = execute(con, """
-        select d.normalized_domain, count(distinct d.job_offer_id) as offer_count
-        from fct_job_offer_domain d
-        join fct_job_offer o using (job_offer_id)
-        where o.is_canonical_listing
-          and d.normalized_domain in (select distinct canonical_domain from mapping_domaines)
-        group by d.normalized_domain
-        order by offer_count desc
-    """)
-    if domains:
-        domains_fig = horizontal_bar_chart(
-            domains, "normalized_domain", "offer_count", "DOMAINS OF INTERVENTION",
-        )
-        coverage_rate = execute(con, """
-            select round(100.0 * count(case when normalized_domain in
-                       (select distinct canonical_domain from mapping_domaines)
-                     then 1 end) / nullif(count(*), 0), 1) as pct
-            from fct_job_offer_domain
-        """)[0]["pct"]
-        coverage_stat = big_stat_html(
-            f"{coverage_rate:.1f} %",
-            "Domain mapping coverage. The long tail isn't mapped, "
-            "a documented decision",
-            centered=True,
-        )
-    else:
-        domains_fig = empty_figure(UNAVAILABLE_MESSAGE)
-        coverage_stat = big_stat_html("N/A", "Mapping coverage, unavailable in CI",
-                                       centered=True)
 
     con.close()
 
-    rendered = TEMPLATE_PATH.read_text(encoding="utf-8").format(
-        fonts=fonts_css(),
+    template = TEMPLATE_PATH.read_text(encoding="utf-8")
+    template = template.replace("<!-- FONTS_PLACEHOLDER -->", f"<style>\n{fonts_css()}\n</style>")
+    rendered = string.Template(template).substitute(
         offer_count=offer_count,
         generation_date=datetime.now(timezone.utc).strftime("%d/%m/%Y at %H:%M UTC"),
         kpi_offers=kpi_offers,
@@ -431,9 +383,6 @@ def generate() -> None:
         stat_transparency=transparency_stat,
         chart_transparency_by_category=html_figure(transparency_by_category_fig),
         chart_geo=html_figure(geo_fig),
-        chart_skills=html_figure(skills_fig),
-        chart_domains=html_figure(domains_fig),
-        stat_coverage=coverage_stat,
     )
     OUTPUT_PATH.write_text(rendered, encoding="utf-8")
 
@@ -441,9 +390,6 @@ def generate() -> None:
     print(f"  Scope        : {offer_count} offers")
     print(f"  Flow weeks   : {len(flow)}")
     print(f"  Corpus weeks : {len(weekly)}")
-    print(f"  Technologies : {len(skills) or 'unavailable (CI)'}")
-    print(f"  Domains      : {len(domains) or 'unavailable (CI)'}")
-
 
 if __name__ == "__main__":
     generate()
