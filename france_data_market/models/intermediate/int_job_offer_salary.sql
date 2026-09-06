@@ -1,71 +1,78 @@
-with extraction as (
+with parsed as (
 
     select
-        offre_id,
-        salaire_libelle,
-        regexp_extract(salaire_libelle, '(Annuel|Mensuel|Horaire) de (\d+(?:\.\d+)?) Euros(?: à (\d+(?:\.\d+)?) Euros)?', 1) as periode_texte,
-        regexp_extract(salaire_libelle, '(Annuel|Mensuel|Horaire) de (\d+(?:\.\d+)?) Euros(?: à (\d+(?:\.\d+)?) Euros)?', 2) as montant_1_texte,
-        regexp_extract(salaire_libelle, '(Annuel|Mensuel|Horaire) de (\d+(?:\.\d+)?) Euros(?: à (\d+(?:\.\d+)?) Euros)?', 3) as montant_2_texte
-    from {{ ref('stg_ft_offres') }}
+        job_offer_id,
+        salary_label,
+        regexp_extract(salary_label, '(Annuel|Mensuel|Horaire) de (\d+(?:\.\d+)?) Euros(?: à (\d+(?:\.\d+)?) Euros)?', 1) as period_text,
+        regexp_extract(salary_label, '(Annuel|Mensuel|Horaire) de (\d+(?:\.\d+)?) Euros(?: à (\d+(?:\.\d+)?) Euros)?', 2) as amount_1_text,
+        regexp_extract(salary_label, '(Annuel|Mensuel|Horaire) de (\d+(?:\.\d+)?) Euros(?: à (\d+(?:\.\d+)?) Euros)?', 3) as amount_2_text
+    from {{ ref('stg_raw__ft_job_offers') }}
 
 ),
 
-converti as (
+converted as (
 
     select
-        offre_id,
-        salaire_libelle,
-        periode_texte as salaire_periode_brute,
-        cast(cast(nullif(montant_1_texte, '') as double) as integer) as salaire_min,
-        cast(cast(nullif(montant_2_texte, '') as double) as integer) as salaire_max_brut
-    from extraction
+        job_offer_id,
+        salary_label,
+        period_text as raw_salary_period,
+        cast(cast(nullif(amount_1_text, '') as double) as integer) as salary_min,
+        cast(cast(nullif(amount_2_text, '') as double) as integer) as salary_max_raw
+    from parsed
 
 )
 
 select
-    offre_id,
-    -- Reclassification : un montant "Mensuel" > 10000€ n'est pas plausible comme
-    -- salaire mensuel (max observé ~5400€ dans l'échantillon) mais l'est comme
-    -- salaire annuel (min observé ~30000€). Aucun cas ambigu entre les deux
-    -- (zone vide 5400-30000€). Décision mesurée, documentée séparément.
-    case
-        when salaire_periode_brute = 'Mensuel' and salaire_min > 10000 then 'annuel'
-        else lower(salaire_periode_brute)
-    end as salaire_periode,
-    salaire_periode_brute,
-    salaire_min,
-    coalesce(salaire_max_brut, salaire_min) as salaire_max,
-    salaire_libelle is not null as salaire_mentionne,
-
-    -- Plausibilite du montant annuel, bornes [10000, 300000] (spec §12.1).
-    -- NULL quand la question ne se pose pas : periode non annuelle, ou aucun
-    -- montant. Un booleen a trois etats plutot que deux, parce que "non
-    -- applicable" n'est pas "implausible".
+    job_offer_id,
+    -- Reclassification: a "Mensuel" (monthly) amount > 10000€ isn't plausible
+    -- as a monthly salary (max observed ~5400€ in the sample) but is as an
+    -- annual one (min observed ~30000€). No ambiguous case between the two
+    -- (empty zone 5400-30000€). Measured decision, documented separately.
     --
-    -- POURQUOI UN DRAPEAU ET NON UNE RECLASSIFICATION DE PERIODE. Une mesure
-    -- anterieure a reclasse "Mensuel > 10000" en annuel, sur une zone vide de la
-    -- distribution. La figure symetrique existe ici : rien entre 1800 et
-    -- 25000 EUR, soit 23200 EUR de vide, et les 15 valeurs sous la borne
-    -- tombent dans les distributions observees des mensuels (506-4000) et
-    -- des horaires (12-25). La tentation etait donc reelle. Mesure du coût,
-    -- 03/09 :
-    --   - reclasser les 11 offres a 1800 porterait la population mensuelle
-    --     de 34 a 45, dont 24 % issues d'UN SEUL annonceur (11 annonces
-    --     quasi jumelles, toutes ANONYME, toutes outre-mer, publiees en
-    --     six jours), et sa mediane de 2261 a 1900 EUR
-    --   - reclasser les 4 offres a 15-40 doublerait la population horaire,
-    --     dont la moitie de valeurs nouvelles, et porterait son maximum
-    --     observe de 25 a 40 EUR
-    --   - le gain cote annuel est NUL : mediane 45000 avec ou sans elles
-    -- On abimerait deux petites populations pour ne rien gagner sur la
-    -- grande. Le drapeau exclut sans detruire : la valeur reste lisible,
-    -- l'agregation l'ignore, et la decision est auditable.
+    -- raw_salary_period keeps the literal French value captured by the regex
+    -- (matches France Travail's own text, e.g. "Annuel"): salary_period is
+    -- our own translated, reclassified label.
     case
-        when salaire_periode_brute is null then null
-        when lower(salaire_periode_brute) != 'annuel'
-             and not (salaire_periode_brute = 'Mensuel' and salaire_min > 10000)
+        when raw_salary_period = 'Mensuel' and salary_min > 10000 then 'annual'
+        when raw_salary_period = 'Annuel' then 'annual'
+        when raw_salary_period = 'Mensuel' then 'monthly'
+        when raw_salary_period = 'Horaire' then 'hourly'
+        else null
+    end as salary_period,
+    raw_salary_period,
+    salary_min,
+    coalesce(salary_max_raw, salary_min) as salary_max,
+    salary_label is not null as salary_mentioned,
+
+    -- Plausibility of the annual amount, bounds [10000, 300000]. NULL when
+    -- the question doesn't apply: non-annual period, or no amount. A
+    -- three-state boolean rather than two, because "not applicable" isn't
+    -- "implausible".
+    --
+    -- WHY A FLAG AND NOT A PERIOD RECLASSIFICATION. An earlier measurement
+    -- reclassified "Mensuel > 10000" as annual, on an empty zone of the
+    -- distribution. The symmetric figure exists here: nothing between 1800
+    -- and 25000 EUR, i.e. a 23200 EUR gap, and the 15 values under the bound
+    -- fall within the observed monthly (506-4000) and hourly (12-25)
+    -- distributions. The temptation was therefore real. Cost measured on
+    -- 2026-09-03:
+    --   - reclassifying the 11 offers at 1800 would take the monthly
+    --     population from 34 to 45, 24% of it from A SINGLE advertiser (11
+    --     near-identical listings, all ANONYMOUS, all overseas, published
+    --     over six days), and its median from 2261 to 1900 EUR
+    --   - reclassifying the 4 offers at 15-40 would double the hourly
+    --     population, half of it new values, and take its observed maximum
+    --     from 25 to 40 EUR
+    --   - the gain on the annual side is ZERO: median 45000 with or without them
+    -- Two small populations would be damaged for no gain on the large one.
+    -- The flag excludes without destroying: the value stays readable, the
+    -- aggregation ignores it, and the decision is auditable.
+    case
+        when raw_salary_period is null then null
+        when raw_salary_period != 'Annuel'
+             and not (raw_salary_period = 'Mensuel' and salary_min > 10000)
             then null
-        when salaire_min is null then null
-        else salaire_min >= 10000 and salaire_min <= 300000
-    end as salaire_annuel_plausible
-from converti
+        when salary_min is null then null
+        else salary_min >= 10000 and salary_min <= 300000
+    end as annual_salary_plausible
+from converted

@@ -3,38 +3,37 @@ version: 2
 sources:
   - name: raw
     meta:
-      external_location: "read_json_auto('../data/raw/offres_*.json')"
+      external_location: "read_json_auto('../data/raw/job_offers_*.json')"
     tables:
-      - name: ft_offres
+      - name: ft_job_offers
 
   - name: dinum
     meta:
-      external_location: "read_json_auto('../data/raw/enrichissement_dinum_2026-08-01_1727.json')"
+      external_location: "read_json_auto('../data/raw/enrich_dinum_2026-08-01_1727.json')"
     tables:
-      - name: dinum_entreprises
+      - name: companies
 
-  # Sortie de snapshot_hebdo.py, donc une SOURCE au meme titre que les dumps
-  # JSON -- pas un seed. Les deux seeds du projet (mapping_domaines,
-  # mapping_communes) sont des tables de correspondance maintenues a la main ;
-  # ce fichier-ci est ecrit par un script a chaque run. Le critere est l'auteur
-  # du fichier, pas son extension.
-  - name: historique
+  # Output of weekly_snapshot.py, hence a SOURCE just like the JSON dumps --
+  # not a seed. The project's two seeds (mapping_domaines, mapping_communes)
+  # are lookup tables maintained by hand; this file is written by a script on
+  # every run. The criterion is who authors the file, not its extension.
+  - name: history
     meta:
-      external_location: "read_csv_auto('../data/snapshots/marche_hebdo.csv')"
+      external_location: "read_csv_auto('../data/snapshots/weekly_market.csv')"
     tables:
-      - name: marche_hebdo
+      - name: weekly_market
 
-  # Sortie de presence_offres.py. Source distincte de `historique` : dans ce
-  # projet, external_location est porte par la source, donc deux fichiers =
-  # deux sources.
+  # Output of offer_presence.py. A separate source from `history`: in this
+  # project, external_location lives on the source, so two files = two
+  # sources.
   - name: presence
     meta:
-      external_location: "read_csv_auto('../data/snapshots/presence_offres.csv')"
+      external_location: "read_csv_auto('../data/snapshots/offer_presence.csv')"
     tables:
-      - name: presence_offres
+      - name: job_offer_presence
 
   - name: extraction
     meta:
-      external_location: "read_json_auto('../data/raw/extraction_skills_*.json')"
+      external_location: "read_json_auto('../data/raw/extract_skills_*.json')"
     tables:
-      - name: extraction_skills
+      - name: skills

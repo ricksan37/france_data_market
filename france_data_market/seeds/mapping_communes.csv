@@ -1,4 +1,4 @@
-cle_commune,nom_commune
+commune_key,commune_name
 01100,Apremont
 01300,Ambléon
 03000,Avermes
@@ -14,7 +14,7 @@ cle_commune,nom_commune
 13001,Marseille
 13009,Marseille
 13080,Aix-en-Provence
-13107,NON_RESOLU
+13107,UNRESOLVED
 13122,Ventabren
 13600,Ceyreste
 13700,Marignane
@@ -191,7 +191,7 @@ cle_commune,nom_commune
 95350,Piscop
 97140,Capesterre-de-Marie-Galante
 97400,Saint-Denis
-99999,NON_RESOLU
+99999,UNRESOLVED
 01200,Valserhône
 01750,Crottet
 02100,Essigny-le-Petit

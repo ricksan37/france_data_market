@@ -2,12 +2,12 @@
 Enrichissement DINUM : exploration Phase 3.
 
 Mesure le taux de matching des offres EMPLOYEUR_DIRECT contre l'API
-Recherche d'entreprises (DINUM), conformément à la spec FR-014 / FR-015.
+Recherche d'entreprises (DINUM).
 
 Décision d'architecture : le filtre géographique utilise le
 code INSEE (lieuTravail.commune) et non le code postal, contrairement à
 ce qu'indiquait §7.5. Justification mesurée sur les 213 offres cibles :
-  - code_postal renseigné      : 166 / 213
+  - postal_code renseigné      : 166 / 213
   - code INSEE renseigné       : 198 / 213  (sur-ensemble strict du CP)
   - ni l'un ni l'autre         :  15 / 213
 Le code INSEE offre donc +32 offres de couverture, et une relation 1:1
@@ -58,14 +58,14 @@ def matcher_entreprise(nom_offre, code_commune_offre, resultats):
 
 
 # --- Étape 1 : population cible depuis DuckDB ---
-# Note : à lancer depuis observatoire/ (chemin relatif ../data/)
+# Note : à lancer depuis france_data_market/ (chemin relatif ../data/)
 
 con = duckdb.connect('../data/warehouse.duckdb', read_only=True)
 
 offres = con.execute("""
-    select entreprise_nom, commune
-    from fct_offre
-    where categorie_employeur = 'EMPLOYEUR_DIRECT'
+    select employer_name, commune_code
+    from fct_job_offer
+    where employer_category = 'DIRECT_EMPLOYER'
 """).fetchall()
 
 con.close()
@@ -109,7 +109,7 @@ for i, (nom, code_commune) in enumerate(offres, start=1):
     time.sleep(1 / 7)
 
 
-# --- Étape 3 : métrique de qualité (spec FR-015) ---
+# --- Étape 3 : métrique de qualité ---
 
 print("\n--- Résultat du matching ---")
 for statut, count in compteurs.items():

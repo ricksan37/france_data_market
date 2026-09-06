@@ -1,7 +1,8 @@
-name: 'observatoire'
+name: 'france_data_market'
 version: '1.0.0'
+config-version: 2
 
-profile: 'observatoire'
+profile: 'france_data_market'
 
 model-paths: ["models"]
 analysis-paths: ["analyses"]
@@ -16,3 +17,8 @@ clean-targets:
 
 
 models:
+  france_data_market:
+    staging:
+      +materialized: view
+    marts:
+      +materialized: table

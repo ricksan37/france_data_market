@@ -1,5 +1,5 @@
 """
-Test cible des deux nouveaux champs (entreprise_nom_texte, client_final_masque)
+Test cible des deux nouveaux champs (entreprise_nom_texte, end_client_masked)
 sur 4 offres à vérité terrain déjà lue manuellement.
 
 Attendu :
@@ -8,7 +8,7 @@ Attendu :
   4888800 (Wavestone)   -> nom="Wavestone", masque=False (parle d'elle-même)
   4319968 (BRAINLOGIC)  -> nom="BRAINLOGIC", masque=True (accompagne un client)
 
-Lancement : depuis observatoire/ -> python3 ../exploration/test_extraction_champs_nom.py
+Lancement : depuis france_data_market/ -> python3 ../exploration/test_extraction_champs_nom.py
 """
 
 import sys
@@ -31,12 +31,12 @@ OFFRES_TEST = {
 def main() -> None:
     con = duckdb.connect(CHEMIN_DB, read_only=True)
 
-    for offre_id, (nom_attendu, masque_attendu) in OFFRES_TEST.items():
+    for job_offer_id, (nom_attendu, masque_attendu) in OFFRES_TEST.items():
         row = con.execute(
-            "select description from fct_offre where offre_id = ?", [offre_id]
+            "select job_description from fct_job_offer where job_offer_id = ?", [job_offer_id]
         ).fetchone()
         if row is None:
-            print(f"[{offre_id}] INTROUVABLE dans fct_offre")
+            print(f"[{job_offer_id}] INTROUVABLE dans fct_job_offer")
             continue
         description = row[0]
 
@@ -50,12 +50,12 @@ def main() -> None:
         extraction = ExtractionOffre.model_validate_json(reponse.message.content)
 
         ok_nom = "OK" if extraction.entreprise_nom_texte == nom_attendu else "ECART"
-        ok_masque = "OK" if extraction.client_final_masque == masque_attendu else "ECART"
+        ok_masque = "OK" if extraction.end_client_masked == masque_attendu else "ECART"
 
-        print(f"[{offre_id}]")
+        print(f"[{job_offer_id}]")
         print(f"  nom_texte : {extraction.entreprise_nom_texte!r:30} "
               f"(attendu {nom_attendu!r}) -> {ok_nom}")
-        print(f"  masque    : {extraction.client_final_masque!r:30} "
+        print(f"  masque    : {extraction.end_client_masked!r:30} "
               f"(attendu {masque_attendu!r}) -> {ok_masque}")
 
     con.close()

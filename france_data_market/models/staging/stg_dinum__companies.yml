@@ -1,0 +1,91 @@
+models:
+  - name: stg_dinum__companies
+    description: >
+      Staging model for the DINUM company-enrichment dump. No business logic
+      here — flattening, renaming and casting only. Grain is 1 row = 1
+      enriched job offer, not yet 1 row = 1 SIREN (a company can post several
+      offers).
+    columns:
+      - name: job_offer_id
+        description: Unique identifier of the job offer. Grain of this model.
+        data_tests:
+          - unique
+          - not_null
+      - name: employer_name_raw
+        description: >
+          Employer name as it appears on the job offer (free text, not
+          validated). NULL when the offer is anonymous.
+      - name: job_offer_commune_code
+        description: >
+          INSEE commune code of the job offer's location (5-digit code).
+          Distinguishes arrondissements from their parent commune where
+          postal codes don't — e.g. Paris 15th arrondissement is 75115,
+          the commune of Paris as a whole is 75056.
+      - name: naf_code_on_offer
+        description: NAF code associated with the job offer.
+      - name: match_status
+        description: >
+          Outcome of matching the offer's employer name against the
+          DINUM/SIRENE company database. Encodes which resolution strategy
+          succeeded — name match, progressively loosened with/without
+          department or national scope, consolidated to a parent corporate
+          group, word-inclusion, or NAF-assisted — `non_matchable_known_acronym`
+          when a known acronym was recognized but couldn't be resolved to a
+          specific company, or `unresolved` (`_no_geo` variant) when no
+          match was attempted successfully at all.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - match_name
+                  - match_name_dept
+                  - match_name_national
+                  - match_name_national_no_geo
+                  - match_name_prefix
+                  - match_name_prefix_dept
+                  - match_name_prefix_national
+                  - match_name_then_naf
+                  - match_consolidated_group
+                  - match_consolidated_group_dept
+                  - match_consolidated_group_national
+                  - match_consolidated_group_national_no_geo
+                  - match_consolidated_group_inclusion
+                  - match_consolidated_group_prefix
+                  - match_consolidated_group_prefix_dept
+                  - match_word_inclusion_national
+                  - match_word_inclusion_then_naf
+                  - non_matchable_known_acronym
+                  - unresolved
+                  - unresolved_no_geo
+              config:
+                severity: warn
+      - name: siren
+        description: >
+          SIREN of the company that posted the offer (French national
+          company identifier, 9 digits). NULL when the offer is anonymous.
+      - name: siret_headquarters
+        description: SIRET of the company's headquarters establishment (SIREN + 5-digit NIC).
+      - name: company_legal_name
+        description: >
+          Full legal name of the company as registered, enriched via SIREN
+          lookup — may differ from employer_name_raw.
+      - name: company_naf_code
+        description: >
+          NAF code of the company's main registered activity — may differ
+          from naf_code_on_offer.
+      - name: company_naf_section
+        description: NAF section (broad activity category) the company belongs to.
+      - name: employee_count_range
+        description: INSEE employee-count bracket for the company (coded range, not an exact headcount).
+      - name: employee_count_reference_year
+        description: Reference year for employee_count_range.
+      - name: company_category
+        description: INSEE company-size category (e.g. PME / ETI / GE).
+      - name: company_creation_date
+        description: Date the company was legally registered.
+      - name: establishment_count
+        description: Number of establishments (sites) the company operates.
+      - name: headquarters_city
+        description: Commune of the company's registered headquarters.
+      - name: headquarters_postal_code
+        description: Postal code of the company's registered headquarters.

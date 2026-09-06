@@ -1,19 +1,19 @@
-# pull_complet.py
+# full_pull.py
 """
-Pull complet du périmètre data (Phase 1, point 4 de la spec).
+Full pull of the data scope.
 
-Stratégie hybride retenue après exploration du référentiel ROME :
-- codeROME entier pour les métiers dédiés à la data (M1405, M1811, validés
-  par inspection directe des intitulés retournés, cf. exploration/)
-- motsCles ciblé pour les intitulés isolés dans des métiers ROME fourre-tout
-  (M1403, M1805, M1806, M1868 mélangent data et dizaines de métiers sans rapport)
+Hybrid strategy chosen after exploring the ROME reference table:
+- full codeROME for occupations dedicated to data (M1405, M1811, validated
+  by direct inspection of the returned titles, see exploration/)
+- targeted motsCles for titles scattered across catch-all ROME occupations
+  (M1403, M1805, M1806, M1868 mix data with dozens of unrelated occupations)
 
-Limite connue et acceptée : les offres remontées par motsCles ne portent pas,
-dans le JSON brut, de trace du mot-clé qui les a fait matcher (contrairement
-aux offres codeROME, où romeCode est déjà un champ natif de l'offre). On ne
-modifie pas les offres pour ajouter cette info a posteriori : ça violerait
-le principe "raw jamais modifié" (spec §7.2). Seul le compte par catégorie
-est conservé, dans le metadata.
+Known and accepted limit: offers surfaced via motsCles carry no trace, in
+the raw JSON, of the keyword that matched them (unlike codeROME offers,
+where romeCode is already a native field of the offer). Offers aren't
+modified to add this info after the fact: that would violate the "raw is
+never modified" principle. Only the count per category is kept, in the
+metadata.
 """
 
 import json
@@ -21,86 +21,86 @@ from datetime import datetime
 from pathlib import Path
 
 from auth import get_access_token
-from search import get_all_offres
+from search import get_all_offers
 
-# Périmètre de collecte : une ligne = une catégorie à interroger.
-# Tuple (nom lisible, type de paramètre API, valeur du paramètre).
+# Collection scope: one row = one category to query.
+# Tuple (readable name, API parameter type, parameter value).
 CATEGORIES = [
     ("Data scientist (M1405)", "codeROME", "M1405"),
     ("Data engineer (M1811)", "codeROME", "M1811"),
     ("Data analyst", "motsCles", "data analyst"),
     ("Data architect", "motsCles", "data architect"),
-    ("Décisionnel", "motsCles", "décisionnel"),
+    ("Decisional", "motsCles", "décisionnel"),
     ("Business Intelligence", "motsCles", "business intelligence"),
 ]
 
-OUTPUT_DIR = Path("data/raw")  # couche "raw" : dépôt brut, jamais transformé ici
+OUTPUT_DIR = Path("data/raw")  # "raw" layer: raw drop, never transformed here
 
 
-def pull_complet() -> None:
+def full_pull() -> None:
     """
-    Interroge chaque catégorie du périmètre, agrège les offres brutes et
-    écrit un unique fichier JSON horodaté dans data/raw/.
+    Queries every category in scope, aggregates the raw offers and writes a
+    single timestamped JSON file to data/raw/.
 
-    Le fichier produit contient deux clés :
-    - "metadata"  : date d'extraction + stats par catégorie (volumes, doublons)
-    - "resultats" : la liste concaténée de toutes les offres brutes
+    The file produced has two keys:
+    - "metadata"  : extraction date + per-category stats (volumes, duplicates)
+    - "resultats" : the concatenated list of every raw offer
 
-    Aucune transformation n'est appliquée aux offres (pas de filtrage, pas de
-    dédoublonnage) : c'est le rôle de la couche dbt en aval (spec §7.2). Ici
-    on ne fait que mesurer et déposer.
+    No transformation is applied to the offers (no filtering, no
+    deduplication): that's the downstream dbt layer's job. Here we only
+    measure and drop the file.
     """
-    token, _ = get_access_token()  # un seul token réutilisé pour les 6 requêtes
+    token, _ = get_access_token()  # a single token reused for the 6 requests
 
-    toutes_les_offres = []
-    stats_categories = []
+    all_offers = []
+    category_stats = []
 
-    for nom, type_param, valeur in CATEGORIES:
-        print(f"\n--- {nom} ({type_param}={valeur}) ---")
-        # Le token est passé explicitement pour éviter une ré-auth par catégorie.
-        offres = get_all_offres({type_param: valeur}, token=token)
+    for name, param_type, value in CATEGORIES:
+        print(f"\n--- {name} ({param_type}={value}) ---")
+        # The token is passed explicitly to avoid re-authenticating per category.
+        offers = get_all_offers({param_type: value}, token=token)
 
-        # Doublons "internes" = même id renvoyé deux fois DANS une catégorie
-        # (effet de la pagination sur un index temps réel). Mesuré, pas corrigé.
-        ids = [o["id"] for o in offres]
-        n_doublons_internes = len(ids) - len(set(ids))
+        # "Internal" duplicates = same id returned twice WITHIN a category
+        # (an effect of paginating over a live index). Measured, not fixed.
+        ids = [o["id"] for o in offers]
+        internal_duplicate_count = len(ids) - len(set(ids))
 
-        stats_categories.append({
-            "nom": nom,
-            "type_parametre": type_param,
-            "valeur": valeur,
-            "total_recupere": len(offres),
-            "doublons_internes": n_doublons_internes,
+        category_stats.append({
+            "name": name,
+            "parameter_type": param_type,
+            "value": value,
+            "total_fetched": len(offers),
+            "internal_duplicates": internal_duplicate_count,
         })
 
-        toutes_les_offres.extend(offres)
+        all_offers.extend(offers)
 
-    # Comptage global des id uniques (indicatif) : les doublons inter-catégories
-    # sont attendus, une même offre pouvant matcher plusieurs mots-clés / ROME.
-    ids_globaux = [o["id"] for o in toutes_les_offres]
+    # Global count of unique ids (informational): cross-category duplicates
+    # are expected, since the same offer can match several keywords/ROME codes.
+    global_ids = [o["id"] for o in all_offers]
 
     metadata = {
-        "date_extraction": datetime.now().isoformat(),
-        "categories": stats_categories,
-        "total_offres_brutes": len(toutes_les_offres),
-        "total_offres_id_uniques": len(set(ids_globaux)),
+        "extraction_date": datetime.now().isoformat(),
+        "categories": category_stats,
+        "total_raw_offers": len(all_offers),
+        "total_unique_offer_ids": len(set(global_ids)),
     }
 
-    dump = {"metadata": metadata, "resultats": toutes_les_offres}
+    dump = {"metadata": metadata, "resultats": all_offers}
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    # Horodatage dans le nom de fichier : chaque pull est conservé, rien n'écrase.
-    horodatage = datetime.now().strftime("%Y-%m-%d_%H%M")
-    chemin = OUTPUT_DIR / f"offres_{horodatage}.json"
+    # Timestamp in the filename: every pull is kept, nothing overwrites.
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+    path = OUTPUT_DIR / f"job_offers_{timestamp}.json"
 
-    # ensure_ascii=False pour garder les accents lisibles dans le JSON brut.
-    with open(chemin, "w", encoding="utf-8") as f:
+    # ensure_ascii=False to keep accents readable in the raw JSON.
+    with open(path, "w", encoding="utf-8") as f:
         json.dump(dump, f, ensure_ascii=False, indent=2)
 
-    print(f"\n✅ {len(toutes_les_offres)} offres brutes sauvegardées dans {chemin}")
-    print(f"   ({metadata['total_offres_id_uniques']} ID uniques ; "
-          f"le reste sera dédoublonné en dbt)")
+    print(f"\n✅ {len(all_offers)} raw offers saved to {path}")
+    print(f"   ({metadata['total_unique_offer_ids']} unique IDs; "
+          f"the rest will be deduplicated in dbt)")
 
 
 if __name__ == "__main__":
-    pull_complet()
+    full_pull()

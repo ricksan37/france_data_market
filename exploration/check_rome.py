@@ -9,12 +9,12 @@ propre, ou est-il éparpillé sur plein de codes ?".
 
 C'est ce comptage qui a montré que certains intitulés data n'ont pas de code
 ROME dédié et sont dispersés dans des métiers fourre-tout, d'où le recours
-au filtrage par motsCles pour ces cas (stratégie hybride, cf. pull_complet.py).
+au filtrage par motsCles pour ces cas (stratégie hybride, cf. full_pull.py).
 
 Script jetable, gardé dans exploration/ pour tracer la démarche.
 """
 
-from search import search_offres
+from search import search_offers
 from collections import Counter
 
 
@@ -23,11 +23,11 @@ def check_rome(mots_cles: str) -> None:
     Affiche la répartition (code ROME, libellé) des offres d'un mot-clé.
 
     mots_cles : str passé à l'API en paramètre motsCles. Un seul appel
-    (search_offres, non paginé) : l'échantillon de la 1re page suffit à
+    (search_offers, non paginé) : l'échantillon de la 1re page suffit à
     voir la dispersion. Trie du plus fréquent au moins fréquent.
     """
-    # search_offres attend un dict de paramètres API : on enveloppe le mot-clé.
-    data = search_offres({"motsCles": mots_cles})
+    # search_offers attend un dict de paramètres API : on enveloppe le mot-clé.
+    data = search_offers({"motsCles": mots_cles})
     resultats = data.get("resultats", [])
 
     # Compte les couples (code, libellé) : une entrée = un code ROME distinct.

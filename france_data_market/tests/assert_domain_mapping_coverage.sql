@@ -3,27 +3,27 @@
     tags = ['known_issue']
 ) }}
 
--- Mesure la couverture du mapping de normalisation des domaines
--- (seeds/mapping_domaines.csv), pour détecter une dérive plutôt que de la
--- découvrir silencieusement quand de nouvelles données arriveront (Phase 5).
+-- Measures the coverage of the domain normalization mapping
+-- (seeds/mapping_domaines.csv), to detect drift rather than discover it
+-- silently when new data arrives (Phase 5).
 --
--- Le mapping actuel couvre ~20% des mentions (les 12 clusters de tête,
--- mesurés le 02/08/2026 sur les 552 offres réelles). Ce test n'échoue jamais
--- (WARN uniquement) : son rôle est d'informer, pas de bloquer. Si le taux de
--- couverture chute nettement en dessous de ce niveau avec de nouvelles
--- données, c'est le signal qu'il faut retravailler le mapping : nouveaux
--- clusters apparus, ou volume qui dilue les 12 existants.
+-- The current mapping covers ~20% of mentions (the 12 top clusters,
+-- measured 2026-08-02 on the 552 real offers). This test never fails
+-- (WARN only): its role is to inform, not to block. If the coverage rate
+-- drops well below this level with new data, that's the signal to rework
+-- the mapping: new clusters appeared, or volume diluting the 12 existing
+-- ones.
 --
--- Implémenté comme un test qui échoue TOUJOURS avec le chiffre en message :
--- dbt n'a pas de mécanisme natif pour "afficher une métrique sans échouer",
--- donc on détourne le WARN comme canal d'information périodique.
+-- Implemented as a test that ALWAYS fails with the figure in the message:
+-- dbt has no native mechanism to "display a metric without failing", so
+-- WARN is repurposed as a periodic information channel.
 select
     count(*) as total_mentions,
-    count(case when domaine_brut != domaine_normalise
-               or domaine_brut in (select variante from {{ ref('mapping_domaines') }})
-          then 1 end) as mentions_couvertes,
-    round(100.0 * count(case when domaine_brut != domaine_normalise
-               or domaine_brut in (select variante from {{ ref('mapping_domaines') }})
-          then 1 end) / count(*), 1) as taux_couverture_pct
-from {{ ref('fct_offre_domaine') }}
-having taux_couverture_pct is not null  -- toujours vrai : force le WARN à chaque run
+    count(case when raw_domain != normalized_domain
+               or raw_domain in (select variant from {{ ref('mapping_domaines') }})
+          then 1 end) as covered_mentions,
+    round(100.0 * count(case when raw_domain != normalized_domain
+               or raw_domain in (select variant from {{ ref('mapping_domaines') }})
+          then 1 end) / count(*), 1) as coverage_rate_pct
+from {{ ref('fct_job_offer_domain') }}
+having coverage_rate_pct is not null  -- always true: forces the WARN on every run

@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Observatoire du Marché Data France : Rapport</title>
+<title>France Data Market Observatory: Report</title>
 <style>
-{polices}
+{fonts}
 
     :root {{
         --void: #0B0C0F;
@@ -19,8 +19,8 @@
         --amber: #FFC24B;
         --vermilion: #FF6B5A;
         --green: #4ADE80;
-        --font-titre: 'Archivo Black', 'Arial Black', sans-serif;
-        --font-corps: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --font-title: 'Archivo Black', 'Arial Black', sans-serif;
+        --font-body: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
         --font-mono: 'JetBrains Mono', 'SF Mono', 'Consolas', monospace;
     }}
 
@@ -33,18 +33,17 @@
             linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
         background-size: 24px 24px;
         color: var(--paper);
-        font-family: var(--font-corps);
+        font-family: var(--font-body);
         line-height: 1.65;
         padding: 64px 24px;
     }}
 
-    .conteneur {{ max-width: 1080px; margin: 0 auto; }}
+    .container {{ max-width: 1080px; margin: 0 auto; }}
 
     header {{ margin-bottom: 40px; }}
 
-    /* Tracking mono aligne sur le token d'identite --track-mono (0.14em) :
-       la valeur precedente (0.08em) etait une approximation, pas la valeur
-       du systeme. */
+    /* Mono tracking aligned on the identity token --track-mono (0.14em):
+       the previous value (0.08em) was an approximation, not the system value. */
     .kicker {{
         font-family: var(--font-mono);
         font-size: 11px;
@@ -54,18 +53,18 @@
         margin-bottom: 14px;
     }}
 
-    /* H1 aligne sur le palier d'identite (40px), pas une valeur intermediaire. */
+    /* H1 aligned on the identity's step (40px), not an intermediate value. */
     h1 {{
-        font-family: var(--font-titre);
+        font-family: var(--font-title);
         font-size: 40px;
         line-height: 1.1;
         letter-spacing: -0.02em;
         margin-bottom: 12px;
     }}
 
-    .sous-titre {{ color: var(--paper-muted); font-size: 16px; margin-bottom: 6px; }}
+    .subtitle {{ color: var(--paper-muted); font-size: 16px; margin-bottom: 6px; }}
 
-    .date-generation {{
+    .generation-date {{
         font-family: var(--font-mono);
         font-size: 11px;
         color: var(--paper-muted);
@@ -83,13 +82,13 @@
     }}
 
     h2 {{
-        font-family: var(--font-titre);
+        font-family: var(--font-title);
         font-size: 24px;
         letter-spacing: -0.02em;
         margin-bottom: 18px;
     }}
 
-    .note-section {{
+    .section-note {{
         font-family: var(--font-mono);
         font-size: 11px;
         line-height: 1.7;
@@ -98,9 +97,9 @@
         margin-bottom: 16px;
     }}
 
-    /* Note de carte : sert a nommer ce qui a ete ecarte du graphique. Ecarter
-       en silence serait le contraire du principe du projet. */
-    .note-carte {{
+    /* Card note: used to name what was excluded from the chart. A silent
+       exclusion would be the opposite of the project's principle. */
+    .card-note {{
         font-family: var(--font-mono);
         font-size: 10px;
         line-height: 1.7;
@@ -109,10 +108,10 @@
         margin-bottom: 14px;
     }}
 
-    /* Titre de carte. Sorti de la figure Plotly, qui rognait les accents des
-       capitales sur sa propre boite de titre. Taille et tracking alignes sur
-       le token mono de l'identite plutot qu'une valeur ad hoc. */
-    .titre-carte {{
+    /* Card title. Moved out of the Plotly figure, which clipped the accents
+       of capital letters in its own title box. Size and tracking aligned on
+       the identity's mono token rather than an ad hoc value. */
+    .card-title {{
         font-family: var(--font-mono);
         font-size: 11px;
         font-weight: 400;
@@ -122,22 +121,22 @@
         margin-bottom: 14px;
     }}
 
-    /* align-items: start : sans cela, une carte de statistique se retrouve
-       etiree a la hauteur du graphique voisin et son chiffre flotte au
-       milieu d'un vide. */
-    .grille {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; align-items: start; }}
-    .grille-pleine {{ display: grid; grid-template-columns: 1fr; gap: 24px; }}
+    /* align-items: start: without it, a stat card stretches to the height of
+       the neighboring chart and its number floats in the middle of empty
+       space. */
+    .grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; align-items: start; }}
+    .grid-full {{ display: grid; grid-template-columns: 1fr; gap: 24px; }}
 
-    /* Ligne de KPI : quatre grands chiffres avant tout graphique, comme le
-       prescrit la composition dashboard de l'identite. */
-    .grille-kpi {{
+    /* KPI row: four big numbers before any chart, as the identity's
+       dashboard composition prescribes. */
+    .kpi-grid {{
         display: grid;
         grid-template-columns: repeat(4, 1fr);
         gap: 16px;
         margin-bottom: 48px;
     }}
 
-    .carte {{
+    .card {{
         background-color: var(--slate);
         border: 1px solid var(--hairline);
         border-radius: 16px;
@@ -145,17 +144,17 @@
         overflow: hidden;
     }}
 
-    /* Feature card : une par page au maximum, pour le resultat qui doit
-       ressortir. Fond releve d'un ton et bordure marquee, jamais un
-       remplissage accent complet. */
-    .carte-feature {{
+    /* Feature card: at most one per page, for the result that must stand
+       out. Background raised one tone and a marked border, never a full
+       accent fill. */
+    .feature-card {{
         background-color: var(--slate-raised);
         border: 1px solid var(--hairline-bright);
     }}
 
-    /* Big stat. Hauteur ajustee au contenu : la version precedente imposait
-       180px de haut a trois lignes de texte, ce qui creusait un vide au
-       milieu de la carte pendant que la carte voisine debordait. */
+    /* Big stat. Height fitted to content: the previous version forced 180px
+       of height on three lines of text, which dug out empty space in the
+       middle of the card while the neighboring card overflowed. */
     .big-stat {{
         background-color: var(--slate);
         border: 1px solid var(--hairline);
@@ -167,17 +166,17 @@
         gap: 10px;
     }}
 
-    /* Taille alignee sur le palier --size-stat-sm (44px) du token de
-       l'identite : la ligne de KPI est le cas "size=sm" du composant StatCard. */
-    .big-stat-valeur {{
-        font-family: var(--font-titre);
+    /* Size aligned on the --size-stat-sm (44px) step of the identity token:
+       the KPI row is the "size=sm" case of the StatCard component. */
+    .big-stat-value {{
+        font-family: var(--font-title);
         font-size: 44px;
         line-height: 0.9;
         letter-spacing: -0.02em;
         color: var(--blue);
     }}
 
-    .big-stat-libelle {{
+    .big-stat-label {{
         font-family: var(--font-mono);
         font-size: 10px;
         line-height: 1.6;
@@ -186,10 +185,10 @@
         color: var(--paper-muted);
     }}
 
-    /* Stat centree et seule sur sa carte : palier --size-stat (56px), la
-       taille pleine du composant plutot que sa variante "sm". */
-    .big-stat-centre {{ align-items: center; text-align: center; }}
-    .big-stat-centre .big-stat-valeur {{ font-size: 56px; }}
+    /* Stat centered and alone on its card: --size-stat (56px) step, the
+       component's full size rather than its "sm" variant. */
+    .big-stat-centered {{ align-items: center; text-align: center; }}
+    .big-stat-centered .big-stat-value {{ font-size: 56px; }}
 
     footer {{
         margin-top: 56px;
@@ -202,110 +201,110 @@
     }}
 
     @media (max-width: 860px) {{
-        .grille-kpi {{ grid-template-columns: repeat(2, 1fr); }}
+        .kpi-grid {{ grid-template-columns: repeat(2, 1fr); }}
     }}
 
     @media (max-width: 720px) {{
-        .grille {{ grid-template-columns: 1fr; }}
-        .grille-kpi {{ grid-template-columns: 1fr; }}
+        .grid {{ grid-template-columns: 1fr; }}
+        .kpi-grid {{ grid-template-columns: 1fr; }}
         h1 {{ font-size: 30px; }}
     }}
 </style>
 </head>
 <body>
-<div class="conteneur">
+<div class="container">
 
     <header>
-        <div class="kicker">OBSERVATOIRE : MARCHÉ DATA FRANCE</div>
-        <h1>État du marché de l'emploi data en France</h1>
-        <p class="sous-titre">{nb_offres} offres France Travail, codes ROME M1405 et M1811, périmètre défini en Phase 1</p>
-        <p class="date-generation">Généré le {date_generation}</p>
+        <div class="kicker">FRANCE DATA MARKET OBSERVATORY</div>
+        <h1>State of the data job market in France</h1>
+        <p class="subtitle">{offer_count} France Travail job offers, ROME codes M1405 and M1811, scope defined in Phase 1</p>
+        <p class="generation-date">Generated on {generation_date}</p>
     </header>
 
-    <div class="grille-kpi">
-        {kpi_offres}
-        {kpi_sorties}
-        {kpi_anonymat}
-        {kpi_transparence}
+    <div class="kpi-grid">
+        {kpi_offers}
+        {kpi_exits}
+        {kpi_anonymity}
+        {kpi_transparency}
     </div>
 
     <section>
-        <div class="section-kicker">01 : FLUX DU MARCHÉ</div>
-        <h2>Ce qui apparaît, ce qui disparaît</h2>
-        <p class="note-section">
-            Mesuré sur la présence réelle des offres dans chaque collecte, jamais sur le corpus cumulé.
-            Une offre vue une fois reste dans le corpus pour toujours : sur les 552 offres de juillet, 463 avaient
-            disparu de France Travail six semaines plus tard, et le corpus les comptait encore.
+        <div class="section-kicker">01: MARKET FLOW</div>
+        <h2>What appears, what disappears</h2>
+        <p class="section-note">
+            Measured on offers' actual presence in each collection, never on the accumulated corpus.
+            An offer seen once stays in the corpus forever: of the 552 July offers, 463 had
+            disappeared from France Travail six weeks later, and the corpus still counted them.
         </p>
-        <div class="grille">
-            <div class="carte">{chart_flux}</div>
-            <div class="carte">{chart_anonymat}</div>
+        <div class="grid">
+            <div class="card">{chart_flow}</div>
+            <div class="card">{chart_anonymity}</div>
         </div>
     </section>
 
     <section>
-        <div class="section-kicker">02 : RÉMUNÉRATION</div>
-        <h2>Salaire médian annoncé</h2>
-        <p class="note-section">
-            Calculé sur les seules offres affichant un salaire annuel plausible, et par annonce distincte.
-            Un employeur qui publie le même poste dans vingt-quatre communes ne pèse ainsi qu'une fois
-            dans la médiane. La médiane résiste par ailleurs aux valeurs extrêmes, contrairement à la moyenne.
+        <div class="section-kicker">02: COMPENSATION</div>
+        <h2>Median advertised salary</h2>
+        <p class="section-note">
+            Computed only on offers showing a plausible annual salary, and by distinct listing.
+            An employer publishing the same position in twenty-four communes therefore counts only once
+            in the median. The median also resists outliers, unlike the mean.
         </p>
-        <div class="grille">
-            <div class="carte">{chart_salaire_cat}</div>
-            <div class="carte carte-feature">{chart_salaire_exp}</div>
+        <div class="grid">
+            <div class="card">{chart_salary_by_category}</div>
+            <div class="card feature-card">{chart_salary_by_experience}</div>
         </div>
     </section>
 
     <section>
-        <div class="section-kicker">03 : TRANSPARENCE SALARIALE</div>
-        <h2>Affichage du salaire dans les offres</h2>
-        <div class="grille">
-            {stat_transparence}
-            <div class="carte">{chart_transparence_cat}</div>
+        <div class="section-kicker">03: SALARY TRANSPARENCY</div>
+        <h2>Salary disclosure in job offers</h2>
+        <div class="grid">
+            {stat_transparency}
+            <div class="card">{chart_transparency_by_category}</div>
         </div>
     </section>
 
     <section>
-        <div class="section-kicker">04 : GÉOGRAPHIE</div>
-        <h2>Répartition géographique</h2>
-        <div class="grille-pleine">
-            <div class="carte">{chart_geo}</div>
+        <div class="section-kicker">04: GEOGRAPHY</div>
+        <h2>Geographic distribution</h2>
+        <div class="grid-full">
+            <div class="card">{chart_geo}</div>
         </div>
     </section>
 
     <section>
-        <div class="section-kicker">05 : TECHNOLOGIES</div>
-        <h2>Compétences techniques demandées</h2>
-        <p class="note-section">
-            Section alimentée par l'extraction LLM, qui tourne en local et jamais sur un runner CI.
-            Elle est donc systématiquement vide sur un rapport généré automatiquement (voir le README).
+        <div class="section-kicker">05: TECHNOLOGIES</div>
+        <h2>Technical skills requested</h2>
+        <p class="section-note">
+            Section fed by LLM extraction, which runs locally and never on a CI runner.
+            It is therefore systematically empty on an automatically generated report (see the README).
         </p>
-        <div class="grille-pleine">
-            <div class="carte">{chart_skills}</div>
+        <div class="grid-full">
+            <div class="card">{chart_skills}</div>
         </div>
     </section>
 
     <section>
-        <div class="section-kicker">06 : DOMAINES</div>
-        <h2>Domaines d'intervention</h2>
-        <p class="note-section">
-            Même dépendance à l'extraction LLM que la section précédente.
+        <div class="section-kicker">06: DOMAINS</div>
+        <h2>Domains of intervention</h2>
+        <p class="section-note">
+            Same dependency on LLM extraction as the previous section.
         </p>
-        <div class="grille">
-            <div class="carte">{chart_domaines}</div>
-            {stat_couverture}
+        <div class="grid">
+            <div class="card">{chart_domains}</div>
+            {stat_coverage}
         </div>
     </section>
 
     <footer>
-        Observatoire du Marché Data France. Pipeline dbt et DuckDB, enrichissement SIRENE via l'API Recherche
-        d'entreprises (DINUM), extraction de compétences par LLM local (Ollama, mistral-nemo).
-        Rapport régénéré à chaque exécution du pipeline. Les sections Technologies et Domaines exigent un run local
-        avec extraction LLM, absente du runner CI (CI_SANS_EXTRACTION) : elles restent vides sur tout rapport automatisé.
-        Sauf mention contraire, les mesures portent sur les annonces distinctes et non sur les offres : une même annonce
-        publiée dans plusieurs villes reçoit un identifiant par ville, et compterait sinon autant de fois.
-        La section Géographie fait exception, pour la raison indiquée sous son graphique.
+        France Data Market Observatory. dbt and DuckDB pipeline, SIRENE enrichment via the Company Search
+        API (DINUM), skill extraction via local LLM (Ollama, mistral-nemo).
+        Report regenerated on every pipeline run. The Technologies and Domains sections require a local run
+        with LLM extraction, absent from the CI runner (CI_WITHOUT_EXTRACTION): they stay empty on every automated report.
+        Unless stated otherwise, measurements cover distinct listings rather than offers: the same listing
+        published in several cities gets one identifier per city, and would otherwise count that many times.
+        The Geography section is the exception, for the reason stated under its chart.
     </footer>
 
 </div>

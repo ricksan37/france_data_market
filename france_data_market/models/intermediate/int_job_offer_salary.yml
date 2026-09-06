@@ -1,25 +1,68 @@
+version: 2
+
+models:
+  - name: int_job_offer_salary
+    description: >
+      Regex parsing of France Travail's free-text salary_label into a
+      structured period/min/max, plus the annual_salary_plausible flag.
+      Grain is 1 row = 1 job offer.
+    columns:
+      - name: job_offer_id
+        description: Unique identifier of the job offer. Grain of this model.
+
+      - name: salary_period
+        description: >
+          "annual", "monthly" or "hourly", after the monthly > 10000€ ->
+          annual reclassification. NULL when no salary is mentioned.
+
+      - name: raw_salary_period
+        description: >
+          The period before reclassification, kept in the literal French
+          form captured by the regex ("Annuel", "Mensuel", "Horaire") --
+          it matches France Travail's own source text.
+
+      - name: salary_min
+        description: Lower bound of the parsed salary range, in the unit given by salary_period.
+
+      - name: salary_max
+        description: >
+          Upper bound of the parsed salary range. Equal to salary_min when
+          salary_label states a single amount rather than a range.
+
+      - name: salary_mentioned
+        description: Whether France Travail's offer states a salary at all.
+
+      - name: annual_salary_plausible
+        description: >
+          True/false when salary_period is annual and a plausibility check
+          applies (bounds [10000, 300000]); NULL when the question doesn't
+          apply (non-annual period, or no amount) rather than false, since
+          "not applicable" isn't "implausible". A flag, not a further
+          reclassification -- see the SQL comment for the measured cost of
+          reclassifying the borderline monthly/hourly values instead.
+
 unit_tests:
   - name: test_parsing_salaire
     description: >
-      Vérifie le parsing regex du salaire et la reclassification
-      Mensuel -> annuel (§4.4, §8.2).
-    model: int_offres_salaire
+      Verifies the salary regex parsing and the monthly -> annual
+      reclassification.
+    model: int_job_offer_salary
     given:
-      - input: ref('stg_ft_offres')
+      - input: ref('stg_raw__ft_job_offers')
         rows:
-          - {offre_id: "1", salaire_libelle: "Annuel de 45000.0 Euros à 60000.0 Euros"}
-          - {offre_id: "2", salaire_libelle: "Annuel de 60000.0 Euros à 60000.0 Euros"}
-          - {offre_id: "3", salaire_libelle: "Annuel de 37000.0 Euros sur 12.0 mois"}
-          - {offre_id: "4", salaire_libelle: "Horaire de 25.0 Euros sur 12 mois"}
-          - {offre_id: "5", salaire_libelle: "Mensuel de 50000.0 Euros à 59000 Euros sur 12 mois"}
-          - {offre_id: "6", salaire_libelle: "Mensuel de 1900.0 Euros à 2500.0 Euros"}
-          - {offre_id: "7", salaire_libelle: null}
+          - {job_offer_id: "1", salary_label: "Annuel de 45000.0 Euros à 60000.0 Euros"}
+          - {job_offer_id: "2", salary_label: "Annuel de 60000.0 Euros à 60000.0 Euros"}
+          - {job_offer_id: "3", salary_label: "Annuel de 37000.0 Euros sur 12.0 mois"}
+          - {job_offer_id: "4", salary_label: "Horaire de 25.0 Euros sur 12 mois"}
+          - {job_offer_id: "5", salary_label: "Mensuel de 50000.0 Euros à 59000 Euros sur 12 mois"}
+          - {job_offer_id: "6", salary_label: "Mensuel de 1900.0 Euros à 2500.0 Euros"}
+          - {job_offer_id: "7", salary_label: null}
     expect:
       rows:
-        - {offre_id: "1", salaire_periode: "annuel", salaire_min: 45000, salaire_max: 60000, salaire_mentionne: true}
-        - {offre_id: "2", salaire_periode: "annuel", salaire_min: 60000, salaire_max: 60000, salaire_mentionne: true}
-        - {offre_id: "3", salaire_periode: "annuel", salaire_min: 37000, salaire_max: 37000, salaire_mentionne: true}
-        - {offre_id: "4", salaire_periode: "horaire", salaire_min: 25, salaire_max: 25, salaire_mentionne: true}
-        - {offre_id: "5", salaire_periode: "annuel", salaire_min: 50000, salaire_max: 59000, salaire_mentionne: true}
-        - {offre_id: "6", salaire_periode: "mensuel", salaire_min: 1900, salaire_max: 2500, salaire_mentionne: true}
-        - {offre_id: "7", salaire_periode: null, salaire_min: null, salaire_max: null, salaire_mentionne: false}
+        - {job_offer_id: "1", salary_period: "annual", salary_min: 45000, salary_max: 60000, salary_mentioned: true}
+        - {job_offer_id: "2", salary_period: "annual", salary_min: 60000, salary_max: 60000, salary_mentioned: true}
+        - {job_offer_id: "3", salary_period: "annual", salary_min: 37000, salary_max: 37000, salary_mentioned: true}
+        - {job_offer_id: "4", salary_period: "hourly", salary_min: 25, salary_max: 25, salary_mentioned: true}
+        - {job_offer_id: "5", salary_period: "annual", salary_min: 50000, salary_max: 59000, salary_mentioned: true}
+        - {job_offer_id: "6", salary_period: "monthly", salary_min: 1900, salary_max: 2500, salary_mentioned: true}
+        - {job_offer_id: "7", salary_period: null, salary_min: null, salary_max: null, salary_mentioned: false}

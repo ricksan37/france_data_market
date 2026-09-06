@@ -1,15 +1,15 @@
--- Test singulier : aucune offre ne doit avoir un type_contrat hors de la liste connue.
--- NB : on n'utilise NI accepted_values NI NOT IN. Les deux déclenchent un bug
--- interne de l'optimiseur DuckDB 1.5.4 (INTERNAL Error: index 4 within vector
--- of size 4, dans RemoveUnusedColumns/SumRewriterOptimizer). Les != chaînés
--- empruntent un autre chemin de compilation et l'évitent.
--- Contrat dbt : 0 ligne = pass, >= 1 ligne = fail.
+-- Singular test: no offer should have a contract_type outside the known list.
+-- NB: we use NEITHER accepted_values NOR NOT IN. Both trigger an internal
+-- DuckDB 1.5.4 optimizer bug (INTERNAL Error: index 4 within vector of
+-- size 4, in RemoveUnusedColumns/SumRewriterOptimizer). Chained != take a
+-- different compilation path and avoid it.
+-- dbt contract: 0 rows = pass, >= 1 row = fail.
 
 select
-    type_contrat
-from {{ ref('fct_offre') }}
-where type_contrat != 'CDI'
-  and type_contrat != 'CDD'
-  and type_contrat != 'MIS'
-  and type_contrat != 'LIB'
-  and type_contrat != 'CCE'
+    contract_type
+from {{ ref('fct_job_offer') }}
+where contract_type != 'CDI'
+  and contract_type != 'CDD'
+  and contract_type != 'MIS'
+  and contract_type != 'LIB'
+  and contract_type != 'CCE'

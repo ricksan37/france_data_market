@@ -1,0 +1,26 @@
+version: 2
+
+models:
+  - name: fct_job_offer_domain
+    description: >
+      Fine-grained fact table: 1 row = 1 (job offer, domain) pair. A model
+      distinct from fct_job_offer_technology rather than a single table with
+      a skill_type column (explicit decision). Known limit: the extraction
+      model (mistral-nemo) under-extracts this field on consulting
+      listings, so domain counts are floors, not exact measurements.
+    columns:
+      - name: job_offer_id
+        description: Identifier of the job offer this domain mention belongs to.
+
+      - name: raw_domain
+        description: >
+          Domain exactly as extracted by the LLM, before normalization.
+          Kept as the audit source alongside normalized_domain.
+
+      - name: normalized_domain
+        description: >
+          raw_domain mapped to a canonical form via seeds/mapping_domaines.csv
+          for the 12 most frequent clusters (>60 cumulative occurrences
+          each). Equals raw_domain unchanged when no match exists in the
+          mapping -- the long tail (1-10 occurrences) is deliberately not
+          mapped.

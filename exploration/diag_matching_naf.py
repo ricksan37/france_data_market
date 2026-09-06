@@ -14,7 +14,7 @@ def normaliser_nom(nom):
     return " ".join(m for m in nom.split() if m not in MOTS_VIDES)
 
 
-def diagnostiquer(nom_offre, code_commune, code_naf_offre, resultats):
+def diagnostiquer(nom_offre, code_commune, naf_code_on_offer, resultats):
     """
     Matching en cascade :
     1. commune + établissement actif
@@ -38,8 +38,8 @@ def diagnostiquer(nom_offre, code_commune, code_naf_offre, resultats):
         return "match_nom", par_nom[0].get('nom_complet')
 
     # Cas ambigu sur le nom -> on tente le départage par NAF
-    if len(par_nom) > 1 and code_naf_offre:
-        par_naf = [r for r in par_nom if r.get('activite_principale') == code_naf_offre]
+    if len(par_nom) > 1 and naf_code_on_offer:
+        par_naf = [r for r in par_nom if r.get('activite_principale') == naf_code_on_offer]
         if len(par_naf) == 1:
             return "match_nom_puis_naf", par_naf[0].get('nom_complet')
         return "ambigu_multiple_exact", [r.get('nom_complet') for r in par_nom]
@@ -48,8 +48,8 @@ def diagnostiquer(nom_offre, code_commune, code_naf_offre, resultats):
         return "ambigu_multiple_exact", [r.get('nom_complet') for r in par_nom]
 
     # Le nom ne matche aucun candidat -> repêchage par NAF seul (piste C)
-    if code_naf_offre:
-        par_naf = [r for r in candidats if r.get('activite_principale') == code_naf_offre]
+    if naf_code_on_offer:
+        par_naf = [r for r in candidats if r.get('activite_principale') == naf_code_on_offer]
         if len(par_naf) == 1:
             return "match_naf_sans_nom", par_naf[0].get('nom_complet')
         if len(par_naf) > 1:
@@ -60,16 +60,16 @@ def diagnostiquer(nom_offre, code_commune, code_naf_offre, resultats):
 
 con = duckdb.connect('../data/warehouse.duckdb', read_only=True)
 offres = con.execute("""
-    select entreprise_nom, commune, code_naf
-    from fct_offre
-    where categorie_employeur = 'EMPLOYEUR_DIRECT'
+    select employer_name, commune_code, naf_code
+    from fct_job_offer
+    where employer_category = 'DIRECT_EMPLOYER'
 """).fetchall()
 con.close()
 
 compteurs = {}
 exemples = {}
 
-for i, (nom, commune, code_naf) in enumerate(offres, start=1):
+for i, (nom, commune, naf_code) in enumerate(offres, start=1):
     if commune is None or commune == '':
         statut, detail = "sans_cle_geo", None
     elif nom.strip().upper() == "EY":
@@ -79,7 +79,7 @@ for i, (nom, commune, code_naf) in enumerate(offres, start=1):
         try:
             resp = requests.get(URL_DINUM, params=params)
             resp.raise_for_status()
-            statut, detail = diagnostiquer(nom, commune, code_naf, resp.json().get('results', []))
+            statut, detail = diagnostiquer(nom, commune, naf_code, resp.json().get('results', []))
         except requests.exceptions.HTTPError as e:
             statut, detail = "erreur_technique", str(e)
         time.sleep(1 / 7)

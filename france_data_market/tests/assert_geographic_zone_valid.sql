@@ -1,14 +1,14 @@
--- zone_geographique ne prend que trois valeurs. Test singulier plutôt que
--- accepted_values : le test générique compile un IN() à plusieurs valeurs, que
--- le bug d'optimiseur DuckDB fait planter dans une vue interrogée.
--- Convention du projet depuis, pour tout contrôle sur un ensemble de valeurs.
+-- geographic_zone only takes three values. Singular test rather than
+-- accepted_values: the generic test compiles a multi-value IN(), which the
+-- DuckDB optimizer bug crashes on in a queried view. Project convention
+-- since then, for any check on a set of values.
 --
--- 'inconnue' est une valeur à part entière, pas un trou : 101 offres sur 960
--- n'ont ni code postal ni code INSEE. Les compter comme métropole par défaut
--- gonflerait la métropole de 10 % du corpus sur une supposition.
+-- 'unknown' is a value in its own right, not a gap: 101 offers out of 960
+-- have neither a postal code nor an INSEE code. Counting them as mainland
+-- France by default would inflate it by 10% of the corpus on an assumption.
 
-select offre_id, zone_geographique
-from {{ ref('fct_offre') }}
-where zone_geographique != 'metropole'
-  and zone_geographique != 'outre-mer'
-  and zone_geographique != 'inconnue'
+select job_offer_id, geographic_zone
+from {{ ref('fct_job_offer') }}
+where geographic_zone != 'mainland'
+  and geographic_zone != 'overseas'
+  and geographic_zone != 'unknown'

@@ -1,15 +1,15 @@
 """
-snapshot_hebdo.py
+weekly_snapshot.py
 
-Objectif : calculer un instantané hebdomadaire du marché (Phase 5, spec §13.1)
-et l'ajouter à data/snapshots/marche_hebdo.csv, seul artefact persisté entre
-deux runs CI (le warehouse.duckdb et les dumps JSON restent éphémères/gitignorés).
+Goal: compute a weekly market snapshot and append it to
+data/snapshots/weekly_market.csv, the only artifact persisted between two CI
+runs (warehouse.duckdb and the JSON dumps stay ephemeral/gitignored).
 
-En mode CI_SANS_EXTRACTION (workflow GitHub Actions), fct_offre_technologie
-est vide -- top_technologie vaut alors "non disponible (CI)" plutôt que
-de planter sur un fetchone() vide.
+In CI_WITHOUT_EXTRACTION mode (GitHub Actions workflow), fct_job_offer_technology
+is empty -- top_technology is then "not available (CI)" rather than crashing
+on an empty fetchone().
 
-Lancement : depuis la racine du repo -> python3 snapshot_hebdo.py
+Usage: from the repo root -> python3 weekly_snapshot.py
 """
 
 import csv
@@ -18,124 +18,125 @@ from pathlib import Path
 
 import duckdb
 
-CHEMIN_DB = "data/warehouse.duckdb"
-CHEMIN_SNAPSHOT = Path("data/snapshots/marche_hebdo.csv")
+DB_PATH = "data/warehouse.duckdb"
+SNAPSHOT_PATH = Path("data/snapshots/weekly_market.csv")
 
-COLONNES = [
-    "semaine",
-    "nb_offres_total",
-    "nb_anonyme",
-    "nb_intermediaire",
-    "nb_intermediaire_reclasse",
-    "nb_employeur_direct",
-    "salaire_median_annuel",
-    "top_technologie",
-    "extraction_llm",
+COLUMNS = [
+    "week_start_date",
+    "total_offer_count",
+    "anonymous_offer_count",
+    "intermediary_offer_count",
+    "reclassified_intermediary_offer_count",
+    "direct_employer_offer_count",
+    "median_annual_salary",
+    "top_technology",
+    "llm_extraction_available",
 ]
 
 
-def lundi_de_la_semaine() -> str:
-    """Cle du snapshot : le lundi de la semaine ISO, pas la date d'execution.
+def monday_of_the_week() -> str:
+    """Snapshot key: the Monday of the ISO week, not the run date.
 
-    date.today() faisait de la date du run la cle : trois declenchements
-    manuels le 09/08 ont produit trois lignes distinctes pour une meme
-    semaine, grain que fct_marche_hebdo aurait herite casse. Le lundi reste
-    un axe de dates directement exploitable en graphique, contrairement a
-    une notation "2026-W32".
+    date.today() used to be the key: three manual triggers on 2026-08-09
+    produced three distinct rows for the same week, a grain
+    fct_weekly_market would have inherited broken. The Monday stays a date
+    axis directly usable in a chart, unlike a "2026-W32" notation.
     """
-    aujourdhui = date.today()
-    return (aujourdhui - timedelta(days=aujourdhui.weekday())).isoformat()
+    today = date.today()
+    return (today - timedelta(days=today.weekday())).isoformat()
 
 
-def calculer_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
-    """Calcule les métriques du jour sur l'état actuel de fct_offre."""
+def compute_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
+    """Computes today's metrics on the current state of fct_job_offer."""
 
-    nb_total = con.execute("select count(*) from fct_offre").fetchone()[0]
+    total_count = con.execute("select count(*) from fct_job_offer").fetchone()[0]
 
-    nb_par_categorie = dict(con.execute("""
-        select categorie_employeur, count(*)
-        from fct_offre
-        group by categorie_employeur
+    count_by_category = dict(con.execute("""
+        select employer_category, count(*)
+        from fct_job_offer
+        group by employer_category
     """).fetchall())
 
-    salaire_median = con.execute("""
-        select median(salaire_min)
-        from fct_offre
-        where salaire_periode = 'annuel'
+    median_salary = con.execute("""
+        select median(salary_min)
+        from fct_job_offer
+        where salary_period = 'annual'
     """).fetchone()[0]
 
-    resultat_top_technologie = con.execute("""
-        select technologie
-        from fct_offre_technologie
-        group by technologie
+    top_technology_result = con.execute("""
+        select technology
+        from fct_job_offer_technology
+        group by technology
         order by count(*) desc
         limit 1
     """).fetchone()
-    # None si fct_offre_technologie est vide (mode CI_SANS_EXTRACTION) :
-    # fetchone() renvoie None lui-même, pas (None,), quand 0 ligne ne matche.
-    top_technologie = resultat_top_technologie[0] if resultat_top_technologie else "non disponible (CI)"
+    # None if fct_job_offer_technology is empty (CI_WITHOUT_EXTRACTION mode):
+    # fetchone() itself returns None, not (None,), when 0 rows match.
+    top_technology = top_technology_result[0] if top_technology_result else "not available (CI)"
 
     return {
-        "semaine": lundi_de_la_semaine(),
-        "nb_offres_total": nb_total,
-        "nb_anonyme": nb_par_categorie.get("ANONYME", 0),
-        "nb_intermediaire": nb_par_categorie.get("INTERMEDIAIRE", 0),
-        # En CI_SANS_EXTRACTION, INTERMEDIAIRE_reclasse n'existe pas : la
-        # reclassification dépend des champs d'extraction LLM, absents du runner.
-        # Renvoyer 0 ferait passer une absence pour une mesure nulle -- une courbe
-        # 21 -> 0 -> 0 se lit comme un effondrement. get() sans défaut renvoie None,
-        # que DictWriter écrit en cellule vide : absence explicite, jamais silencieuse.
-        "nb_intermediaire_reclasse": nb_par_categorie.get("INTERMEDIAIRE_reclasse"),
-        "nb_employeur_direct": nb_par_categorie.get("EMPLOYEUR_DIRECT", 0),
-        "salaire_median_annuel": salaire_median,
-        "top_technologie": top_technologie,
-        # Deduit du resultat de requete, pas d'une variable d'environnement
-        # relue en aval (meme choix que top_technologie, plus robuste). Sans
-        # cette colonne, une semaine sans champs LLM est indistinguable d'une
-        # semaine ou le LLM n'aurait rien trouve.
-        "extraction_llm": bool(resultat_top_technologie),
+        "week_start_date": monday_of_the_week(),
+        "total_offer_count": total_count,
+        "anonymous_offer_count": count_by_category.get("ANONYMOUS", 0),
+        "intermediary_offer_count": count_by_category.get("INTERMEDIARY", 0),
+        # In CI_WITHOUT_EXTRACTION, INTERMEDIARY_RECLASSIFIED doesn't exist:
+        # the reclassification depends on LLM extraction fields, absent from
+        # the runner. Returning 0 would pass an absence off as a zero
+        # measurement -- a curve going 21 -> 0 -> 0 reads as a collapse.
+        # get() with no default returns None, which DictWriter writes as an
+        # empty cell: an explicit absence, never a silent one.
+        "reclassified_intermediary_offer_count": count_by_category.get("INTERMEDIARY_RECLASSIFIED"),
+        "direct_employer_offer_count": count_by_category.get("DIRECT_EMPLOYER", 0),
+        "median_annual_salary": median_salary,
+        "top_technology": top_technology,
+        # Derived from the query result, not from an environment variable
+        # re-read downstream (same choice as top_technology, more robust).
+        # Without this column, a week with no LLM fields would be
+        # indistinguishable from a week where the LLM found nothing.
+        "llm_extraction_available": bool(top_technology_result),
     }
 
 
-def ecrire_ligne(snapshot: dict) -> None:
-    """Upsert par semaine : une semaine = une ligne, la derniere ecriture gagne.
+def write_row(snapshot: dict) -> None:
+    """Upsert by week: one week = one row, the latest write wins.
 
-    L'ancien mode append laissait trois lignes pour le 09/08 (deux tests
-    workflow_dispatch plus le run reel). Reecrire le fichier entier coute
-    quelques kilo-octets et garantit l'unicite du grain a la source, plutot
-    que de la rattraper par un qualify dans chaque modele aval.
+    The old append-only mode left three rows for 2026-08-09 (two
+    workflow_dispatch tests plus the real run). Rewriting the whole file
+    costs a few kilobytes and guarantees grain uniqueness at the source,
+    rather than catching it downstream with a qualify in every consuming
+    model.
 
-    Une relance en cours de semaine ecrase donc la ligne de la semaine : c'est
-    voulu, la mesure la plus recente est la bonne. Un run local (champs LLM
-    remplis) prend ainsi le pas sur le run CI du lundi, et extraction_llm
-    trace lequel des deux a produit la ligne.
+    A mid-week rerun therefore overwrites that week's row: this is
+    intentional, the most recent measurement is the right one. A local run
+    (LLM fields populated) thus takes precedence over Monday's CI run, and
+    llm_extraction_available traces which of the two produced the row.
     """
-    CHEMIN_SNAPSHOT.parent.mkdir(parents=True, exist_ok=True)
+    SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-    lignes: dict[str, dict] = {}
-    if CHEMIN_SNAPSHOT.exists():
-        with open(CHEMIN_SNAPSHOT, newline="", encoding="utf-8") as fh:
-            for ligne in csv.DictReader(fh):
-                lignes[ligne["semaine"]] = ligne
-    lignes[snapshot["semaine"]] = snapshot
+    rows: dict[str, dict] = {}
+    if SNAPSHOT_PATH.exists():
+        with open(SNAPSHOT_PATH, newline="", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                rows[row["week_start_date"]] = row
+    rows[snapshot["week_start_date"]] = snapshot
 
-    with open(CHEMIN_SNAPSHOT, "w", newline="", encoding="utf-8") as fh:
-        writer = csv.DictWriter(fh, fieldnames=COLONNES)
+    with open(SNAPSHOT_PATH, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.DictWriter(fh, fieldnames=COLUMNS)
         writer.writeheader()
-        for semaine in sorted(lignes):
-            writer.writerow(lignes[semaine])
+        for week in sorted(rows):
+            writer.writerow(rows[week])
 
 
 def main() -> None:
-    con = duckdb.connect(CHEMIN_DB, read_only=True)
-    snapshot = calculer_snapshot(con)
+    con = duckdb.connect(DB_PATH, read_only=True)
+    snapshot = compute_snapshot(con)
     con.close()
 
-    ecrire_ligne(snapshot)
+    write_row(snapshot)
 
-    print("--- Snapshot ajouté ---")
-    for cle, valeur in snapshot.items():
-        print(f"  {cle} : {valeur}")
+    print("--- Snapshot added ---")
+    for key, value in snapshot.items():
+        print(f"  {key}: {value}")
 
 
 if __name__ == "__main__":

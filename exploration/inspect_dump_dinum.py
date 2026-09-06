@@ -9,14 +9,14 @@ peut produire un STRUCT incomplet et perdre des champs silencieusement.
 On mesure donc, par clé, la présence ET le remplissage avant d'écrire
 la moindre ligne de SQL.
 
-Lancement : depuis observatoire/  ->  python3 ../exploration/inspect_dump_dinum.py
+Lancement : depuis france_data_market/  ->  python3 ../exploration/inspect_dump_dinum.py
 """
 
 import glob
 import json
 from collections import Counter, defaultdict
 
-MOTIF_DUMP = "../data/raw/enrichissement_dinum_*.json"
+MOTIF_DUMP = "../data/raw/enrich_dinum_*.json"
 
 
 def charger_dump_le_plus_recent(motif: str) -> tuple[str, dict]:

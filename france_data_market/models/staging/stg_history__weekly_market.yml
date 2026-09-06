@@ -1,0 +1,47 @@
+version: 2
+
+models:
+  - name: stg_history__weekly_market
+    description: >
+      Staging model for the weekly market snapshot (output of
+      weekly_snapshot.py). Grain is 1 row = 1 ISO week, identified by that
+      week's Monday. No business logic here: explicit typing, nothing else.
+    columns:
+      - name: week_start_date
+        description: Monday of the ISO week this snapshot row represents. Grain of this model.
+        data_tests:
+          - unique
+          - not_null
+
+      - name: total_offer_count
+        description: >
+          Count of the accumulated corpus (deduplicated union of every dump
+          present on disk) as of this week -- not the offers active on
+          France Travail that week. See fct_weekly_market for the full caveat.
+
+      - name: anonymous_offer_count
+        description: Count of offers classified ANONYMOUS (see int_employer_classification) as of this week.
+
+      - name: intermediary_offer_count
+        description: Count of offers classified INTERMEDIARY as of this week.
+
+      - name: reclassified_intermediary_offer_count
+        description: >
+          Count of offers classified INTERMEDIARY_RECLASSIFIED as of this week.
+          Always empty in CI: the reclassification depends on LLM extraction
+          fields, absent from the runner -- hence the explicit cast rather
+          than relying on type inference.
+
+      - name: direct_employer_offer_count
+        description: Count of offers classified DIRECT_EMPLOYER as of this week.
+
+      - name: median_annual_salary
+        description: Median annual salary across the week's corpus.
+
+      - name: top_technology
+        description: Most frequently mentioned technology across the week's corpus.
+
+      - name: llm_extraction_available
+        description: >
+          Whether this week's snapshot was produced with LLM extraction data
+          available (false in CI).

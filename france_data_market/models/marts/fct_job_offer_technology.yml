@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: fct_job_offer_technology
+    description: >
+      Fine-grained fact table: 1 row = 1 (job offer, technology) pair. This
+      grain is what lets you count how many offers ask for Python: a simple
+      group by technology, impossible on a LIST column. Offers with no
+      technology at all (consulting listings, ~60% of the tested sample)
+      disappear here -- not data loss, fct_job_offer remains the reference
+      table for counting offers.
+    columns:
+      - name: job_offer_id
+        description: Identifier of the job offer this technology mention belongs to.
+
+      - name: technology
+        description: A single technology mentioned in the offer, as extracted by the LLM.

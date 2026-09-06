@@ -9,7 +9,7 @@ intitulés renvoyés pour se faire une idée du contenu réel du code.
 
 Conclusion tirée de ces essais : M1405 et M1811 sont dédiés data ; M1403,
 M1805, M1806, M1868 mélangent data et beaucoup d'autres métiers. Cette
-observation fonde la stratégie hybride finale (cf. search.py / pull_complet.py).
+observation fonde la stratégie hybride finale (cf. search.py / full_pull.py).
 
 Script jetable, gardé dans exploration/ pour tracer la démarche.
 """

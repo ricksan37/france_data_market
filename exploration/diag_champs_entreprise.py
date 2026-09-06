@@ -1,7 +1,7 @@
 import json
 from collections import Counter
 
-with open('../data/raw/offres_2026-07-17_1403.json') as f:
+with open('../data/raw/job_offers_2026-07-17_1403.json') as f:
     d = json.load(f)
 
 offres = d['resultats']

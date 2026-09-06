@@ -1,0 +1,33 @@
+version: 2
+
+models:
+  - name: int_job_listing_clusters
+    description: >
+      Groups job offers that are actually the same listing republished
+      across cities, via a normalized-text signature (lowercase, collapsed
+      whitespace -- not a similarity threshold). No offer is dropped: every
+      analysis chooses to count offers or listings. Grain is 1 row = 1 job
+      offer.
+    columns:
+      - name: job_offer_id
+        description: Unique identifier of the job offer. Grain of this model.
+        data_tests:
+          - unique
+          - not_null
+
+      - name: listing_signature
+        description: >
+          MD5 hash of the offer's normalized description (lowercase,
+          collapsed whitespace). Identical across every job offer that is
+          actually the same listing.
+
+      - name: cluster_size
+        description: Number of job offers sharing this listing_signature.
+
+      - name: is_canonical_listing
+        description: >
+          True for the oldest job offer in the cluster (the original
+          publication; the others are reposts), tie-broken by job_offer_id
+          so the result doesn't depend on read order. Exactly one true per
+          listing_signature -- enforced downstream by
+          assert_one_canonical_per_cluster on fct_job_offer.

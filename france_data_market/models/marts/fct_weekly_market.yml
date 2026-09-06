@@ -1,29 +1,29 @@
 version: 2
 
 models:
-  - name: fct_marche_hebdo
+  - name: fct_weekly_market
     description: >
-      Etat hebdomadaire du corpus d'offres. Grain : une ligne par semaine ISO,
-      identifiee par son lundi. Mesure la taille du corpus accumule, PAS le
-      nombre d'offres actives sur le marche a cette date (voir l'en-tete du
-      modele).
+      Weekly state of the offer corpus. Grain: one row per ISO week,
+      identified by its Monday. Measures the accumulated corpus size, NOT
+      the number of offers active on the market at that date (see the
+      model's header comment).
     columns:
-      - name: semaine
-        description: Lundi de la semaine ISO. Cle du grain.
+      - name: week_start_date
+        description: Monday of the ISO week. Grain key.
         data_tests:
           - unique
           - not_null
-      - name: nb_offres_total
-        description: Offres dans fct_offre au moment du run, corpus accumule.
+      - name: total_offer_count
+        description: Offers in fct_job_offer at run time, accumulated corpus.
         data_tests:
           - not_null
-      - name: nb_intermediaire_reclasse
+      - name: reclassified_intermediary_offer_count
         description: >
-          Offres reclassees ANONYME vers INTERMEDIAIRE via client_final_masque.
-          NULL (et non 0) sur les semaines produites en CI, ou l'extraction LLM
-          n'a pas tourne : la mesure est indisponible, pas nulle.
-      - name: extraction_llm
+          Offers reclassified from ANONYMOUS to INTERMEDIARY via
+          end_client_masked. NULL (not 0) on weeks produced in CI, where the
+          LLM extraction didn't run: the measurement is unavailable, not zero.
+      - name: llm_extraction_available
         description: >
-          Vrai si le run qui a produit la ligne disposait des champs
-          d'extraction LLM. Permet de distinguer une mesure absente d'une
-          mesure a zero sur toute colonne qui en depend.
+          True if the run that produced this row had the LLM extraction
+          fields available. Lets you tell an absent measurement apart from a
+          zero measurement on any column that depends on it.

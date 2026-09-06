@@ -1,26 +1,31 @@
 """
-Extraction des compétences depuis le texte des offres, Phase 4 (spec §8).
+Skill extraction from job offer text.
 
-Réplique le pattern d'ingestion établi en Phase 1 et Phase 3 : script Python
--> dump JSON horodaté dans data/raw/ -> source dbt -> modèle stg_. dbt ne fait
-pas d'appels LLM, pas plus qu'il ne fait d'appels HTTP.
+Replicates the ingestion pattern established in Phase 1 and Phase 3: Python
+script -> timestamped JSON dump in data/raw/ -> dbt source -> stg_ model. dbt
+makes no LLM calls, just as it makes no HTTP calls.
 
-MODÈLE RETENU : mistral-nemo (12B), après comparaison mesurée sur un
-échantillon de 20 offres contre mistral 7B et qwen3 8B. Critère décisif : seul
-Nemo distingue correctement un produit nommé (Azure, Databricks) d'un concept
-technique (RAG, CI/CD, Data Lake) : défaut irréductible par prompt sur les
-deux modèles 7-8B, testé sur trois formulations successives.
+MODEL CHOSEN: mistral-nemo (12B), after a measured comparison on a 20-offer
+sample against mistral 7B and qwen3 8B. Decisive criterion: only Nemo
+correctly distinguishes a named product (Azure, Databricks) from a technical
+concept (RAG, CI/CD, Data Lake): an irreducible defect via prompting on both
+7-8B models, tested across three successive phrasings.
 
-LIMITE CONNUE ET ASSUMÉE : Nemo sous-extrait le champ 'domaines' sur les
-annonces de conseil. Mesuré : 4 concepts relevés sur ~8 présents dans le texte
-(offre 0388930). Non corrigé : une itération supplémentaire de prompt a produit
-un gain marginal sur 'domaines' au prix d'une hallucination sur
-annees_experience_min. Le rapport gain/risque s'inverse : 'technologies' est le
-champ prioritaire du projet et il est fiable.
+KNOWN AND ACCEPTED LIMIT: Nemo under-extracts the 'domaines' field on
+consulting listings. Measured: 4 concepts found out of ~8 present in the
+text (offer 0388930). Not fixed: a further prompt iteration produced a
+marginal gain on 'domaines' at the cost of a hallucination on
+annees_experience_min. The gain/risk ratio flips: 'technologies' is the
+project's priority field and it's reliable.
 
-Lancement : depuis la RACINE du repo -> python3 extraction_skills.py
-Reprise incrémentale : seules les offres absentes des dumps précédents sont
-traitées. Durée mesurée : 34,5 s/offre (317 min pour 552 offres).
+Usage: from the repo ROOT -> python3 extract_skills.py
+Incremental resume: only offers absent from previous dumps are processed.
+Measured duration: 34.5 s/offer (317 min for 552 offers).
+
+The extraction prompt below stays in French: it's a measured, validated
+configuration (model choice + exact wording, three iterations tested), not
+just code -- translating it could shift the LLM's actual extraction
+behavior without a new measurement.
 """
 
 import json
@@ -35,9 +40,9 @@ from ollama import chat
 sys.path.insert(0, "exploration")
 from schema_extraction import ExtractionOffre
 
-MODELE = "mistral-nemo"
-CHEMIN_DB = "data/warehouse.duckdb"
-DOSSIER_SORTIE = Path("data/raw")
+MODEL = "mistral-nemo"
+DB_PATH = "data/warehouse.duckdb"
+OUTPUT_DIR = Path("data/raw")
 
 PROMPT = """Tu extrais des informations factuelles d'une offre d'emploi française.
 
@@ -133,132 +138,134 @@ Texte de l'offre :
 ---"""
 
 
-def charger_ids_deja_extraits() -> set[str]:
-    """Union des offre_id de tous les dumps d'extraction precedents.
+def load_already_extracted_ids() -> set[str]:
+    """Union of job_offer_id across every previous extraction dump.
 
-    Lit un motif et non un nom fige : c'est ce couplage qui aurait fait
-    reconstruire indefiniment les 552 offres de juillet cote source `raw`
-    (bug Phase 5). Un dump de plus doit enrichir la reprise, jamais la casser.
+    Reads a pattern rather than a frozen filename: that coupling is exactly
+    what would have made the 552 July offers rebuild endlessly on the `raw`
+    source side (Phase 5 bug). One more dump should enrich the resume,
+    never break it.
     """
     ids: set[str] = set()
-    for chemin in sorted(DOSSIER_SORTIE.glob("extraction_skills_*.json")):
-        with open(chemin, encoding="utf-8") as fh:
+    for path in sorted(OUTPUT_DIR.glob("extract_skills_*.json")):
+        with open(path, encoding="utf-8") as fh:
             dump = json.load(fh)
         ids.update(
-            resultat["offre_id"]
-            for resultat in dump.get("resultats", [])
-            if resultat.get("offre_id")
+            result["job_offer_id"]
+            for result in dump.get("resultats", [])
+            if result.get("job_offer_id")
         )
     return ids
 
 
-def ecrire_dump(chemin: Path, resultats: list, echecs: list, duree: float) -> None:
-    """Ecrit le dump {metadata, resultats}, structure commune aux dumps FT et DINUM.
+def write_dump(path: Path, results: list, failures: list, duration: float) -> None:
+    """Writes the {metadata, resultats} dump, the structure shared with the
+    FT and DINUM dumps.
 
-    Appelee periodiquement et pas seulement en fin de run : un plantage a H+3
-    sur 4 h de traitement ne doit pas couter 4 h. Le fichier partiel est relu
-    au lancement suivant par charger_ids_deja_extraits() -- checkpoint et
-    reprise sont le meme mecanisme, ecrit une fois.
+    Called periodically, not only at the end of the run: a crash at H+3 on a
+    4h run shouldn't cost 4 hours. The partial file is read back on the next
+    launch by load_already_extracted_ids() -- checkpoint and resume are the
+    same mechanism, written once.
     """
     dump = {
         "metadata": {
-            "date_execution": datetime.now().isoformat(),
-            "modele": MODELE,
-            "population_cible": "fct_offre, offres sans extraction anterieure (reprise incrementale)",
-            "nb_offres": len(resultats),
-            "nb_echecs": len(echecs),
-            "offres_en_echec": echecs,
-            "duree_secondes": round(duree, 1),
-            "duree_moyenne_par_offre": round(duree / len(resultats), 1) if resultats else None,
+            "execution_date": datetime.now().isoformat(),
+            "model": MODEL,
+            "target_population": "fct_job_offer, offers with no prior extraction (incremental resume)",
+            "offer_count": len(results),
+            "failure_count": len(failures),
+            "failed_offers": failures,
+            "duration_seconds": round(duration, 1),
+            "average_duration_per_offer": round(duration / len(results), 1) if results else None,
         },
-        "resultats": resultats,
+        "resultats": results,
     }
-    with open(chemin, "w", encoding="utf-8") as fh:
+    with open(path, "w", encoding="utf-8") as fh:
         json.dump(dump, fh, ensure_ascii=False, indent=2)
 
 
-def charger_offres() -> list[tuple[str, str, str]]:
-    """Lit fct_offre plutôt que stg_ft_offres.
+def load_offers() -> list[tuple[str, str, str]]:
+    """Reads fct_job_offer rather than stg_raw__ft_job_offers.
 
-    fct_offre est matérialisée en table : elle s'interroge depuis n'importe
-    quel répertoire. stg_ft_offres est une vue, dont le chemin relatif vers le
-    JSON source ne se résout que depuis observatoire/ (piège connu).
-    read_only=True pour ne pas prendre le verrou mono-écrivain DuckDB.
+    fct_job_offer is materialized as a table: it can be queried from any
+    directory. stg_raw__ft_job_offers is a view, whose relative path to the
+    source JSON only resolves from france_data_market/ (known pitfall).
+    read_only=True to avoid taking DuckDB's single-writer lock.
     """
-    con = duckdb.connect(CHEMIN_DB, read_only=True)
-    offres = con.execute("""
-        select offre_id, intitule, description
-        from fct_offre
-        order by offre_id
+    con = duckdb.connect(DB_PATH, read_only=True)
+    offers = con.execute("""
+        select job_offer_id, job_title, job_description
+        from fct_job_offer
+        order by job_offer_id
     """).fetchall()
     con.close()
 
-    # Filtre EN PYTHON, jamais par un `not in` SQL : un IN() a plusieurs
-    # centaines de valeurs fait planter l'optimiseur DuckDB (bug connu,
-    # version-independant). Une comparaison de sets contourne le sujet.
-    deja_extraites = charger_ids_deja_extraits()
-    nouvelles = [offre for offre in offres if offre[0] not in deja_extraites]
+    # Filtered IN PYTHON, never via a SQL `not in`: an IN() with several
+    # hundred values crashes the DuckDB optimizer (known bug,
+    # version-independent). A set comparison sidesteps the issue.
+    already_extracted = load_already_extracted_ids()
+    new_offers = [offer for offer in offers if offer[0] not in already_extracted]
 
-    print(f"fct_offre            : {len(offres)}")
-    print(f"Deja extraites       : {len(deja_extraites)}")
-    print(f"A extraire ce run    : {len(nouvelles)}\n")
+    print(f"fct_job_offer        : {len(offers)}")
+    print(f"Already extracted    : {len(already_extracted)}")
+    print(f"To extract this run  : {len(new_offers)}\n")
 
-    return nouvelles
+    return new_offers
 
 
-def extraire_une_offre(description: str) -> ExtractionOffre:
-    """Un appel LLM contraint par le schéma. temperature=0 : pas de créativité."""
-    reponse = chat(
-        model=MODELE,
+def extract_one_offer(description: str) -> ExtractionOffre:
+    """A single LLM call constrained by the schema. temperature=0: no creativity."""
+    response = chat(
+        model=MODEL,
         messages=[{"role": "user", "content": PROMPT.format(description=description)}],
         format=ExtractionOffre.model_json_schema(),
         options={"temperature": 0},
     )
-    return ExtractionOffre.model_validate_json(reponse.message.content)
+    return ExtractionOffre.model_validate_json(response.message.content)
 
 
 def main() -> None:
-    offres = charger_offres()
-    total = len(offres)
+    offers = load_offers()
+    total = len(offers)
 
-    # "Rien a faire" est un etat normal d'un script incremental, pas une
-    # erreur. Sortir ici evite en prime la division par zero du calcul de
-    # duree moyenne en fin de dump.
+    # "Nothing to do" is a normal state for an incremental script, not an
+    # error. Returning here also avoids a division by zero when computing
+    # the average duration at the end of the dump.
     if total == 0:
-        print("Rien a extraire : toutes les offres de fct_offre ont un resultat.")
+        print("Nothing to extract: every offer in fct_job_offer already has a result.")
         return
 
-    print(f"Modele           : {MODELE}")
-    print(f"Duree estimee    : {total * 34.5 / 60:.0f} minutes (34,5 s/offre mesurees)\n")
+    print(f"Model            : {MODEL}")
+    print(f"Estimated time   : {total * 34.5 / 60:.0f} minutes (34.5 s/offer measured)\n")
 
-    horodatage = datetime.now().strftime("%Y-%m-%d_%H%M")
-    chemin_sortie = DOSSIER_SORTIE / f"extraction_skills_{horodatage}.json"
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+    output_path = OUTPUT_DIR / f"extract_skills_{timestamp}.json"
 
-    resultats = []
-    echecs = []
-    debut_total = time.time()
+    results = []
+    failures = []
+    start_time = time.time()
 
-    for i, (offre_id, intitule, description) in enumerate(offres, 1):
+    for i, (offer_id, title, description) in enumerate(offers, 1):
         try:
-            extraction = extraire_une_offre(description)
-            resultats.append({
-                "offre_id": offre_id,
-                "statut_extraction": "ok",
-                "erreur": None,  # toujours présente : des clés hétérogènes
-                                 # feraient inférer un schéma incomplet à
-                                 # read_json_auto (piège identifié au palier 0)
+            extraction = extract_one_offer(description)
+            results.append({
+                "job_offer_id": offer_id,
+                "extraction_status": "ok",
+                "error": None,  # always present: heterogeneous keys would
+                                # make read_json_auto infer an incomplete
+                                # schema (pitfall identified at gate 0)
                 **extraction.model_dump(),
             })
         except Exception as err:
-            # Un échec est un fait à compter et à tracer, pas une raison
-            # d'interrompre 3 h de traitement. La ligne est conservée avec
-            # un statut distinct pour que le taux d'échec soit mesurable en
-            # aval, comme le statut_matching de la Phase 3.
-            echecs.append(offre_id)
-            resultats.append({
-                "offre_id": offre_id,
-                "statut_extraction": "echec",
-                "erreur": str(err)[:200],
+            # A failure is a fact to count and trace, not a reason to
+            # interrupt a 3h run. The row is kept with a distinct status so
+            # the failure rate is measurable downstream, like the DINUM
+            # enrichment's match_status.
+            failures.append(offer_id)
+            results.append({
+                "job_offer_id": offer_id,
+                "extraction_status": "echec",
+                "error": str(err)[:200],
                 "technologies": [],
                 "domaines": [],
                 "niveau_etudes": None,
@@ -270,26 +277,26 @@ def main() -> None:
                 "client_final_masque": None,
             })
 
-        # Progression toutes les 10 offres : sur 3 h de traitement, un
-        # terminal muet ne permet pas de distinguer "ça avance" de "c'est figé".
+        # Progress every 10 offers: over a 3h run, a silent terminal doesn't
+        # let you tell "it's progressing" from "it's stuck".
         if i % 10 == 0 or i == total:
-            ecoule = time.time() - debut_total
-            reste = (ecoule / i) * (total - i)
-            print(f"[{i:3}/{total}] {ecoule / 60:5.1f} min ecoulees | "
-                  f"~{reste / 60:5.1f} min restantes | echecs : {len(echecs)}")
+            elapsed = time.time() - start_time
+            remaining = (elapsed / i) * (total - i)
+            print(f"[{i:3}/{total}] {elapsed / 60:5.1f} min elapsed | "
+                  f"~{remaining / 60:5.1f} min remaining | failures: {len(failures)}")
 
-        # Checkpoint toutes les 25 offres (~14 min). Voir ecrire_dump().
+        # Checkpoint every 25 offers (~14 min). See write_dump().
         if i % 25 == 0:
-            ecrire_dump(chemin_sortie, resultats, echecs, time.time() - debut_total)
+            write_dump(output_path, results, failures, time.time() - start_time)
 
-    duree_totale = time.time() - debut_total
+    total_duration = time.time() - start_time
 
-    ecrire_dump(chemin_sortie, resultats, echecs, duree_totale)
+    write_dump(output_path, results, failures, total_duration)
 
     print(f"\n{'=' * 70}")
-    print(f"Termine en {duree_totale / 60:.1f} minutes")
-    print(f"Echecs     : {len(echecs)}/{total}")
-    print(f"Dump ecrit : {chemin_sortie}")
+    print(f"Done in {total_duration / 60:.1f} minutes")
+    print(f"Failures  : {len(failures)}/{total}")
+    print(f"Dump written: {output_path}")
 
 
 if __name__ == "__main__":

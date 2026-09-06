@@ -1,28 +1,52 @@
+version: 2
+
+models:
+  - name: int_employer_classification
+    description: >
+      Employer classification for each job offer, based on NAF code and
+      employer name and, as a last resort, the end_client_masked text signal
+      from the LLM extraction. Grain is 1 row = 1 job offer.
+    columns:
+      - name: job_offer_id
+        description: Unique identifier of the job offer. Grain of this model.
+
+      - name: employer_category
+        description: >
+          One of DIRECT_EMPLOYER (structurally identifiable employer),
+          INTERMEDIARY (known staffing/recruitment firm, matched on NAF code
+          or employer name), ANONYMOUS (neither NAF nor employer name
+          usable), or INTERMEDIARY_RECLASSIFIED (structurally ANONYMOUS, but
+          the offer's text reveals a masked end client -- see
+          end_client_masked in stg_extraction__skills). Validated by the
+          dedicated assert_employer_category_valid test rather than
+          accepted_values, to avoid the DuckDB 1.5.4 multi-value IN()
+          optimizer bug.
+
 unit_tests:
   - name: test_parsing_employeur
     description: >
-      Vérifie la classification employeur (EMPLOYEUR_DIRECT / INTERMEDIAIRE /
-      ANONYME / INTERMEDIAIRE_reclasse) sur la base du code NAF, du nom de
-      l'entreprise (spec §6.1) et, en dernier recours, du signal texte
-      client_final_masque issu de l'extraction Phase 4.
-    model: int_classification_employeur
+      Verifies the employer classification (DIRECT_EMPLOYER / INTERMEDIARY /
+      ANONYMOUS / INTERMEDIARY_RECLASSIFIED) based on NAF code, employer name
+      and, as a last resort, the end_client_masked text signal from the LLM
+      extraction.
+    model: int_employer_classification
     given:
-      - input: ref('stg_ft_offres')
+      - input: ref('stg_raw__ft_job_offers')
         rows:
-          - {offre_id: "1", entreprise_nom: "STEP UP", code_naf: null}
-          - {offre_id: "2", entreprise_nom: null, code_naf: "62.02A"}
-          - {offre_id: "3", entreprise_nom: "Crédit Agricole", code_naf: null}
-          - {offre_id: "4", entreprise_nom: null, code_naf: null}
-          - {offre_id: "5", entreprise_nom: null, code_naf: "69.20Z"}
-          - {offre_id: "6", entreprise_nom: null, code_naf: null}
-      - input: ref('stg_offres_skills')
+          - {job_offer_id: "1", employer_name_raw: "STEP UP", naf_code_on_offer: null}
+          - {job_offer_id: "2", employer_name_raw: null, naf_code_on_offer: "62.02A"}
+          - {job_offer_id: "3", employer_name_raw: "Crédit Agricole", naf_code_on_offer: null}
+          - {job_offer_id: "4", employer_name_raw: null, naf_code_on_offer: null}
+          - {job_offer_id: "5", employer_name_raw: null, naf_code_on_offer: "69.20Z"}
+          - {job_offer_id: "6", employer_name_raw: null, naf_code_on_offer: null}
+      - input: ref('stg_extraction__skills')
         rows:
-          - {offre_id: "6", client_final_masque: true}
+          - {job_offer_id: "6", end_client_masked: true}
     expect:
       rows:
-        - {offre_id: "1", categorie_employeur: "INTERMEDIAIRE"}
-        - {offre_id: "2", categorie_employeur: "INTERMEDIAIRE"}
-        - {offre_id: "3", categorie_employeur: "EMPLOYEUR_DIRECT"}
-        - {offre_id: "4", categorie_employeur: "ANONYME"}
-        - {offre_id: "5", categorie_employeur: "ANONYME"}
-        - {offre_id: "6", categorie_employeur: "INTERMEDIAIRE_reclasse"}
+        - {job_offer_id: "1", employer_category: "INTERMEDIARY"}
+        - {job_offer_id: "2", employer_category: "INTERMEDIARY"}
+        - {job_offer_id: "3", employer_category: "DIRECT_EMPLOYER"}
+        - {job_offer_id: "4", employer_category: "ANONYMOUS"}
+        - {job_offer_id: "5", employer_category: "ANONYMOUS"}
+        - {job_offer_id: "6", employer_category: "INTERMEDIARY_RECLASSIFIED"}

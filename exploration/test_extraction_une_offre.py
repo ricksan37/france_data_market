@@ -7,10 +7,10 @@ structure (clés, types, imbrication) ; les descriptions sont écartées. Toute
 consigne de SENS doit donc vivre dans le prompt. Les descriptions du schéma
 restent en place comme documentation du code, mais elles ne pilotent rien.
 
-ATTENTION : stg_ft_offres est une vue -> lancement obligatoire depuis
-observatoire/, sinon son chemin relatif vers le JSON ne se résout pas.
+ATTENTION : stg_raw__ft_job_offers est une vue -> lancement obligatoire depuis
+france_data_market/, sinon son chemin relatif vers le JSON ne se résout pas.
 
-Lancement : depuis observatoire/  ->  python3 ../exploration/test_extraction_une_offre.py
+Lancement : depuis france_data_market/  ->  python3 ../exploration/test_extraction_une_offre.py
 """
 
 import sys
@@ -102,7 +102,7 @@ notre client", le nom à extraire est celui du CABINET, pas du client (le
 client est justement non nommé).
 null si aucun nom n'apparaît dans le texte.
 
-client_final_masque : true UNIQUEMENT si le texte dit explicitement que
+end_client_masked : true UNIQUEMENT si le texte dit explicitement que
 l'annonceur recrute POUR UNE AUTRE entreprise non nommée ("notre client",
 "pour le compte de", "accompagner un grand groupe" en parlant d'un tiers).
 false si l'entreprise nommée parle d'ELLE-MÊME, même si elle utilise des
@@ -122,14 +122,14 @@ def main() -> None:
     # read_only=True : ne jamais verrouiller la base pendant la lecture
     # (piège du verrou mono-écrivain DuckDB).
     con = duckdb.connect(CHEMIN_DB, read_only=True)
-    offre_id, intitule, description = con.execute("""
-        select offre_id, intitule, description
-        from stg_ft_offres
-        where offre_id = '0388930'
+    job_offer_id, job_title, description = con.execute("""
+        select job_offer_id, job_title, job_description
+        from stg_raw__ft_job_offers
+        where job_offer_id = '0388930'
     """).fetchone()
     con.close()
 
-    print(f"Offre : {offre_id} ({intitule})")
+    print(f"Offre : {job_offer_id} ({job_title})")
     print(f"Longueur description : {len(description)} caracteres\n")
 
     debut = time.time()

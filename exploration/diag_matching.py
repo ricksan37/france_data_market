@@ -47,9 +47,9 @@ def diagnostiquer(nom_offre, code_commune_offre, resultats, total_results_api):
 
 con = duckdb.connect('../data/warehouse.duckdb', read_only=True)
 offres = con.execute("""
-    select entreprise_nom, commune
-    from fct_offre
-    where categorie_employeur = 'EMPLOYEUR_DIRECT'
+    select employer_name, commune_code
+    from fct_job_offer
+    where employer_category = 'DIRECT_EMPLOYER'
 """).fetchall()
 con.close()
 

@@ -1,19 +1,20 @@
 """
-Genere dashboard/rapport.html : rapport statique Millimeter Dark sur l'etat
-du marche data France. Lit warehouse.duckdb en lecture seule, produit une
-figure Plotly par requete, assemble le tout dans template_rapport.html.
+Generates dashboard/report.html: a static, dark-themed report on the
+state of the French data job market. Reads warehouse.duckdb read-only,
+produces one Plotly figure per query, assembles it all into
+report_template.html.
 
-AUCUN CHIFFRE EN DUR. Tout compte affiche vient desormais d'une requete.
+NO HARDCODED FIGURE. Every count displayed now comes from a query.
 
-DEGRADATION PROPRE (CI_SANS_EXTRACTION) : detectee par resultat vide plutot
-que par relecture de la variable d'environnement, plus robuste car elle
-mesure l'etat reel des donnees. Concerne uniquement les deux requetes qui
-dependent de stg_offres_skills.
+CLEAN DEGRADATION (CI_WITHOUT_EXTRACTION): detected via an empty result
+rather than by re-reading the environment variable, more robust because it
+measures the data's actual state. Applies only to the two queries that
+depend on stg_extraction__skills.
 
-Pas de dependance pandas/numpy : reservees au dev local
-(requirements-dev.txt), absentes du runner CI.
+No pandas/numpy dependency: reserved for local dev (requirements-dev.txt),
+absent from the CI runner.
 
-Usage : depuis la racine du repo -> .venv/bin/python3 dashboard/generer_rapport.py
+Usage: from the repo root -> .venv/bin/python3 dashboard/generate_report.py
 """
 
 import base64
@@ -24,41 +25,41 @@ import duckdb
 import plotly.graph_objects as go
 import plotly.io as pio
 
-from theme_millimeter import (
-    figure_vide, chart_barres_horizontales, chart_colonnes,
-    chart_barres_groupees, chart_ligne, BLUE, AMBER,
+from theme import (
+    empty_figure, horizontal_bar_chart, column_chart,
+    grouped_bar_chart, line_chart, BLUE, AMBER,
 )
 
-RACINE = Path(__file__).resolve().parent.parent
-DOSSIER = Path(__file__).resolve().parent
-DB_PATH = RACINE / "data" / "warehouse.duckdb"
-TEMPLATE_PATH = DOSSIER / "template_rapport.html"
-SORTIE_PATH = DOSSIER / "rapport.html"
-DOSSIER_POLICES = DOSSIER / "fonts"
+ROOT_DIR = Path(__file__).resolve().parent.parent
+DASHBOARD_DIR = Path(__file__).resolve().parent
+DB_PATH = ROOT_DIR / "data" / "warehouse.duckdb"
+TEMPLATE_PATH = DASHBOARD_DIR / "report_template.html"
+OUTPUT_PATH = DASHBOARD_DIR / "report.html"
+FONTS_DIR = DASHBOARD_DIR / "fonts"
 
-MESSAGE_INDISPONIBLE = (
-    "Section indisponible : extraction LLM non exécutée dans cet environnement "
-    "(Ollama ne tourne pas sur un runner CI, cf. CI_SANS_EXTRACTION)"
+UNAVAILABLE_MESSAGE = (
+    "Section unavailable: LLM extraction not run in this environment "
+    "(Ollama doesn't run on a CI runner, see CI_WITHOUT_EXTRACTION)"
 )
 
-# Traductions de presentation. Les modeles dbt conservent les valeurs
-# canoniques ; seul l'affichage est humanise.
-LIBELLES_CATEGORIE = {
-    "EMPLOYEUR_DIRECT": "Employeur direct",
-    "INTERMEDIAIRE": "Intermédiaire",
-    "INTERMEDIAIRE_reclasse": "Intermédiaire (reclassé)",
-    "ANONYME": "Employeur masqué",
+# Display translations. The dbt models keep the canonical values; only the
+# display is humanized.
+CATEGORY_LABELS = {
+    "DIRECT_EMPLOYER": "Direct employer",
+    "INTERMEDIARY": "Intermediary",
+    "INTERMEDIARY_RECLASSIFIED": "Intermediary (reclassified)",
+    "ANONYMOUS": "Masked employer",
 }
 
-# Nomenclature France Travail du champ experienceExige. Mesure du 31/08 :
-# seules D et E sont presentes dans le corpus, S (souhaitee) est absente.
-LIBELLES_EXPERIENCE = {
-    "D": "Débutant accepté",
-    "E": "Expérience exigée",
-    "S": "Expérience souhaitée",
+# France Travail's nomenclature for the experienceExige field. Measured
+# 2026-08-31: only D and E are present in the corpus, S (desired) is absent.
+EXPERIENCE_LABELS = {
+    "D": "No experience required",
+    "E": "Experience required",
+    "S": "Experience desired",
 }
 
-POLICES_EMBARQUEES = [
+EMBEDDED_FONTS = [
     ("Archivo Black", "ArchivoBlack.woff2", 400),
     ("Inter", "Inter-Regular.woff2", 400),
     ("Inter", "Inter-SemiBold.woff2", 600),
@@ -66,381 +67,383 @@ POLICES_EMBARQUEES = [
 ]
 
 
-def css_polices() -> str:
-    """Regles @font-face avec les WOFF2 encodes en base64.
+def fonts_css() -> str:
+    """@font-face rules with the WOFF2 files base64-encoded.
 
-    Le rapport doit rester un fichier unique ouvrable hors ligne, et afficher
-    la meme chose partout. Declarer des polices systeme tenait la premiere
-    exigence en sacrifiant la seconde : rendu sur une machine sans Arial
-    Black, les titres de charts perdent leurs accents (mesure du 31/08).
-    Embarquer 50 Ko de WOFF2 tient les deux.
+    The report must stay a single file, openable offline, and look the same
+    everywhere. Declaring system fonts met the first requirement while
+    sacrificing the second: rendered on a machine without Arial Black, chart
+    titles lose their accents (measured 2026-08-31). Embedding 50 KB of
+    WOFF2 satisfies both.
 
-    Absence de fonts/ : on n'echoue pas, on retombe sur les polices systeme
-    en le signalant. Regenerer les polices demande le reseau et fonttools,
-    dont le runner CI ne dispose pas (cf. preparer_polices.py).
+    Missing fonts/: we don't fail, we fall back to system fonts while
+    reporting it. Regenerating the fonts needs network access and fonttools,
+    which the CI runner doesn't have (see prepare_fonts.py).
     """
-    regles = []
-    for famille, fichier, graisse in POLICES_EMBARQUEES:
-        chemin = DOSSIER_POLICES / fichier
-        if not chemin.exists():
-            print(f"  ATTENTION : {fichier} absent, repli sur les polices système")
-            return "/* polices non embarquées : dashboard/fonts/ absent */"
-        b64 = base64.b64encode(chemin.read_bytes()).decode("ascii")
-        regles.append(
-            # Accolades simples : cette chaine est passee en argument a
-            # .format(), qui ne retraite pas les valeurs substituees. Les
-            # doubler ici les ferait ressortir litteralement dans le CSS.
-            f"@font-face {{ font-family: '{famille}'; font-weight: {graisse}; "
+    rules = []
+    for family, file, weight in EMBEDDED_FONTS:
+        path = FONTS_DIR / file
+        if not path.exists():
+            print(f"  WARNING: {file} missing, falling back to system fonts")
+            return "/* fonts not embedded: dashboard/fonts/ missing */"
+        b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+        rules.append(
+            # Single braces: this string is passed as an argument to
+            # .format(), which doesn't reprocess substituted values.
+            # Doubling them here would make them show up literally in the CSS.
+            f"@font-face {{ font-family: '{family}'; font-weight: {weight}; "
             f"font-style: normal; font-display: swap; "
             f"src: url(data:font/woff2;base64,{b64}) format('woff2'); }}"
         )
-    return "\n".join(regles)
+    return "\n".join(rules)
 
 
-def executer(con, sql: str) -> list:
-    """Execute une requete et retourne une liste de dictionnaires.
+def execute(con, sql: str) -> list:
+    """Runs a query and returns a list of dictionaries.
 
-    pandas et numpy sont volontairement exclus de requirements.txt : .df()
-    les importe implicitement et casse sur un runner CI minimal. duckdb
-    expose .description et .fetchall() nativement.
+    pandas and numpy are deliberately excluded from requirements.txt: .df()
+    implicitly imports them and breaks on a minimal CI runner. duckdb
+    exposes .description and .fetchall() natively.
     """
-    curseur = con.execute(sql)
-    colonnes = [c[0] for c in curseur.description]
-    return [dict(zip(colonnes, ligne)) for ligne in curseur.fetchall()]
+    cursor = con.execute(sql)
+    columns = [c[0] for c in cursor.description]
+    return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
-def traduire(lignes: list, colonne: str, dictionnaire: dict) -> list:
-    """Remplace les codes bruts par leurs libelles lisibles."""
+def humanize_column(rows: list, column: str, mapping: dict) -> list:
+    """Replaces raw codes with their readable labels."""
     return [
-        {**ligne, colonne: dictionnaire.get(ligne[colonne], ligne[colonne])}
-        for ligne in lignes
+        {**row, column: mapping.get(row[column], row[column])}
+        for row in rows
     ]
 
 
-# Sous ce seuil, une mediane est portee par une ou deux valeurs : elle se
-# lit comme un resultat alors qu'elle n'en est pas un. Mesure du 03/09 :
-# INTERMEDIAIRE_reclasse affichait 65 000 EUR en tete du graphique, calcules
-# sur 3 offres. Le seuil ecarte la barre du graphique ; la note sous la carte
-# nomme ce qui a ete ecarte et pourquoi -- ecarter en silence serait le
-# contraire du principe du projet.
-SEUIL_EFFECTIF = 10
+# Below this threshold, a median is carried by one or two values: it reads
+# as a result when it isn't one. Measured 2026-09-03: INTERMEDIARY_RECLASSIFIED
+# used to show 65,000 EUR at the top of the chart, computed on 3 offers. The
+# threshold drops the bar from the chart; the note under the card names what
+# was dropped and why -- dropping it silently would be the opposite of the
+# project's principle.
+SAMPLE_SIZE_THRESHOLD = 10
 
 
-def separer_par_effectif(lignes: list, col_effectif: str = "n") -> tuple[list, list]:
-    """Scinde un jeu de lignes selon SEUIL_EFFECTIF."""
-    gardees = [l for l in lignes if l[col_effectif] >= SEUIL_EFFECTIF]
-    ecartees = [l for l in lignes if l[col_effectif] < SEUIL_EFFECTIF]
-    return gardees, ecartees
+def split_by_sample_size(rows: list, count_col: str = "n") -> tuple[list, list]:
+    """Splits a set of rows by SAMPLE_SIZE_THRESHOLD."""
+    kept = [r for r in rows if r[count_col] >= SAMPLE_SIZE_THRESHOLD]
+    excluded = [r for r in rows if r[count_col] < SAMPLE_SIZE_THRESHOLD]
+    return kept, excluded
 
 
-def note_effectif(ecartees: list, col_libelle: str) -> str | None:
-    """Phrase qui nomme les categories ecartees, ou None s'il n'y en a pas."""
-    if not ecartees:
+def sample_size_note(excluded: list, label_col: str) -> str | None:
+    """Sentence naming the excluded categories, or None if there are none."""
+    if not excluded:
         return None
-    details = ", ".join(f"{l[col_libelle]} ({l['n']} offres)" for l in ecartees)
-    return (f"Écarté faute d'effectif : {details}. Sous {SEUIL_EFFECTIF} offres "
-            f"au salaire annuel exploitable, une médiane est portée par une ou "
-            f"deux valeurs.")
+    details = ", ".join(f"{r[label_col]} ({r['n']} offers)" for r in excluded)
+    return (f"Excluded for insufficient sample size: {details}. Below "
+            f"{SAMPLE_SIZE_THRESHOLD} offers with a usable annual salary, a "
+            f"median is carried by one or two values.")
 
 
-def etiquettes_mediane(lignes: list, col_libelle: str, col_valeur: str) -> dict:
-    """Etiquette de barre : la mediane ET son effectif, jamais l'une sans l'autre."""
+def median_labels(rows: list, label_col: str, value_col: str) -> dict:
+    """Bar label: the median AND its sample size, never one without the other."""
     return {
-        l[col_libelle]: f"{l[col_valeur]:,.0f} € · n={l['n']}".replace(",", " ")
-        for l in lignes
+        r[label_col]: f"{r[value_col]:,.0f} € · n={r['n']}".replace(",", " ")
+        for r in rows
     }
 
 
-def big_stat_html(valeur: str, libelle: str, centre: bool = False) -> str:
-    """Un chiffre qui vaut mieux qu'un graphique : bloc HTML, pas un chart."""
-    classe = "big-stat big-stat-centre" if centre else "big-stat"
+def big_stat_html(value: str, label: str, centered: bool = False) -> str:
+    """A number worth more than a chart: an HTML block, not a chart."""
+    css_class = "big-stat big-stat-centered" if centered else "big-stat"
     return f"""
-    <div class="{classe}">
-        <div class="big-stat-valeur">{valeur}</div>
-        <div class="big-stat-libelle">{libelle}</div>
+    <div class="{css_class}">
+        <div class="big-stat-value">{value}</div>
+        <div class="big-stat-label">{label}</div>
     </div>
     """
 
 
-def html_figure(fig, premiere: bool = False) -> str:
-    """Titre en HTML puis figure. include_plotlyjs inline sur la premiere seulement.
+def html_figure(fig, first: bool = False) -> str:
+    """HTML title then figure. include_plotlyjs inline on the first one only.
 
-    Le titre est ecrit hors de la figure, en <h3>, et lu depuis layout.meta ou
-    la fabrique l'a range. Plotly rogne les accents des capitales de son
-    propre titre (mesure du 31/08) ; en HTML, rien ne les rogne, et le
-    libelle prend la meme typographie que le reste de la page.
+    The title is written outside the figure, as <h3>, read from layout.meta
+    where the factory stored it. Plotly clips the accents of its own title's
+    capital letters (measured 2026-08-31); in HTML, nothing clips them, and
+    the label gets the same typography as the rest of the page.
 
-    Le JS Plotly complet est embarque plutot que charge depuis un CDN : sans
-    cela, l'ouverture par double-clic (file://) donne "Plotly is not defined"
-    (corrige depuis).
+    The full Plotly JS is embedded rather than loaded from a CDN: without
+    that, opening the file by double-click (file://) gives "Plotly is not
+    defined" (fixed since).
     """
     meta = fig.layout.meta or {}
-    titre = meta.get("titre", "")
+    title = meta.get("title", "")
     note = meta.get("note")
-    entete = f'<h3 class="titre-carte">{titre}</h3>' if titre else ""
+    header = f'<h3 class="card-title">{title}</h3>' if title else ""
     if note:
-        entete += f'<p class="note-carte">{note}</p>'
-    return entete + pio.to_html(
+        header += f'<p class="card-note">{note}</p>'
+    return header + pio.to_html(
         fig,
-        include_plotlyjs="inline" if premiere else False,
+        include_plotlyjs="inline" if first else False,
         full_html=False,
         config={"displayModeBar": False},
     )
 
 
-def generer() -> None:
+def generate() -> None:
     con = duckdb.connect(str(DB_PATH), read_only=True)
 
-    # ---------- Perimetre : deux comptes, parce qu'il y a deux questions ----------
-    # Une meme annonce publiee dans plusieurs villes recoit un identifiant par
-    # ville. "Combien d'offres" et "combien d'annonces" n'ont donc pas la meme
-    # reponse, et le rapport affiche les deux plutot que d'en choisir une.
-    perimetre = executer(con, """
-        select count(*) as offres,
-               count(case when est_annonce_canonique then 1 end) as annonces
-        from fct_offre
+    # ---------- Scope: two counts, because there are two questions ----------
+    # The same listing published in several cities gets one identifier per
+    # city. "How many offers" and "how many listings" therefore don't share
+    # an answer, and the report shows both rather than picking one.
+    scope = execute(con, """
+        select count(*) as offers,
+               count(case when is_canonical_listing then 1 end) as listings
+        from fct_job_offer
     """)[0]
-    nb_offres, nb_annonces = perimetre["offres"], perimetre["annonces"]
+    offer_count, listing_count = scope["offers"], scope["listings"]
 
-    # ---------- KPI ----------
-    # Par annonce : afficher ou non son salaire est un comportement d'employeur,
-    # et un annonceur qui publie 25 fois le meme texte ne le manifeste qu'une
-    # fois. Mesure : 32,6 % par offre contre 30,0 % par annonce.
-    taux_transp = executer(con, """
-        select round(100.0 * count(case when salaire_mentionne then 1 end)
+    # ---------- KPIs ----------
+    # By listing: showing a salary or not is an employer behavior, and an
+    # advertiser publishing the same text 25 times only shows it once.
+    # Measured: 32.6% by offer versus 30.0% by listing.
+    transparency_rate = execute(con, """
+        select round(100.0 * count(case when salary_mentioned then 1 end)
                      / nullif(count(*), 0), 1) as pct
-        from fct_offre
-        where est_annonce_canonique
+        from fct_job_offer
+        where is_canonical_listing
     """)[0]["pct"]
 
-    hebdo = executer(con, """
-        select semaine, nb_offres_total, taux_anonymat_pct
-        from fct_marche_hebdo
-        order by semaine
+    weekly = execute(con, """
+        select week_start_date, total_offer_count, anonymous_rate_pct
+        from fct_weekly_market
+        order by week_start_date
     """)
-    taux_anonymat = hebdo[-1]["taux_anonymat_pct"] if hebdo else None
+    anonymous_rate = weekly[-1]["anonymous_rate_pct"] if weekly else None
 
-    flux = executer(con, """
-        select semaine, semaines_depuis_precedente, nb_actives,
-               nb_nouvelles, nb_sorties, taux_sortie_pct
-        from fct_marche_flux
-        order by semaine
+    flow = execute(con, """
+        select week_start_date, weeks_since_previous, active_offer_count,
+               new_offer_count, exit_count, exit_rate_pct
+        from fct_weekly_market_flow
+        order by week_start_date
     """)
-    # La derniere ligne portant un taux de sortie : NULL sur la premiere
-    # semaine, faute de point de comparaison.
-    sorties = next((l for l in reversed(flux) if l["taux_sortie_pct"] is not None), None)
+    # The last row carrying an exit rate: NULL on the first week, for lack of
+    # a comparison point.
+    exits = next((r for r in reversed(flow) if r["exit_rate_pct"] is not None), None)
 
-    kpi_offres = big_stat_html(
-        f"{nb_offres}", f"Offres analysées, {nb_annonces} annonces distinctes")
-    kpi_transparence = big_stat_html(f"{taux_transp:.1f} %", "Offres affichant un salaire")
-    kpi_anonymat = (
-        big_stat_html(f"{taux_anonymat:.1f} %", "Offres à employeur masqué")
-        if taux_anonymat is not None
-        else big_stat_html("N/A", "Employeur masqué, historique insuffisant")
+    kpi_offers = big_stat_html(
+        f"{offer_count}", f"Offers analyzed, {listing_count} distinct listings")
+    kpi_transparency = big_stat_html(f"{transparency_rate:.1f} %", "Offers disclosing a salary")
+    kpi_anonymity = (
+        big_stat_html(f"{anonymous_rate:.1f} %", "Offers with a masked employer")
+        if anonymous_rate is not None
+        else big_stat_html("N/A", "Masked employer, insufficient history")
     )
-    kpi_sorties = (
+    kpi_exits = (
         big_stat_html(
-            f"{sorties['taux_sortie_pct']:.1f} %",
-            # Accord du pluriel : l'ecart valait six semaines tant qu'il n'y
-            # avait que deux points de mesure, il vaut 1 depuis le troisieme.
-            # Un libelle genere doit rester grammatical quelle que soit la valeur.
-            f"Offres disparues en {sorties['semaines_depuis_precedente']} "
-            f"semaine{'s' if sorties['semaines_depuis_precedente'] > 1 else ''}",
+            f"{exits['exit_rate_pct']:.1f} %",
+            # Plural agreement: the gap was six weeks while there were only
+            # two data points, it's been 1 since the third. A generated
+            # label must stay grammatical regardless of the value.
+            f"Offers exited over {exits['weeks_since_previous']} "
+            f"week{'s' if exits['weeks_since_previous'] > 1 else ''}",
         )
-        if sorties
-        else big_stat_html("N/A", "Flux, une seule semaine mesurée")
+        if exits
+        else big_stat_html("N/A", "Flow, only one week measured")
     )
 
-    # ---------- 01 Flux ----------
-    if len(flux) >= 2:
-        # Axe categoriel et non temporel : deux mesures espacees de six
-        # semaines donneraient deux barres filiformes noyees dans du vide.
-        flux_libelle = [{**l, "semaine": l["semaine"].strftime("%d/%m")} for l in flux]
-        fig_flux = chart_barres_groupees(
-            flux_libelle, "semaine",
-            [("nb_nouvelles", "Nouvelles"), ("nb_sorties", "Disparues")],
-            "FLUX HEBDOMADAIRE DES OFFRES",
+    # ---------- 01 Flow ----------
+    if len(flow) >= 2:
+        # Categorical axis rather than temporal: two measurements six weeks
+        # apart would give two thin bars lost in empty space.
+        flow_labeled = [{**r, "week_start_date": r["week_start_date"].strftime("%d/%m")} for r in flow]
+        flow_fig = grouped_bar_chart(
+            flow_labeled, "week_start_date",
+            [("new_offer_count", "New"), ("exit_count", "Exited")],
+            "WEEKLY OFFER FLOW",
         )
     else:
-        fig_flux = figure_vide("Flux disponible à partir de deux semaines mesurées")
+        flow_fig = empty_figure("Flow available from two measured weeks onward")
 
-    # Axe categoriel, comme le flux. Sur un axe temporel, Plotly place ses
-    # propres graduations : il affichait "Aug 9, Aug 16, Aug 23, Aug 30" quand
-    # les semaines mesurees sont les 10, 17, 24 et 31 -- des dates fausses,
-    # en anglais, sur un rapport francais.
-    hebdo_libelle = [{**l, "semaine": l["semaine"].strftime("%d/%m")} for l in hebdo]
-    fig_anonymat = chart_ligne(
-        hebdo_libelle, "semaine", "taux_anonymat_pct",
-        "PART DES OFFRES À EMPLOYEUR MASQUÉ", suffixe=" %",
+    # Categorical axis, like the flow. On a temporal axis, Plotly places its
+    # own ticks: it showed "Aug 9, Aug 16, Aug 23, Aug 30" when the measured
+    # weeks are the 10th, 17th, 24th and 31st -- wrong dates, in English, on
+    # a report about France.
+    weekly_labeled = [{**r, "week_start_date": r["week_start_date"].strftime("%d/%m")} for r in weekly]
+    anonymity_fig = line_chart(
+        weekly_labeled, "week_start_date", "anonymous_rate_pct",
+        "SHARE OF OFFERS WITH A MASKED EMPLOYER", suffix=" %",
     )
 
-    # ---------- 02 Remuneration ----------
-    # Filtre sur salaire_annuel_plausible et non plus sur un offre_id ecrit en
-    # dur. La version precedente excluait nommement l'offre 4933945, seul cas
-    # connu jusqu'ici ; il y en a 15 au 03/09. Une exclusion nominative ne
-    # passe pas a l'echelle, une regle si.
-    salaire_cat = traduire(executer(con, """
-        select categorie_employeur,
+    # ---------- 02 Compensation ----------
+    # Filters on annual_salary_plausible rather than a hardcoded
+    # job_offer_id. The previous version explicitly excluded offer 4933945,
+    # the only known case at the time; there are 15 as of 2026-09-03. A
+    # named exclusion doesn't scale, a rule does.
+    salary_by_category = humanize_column(execute(con, """
+        select employer_category,
                count(*) as n,
-               median(salaire_min) as salaire_median
-        from fct_offre
-        where salaire_periode = 'annuel' and salaire_annuel_plausible
-          and est_annonce_canonique
-        group by categorie_employeur
-        order by salaire_median desc
-    """), "categorie_employeur", LIBELLES_CATEGORIE)
-    cat_gardees, cat_ecartees = separer_par_effectif(salaire_cat)
-    fig_salaire_cat = chart_barres_horizontales(
-        cat_gardees, "categorie_employeur", "salaire_median",
-        "SALAIRE MÉDIAN PAR CATÉGORIE D'EMPLOYEUR",
-        etiquettes=etiquettes_mediane(cat_gardees, "categorie_employeur", "salaire_median"),
-        note=note_effectif(cat_ecartees, "categorie_employeur"),
+               median(salary_min) as median_salary
+        from fct_job_offer
+        where salary_period = 'annual' and annual_salary_plausible
+          and is_canonical_listing
+        group by employer_category
+        order by median_salary desc
+    """), "employer_category", CATEGORY_LABELS)
+    kept_categories, excluded_categories = split_by_sample_size(salary_by_category)
+    salary_by_category_fig = horizontal_bar_chart(
+        kept_categories, "employer_category", "median_salary",
+        "MEDIAN SALARY BY EMPLOYER CATEGORY",
+        labels=median_labels(kept_categories, "employer_category", "median_salary"),
+        note=sample_size_note(excluded_categories, "employer_category"),
     )
 
-    salaire_exp = traduire(executer(con, """
-        select experience_exige,
+    salary_by_experience = humanize_column(execute(con, """
+        select required_experience,
                count(*) as n,
-               median(salaire_min) as salaire_median
-        from fct_offre
-        where salaire_periode = 'annuel' and salaire_annuel_plausible
-          and est_annonce_canonique
-        group by experience_exige
-        order by salaire_median
-    """), "experience_exige", LIBELLES_EXPERIENCE)
-    exp_gardees, exp_ecartees = separer_par_effectif(salaire_exp)
-    # Blue seul : deux barres d'une meme mesure, pas deux series ni un delta.
-    # La version precedente coloriait "debutant" en Vermilion et "experience
-    # exigee" en Green, ce qui detournait le codage positif/negatif de
-    # l'identite pour porter un jugement de valeur sur un niveau d'experience.
-    fig_salaire_exp = chart_colonnes(
-        exp_gardees, "experience_exige", "salaire_median",
-        "SALAIRE MÉDIAN PAR NIVEAU D'EXPÉRIENCE", hauteur=364,
-        etiquettes=etiquettes_mediane(exp_gardees, "experience_exige", "salaire_median"),
-        note=note_effectif(exp_ecartees, "experience_exige"),
+               median(salary_min) as median_salary
+        from fct_job_offer
+        where salary_period = 'annual' and annual_salary_plausible
+          and is_canonical_listing
+        group by required_experience
+        order by median_salary
+    """), "required_experience", EXPERIENCE_LABELS)
+    kept_experience, excluded_experience = split_by_sample_size(salary_by_experience)
+    # Blue alone: two bars of the same measurement, not two series or a
+    # delta. The previous version colored "beginner" Vermilion and
+    # "experience required" Green, which repurposed the identity's
+    # positive/negative coding to pass a value judgment on an experience
+    # level.
+    salary_by_experience_fig = column_chart(
+        kept_experience, "required_experience", "median_salary",
+        "MEDIAN SALARY BY EXPERIENCE LEVEL", height=364,
+        labels=median_labels(kept_experience, "required_experience", "median_salary"),
+        note=sample_size_note(excluded_experience, "required_experience"),
     )
 
-    # ---------- 03 Transparence ----------
-    stat_transparence = big_stat_html(
-        f"{taux_transp:.1f} %",
-        f"Offres affichant un salaire, sur {nb_offres} analysées",
-        centre=True,
+    # ---------- 03 Transparency ----------
+    transparency_stat = big_stat_html(
+        f"{transparency_rate:.1f} %",
+        f"Offers disclosing a salary, out of {offer_count} analyzed",
+        centered=True,
     )
-    transparence_cat = traduire(executer(con, """
-        select categorie_employeur,
-               round(100.0 * count(distinct case when salaire_mentionne then offre_id end)
-                     / nullif(count(distinct offre_id), 0), 1) as taux_pct
-        from fct_offre
-        where est_annonce_canonique
-        group by categorie_employeur
-        order by taux_pct desc
-    """), "categorie_employeur", LIBELLES_CATEGORIE)
-    fig_transparence_cat = chart_barres_horizontales(
-        transparence_cat, "categorie_employeur", "taux_pct",
-        "SALAIRE AFFICHÉ, PAR CATÉGORIE", suffixe=" %",
+    transparency_by_category = humanize_column(execute(con, """
+        select employer_category,
+               round(100.0 * count(distinct case when salary_mentioned then job_offer_id end)
+                     / nullif(count(distinct job_offer_id), 0), 1) as rate_pct
+        from fct_job_offer
+        where is_canonical_listing
+        group by employer_category
+        order by rate_pct desc
+    """), "employer_category", CATEGORY_LABELS)
+    transparency_by_category_fig = horizontal_bar_chart(
+        transparency_by_category, "employer_category", "rate_pct",
+        "SALARY DISCLOSED, BY CATEGORY", suffix=" %",
     )
 
-    # ---------- 04 Geographie ----------
-    # Jointure sur cle_commune et non sur code_postal : Paris, Lyon et Marseille
-    # arrivent sans code postal, avec leur seul code INSEE de commune globale.
-    # Avant ce correctif le rapport affichait 71 offres parisiennes ; il y en a
-    # 148. Les trois plus grandes villes du pays etaient sous-comptees de moitie.
-    geo = executer(con, """
-        select c.nom_commune, count(distinct o.offre_id) as nb_offres
-        from fct_offre o
-        join dim_commune c on c.cle_commune = o.cle_commune
-        where c.nom_commune is not null and c.nom_commune != 'NON_RESOLU'
-        group by c.nom_commune
-        order by nb_offres desc
+    # ---------- 04 Geography ----------
+    # Joined on commune_key rather than postal_code: Paris, Lyon and
+    # Marseille arrive with no postal code, only their overall commune's
+    # INSEE code. Before this fix the report showed 71 Parisian offers;
+    # there are 148. The country's three biggest cities were undercounted
+    # by half.
+    geo = execute(con, """
+        select c.commune_name, count(distinct o.job_offer_id) as offer_count
+        from fct_job_offer o
+        join dim_commune c on c.commune_key = o.commune_key
+        where c.commune_name is not null and c.commune_name != 'UNRESOLVED'
+        group by c.commune_name
+        order by offer_count desc
         limit 10
     """)
-    # Seul graphique compté par OFFRE et non par annonce, volontairement : un
-    # poste ouvert dans plusieurs communes represente une opportunite dans
-    # chacune. Le compter une fois, dans la ville de la publication la plus
-    # ancienne, effacerait les autres. L'exception est signalee sous la carte.
-    fig_geo = chart_barres_horizontales(
-        geo, "nom_commune", "nb_offres", "DIX PREMIÈRES COMMUNES PAR NOMBRE D'OFFRES",
-        note="Compté par offre, et non par annonce comme le reste du rapport : "
-             "un poste ouvert dans plusieurs communes représente une opportunité "
-             "dans chacune.",
+    # The only chart counted by OFFER rather than listing, deliberately: a
+    # position opened in several communes represents an opportunity in
+    # each. Counting it once, in the city of the earliest publication, would
+    # erase the others. The exception is noted under the card.
+    geo_fig = horizontal_bar_chart(
+        geo, "commune_name", "offer_count", "TOP 10 COMMUNES BY OFFER COUNT",
+        note="Counted by offer, not by listing like the rest of the report: "
+             "a position opened in several communes represents an "
+             "opportunity in each.",
     )
 
     # ---------- 05 Technologies ----------
-    skills = executer(con, """
-        select t.technologie, count(distinct t.offre_id) as nb_offres
-        from fct_offre_technologie t
-        join fct_offre o using (offre_id)
-        where o.est_annonce_canonique
-        group by t.technologie
-        order by nb_offres desc
+    skills = execute(con, """
+        select t.technology, count(distinct t.job_offer_id) as offer_count
+        from fct_job_offer_technology t
+        join fct_job_offer o using (job_offer_id)
+        where o.is_canonical_listing
+        group by t.technology
+        order by offer_count desc
         limit 10
     """)
-    fig_skills = (
-        chart_barres_horizontales(skills, "technologie", "nb_offres",
-                                  "DIX TECHNOLOGIES LES PLUS DEMANDÉES")
-        if skills else figure_vide(MESSAGE_INDISPONIBLE)
+    skills_fig = (
+        horizontal_bar_chart(skills, "technology", "offer_count",
+                              "TOP 10 MOST REQUESTED TECHNOLOGIES")
+        if skills else empty_figure(UNAVAILABLE_MESSAGE)
     )
 
-    # ---------- 06 Domaines ----------
-    domaines = executer(con, """
-        select d.domaine_normalise, count(distinct d.offre_id) as nb_offres
-        from fct_offre_domaine d
-        join fct_offre o using (offre_id)
-        where o.est_annonce_canonique
-          and d.domaine_normalise in (select distinct domaine_canonique from mapping_domaines)
-        group by d.domaine_normalise
-        order by nb_offres desc
+    # ---------- 06 Domains ----------
+    domains = execute(con, """
+        select d.normalized_domain, count(distinct d.job_offer_id) as offer_count
+        from fct_job_offer_domain d
+        join fct_job_offer o using (job_offer_id)
+        where o.is_canonical_listing
+          and d.normalized_domain in (select distinct canonical_domain from mapping_domaines)
+        group by d.normalized_domain
+        order by offer_count desc
     """)
-    if domaines:
-        fig_domaines = chart_barres_horizontales(
-            domaines, "domaine_normalise", "nb_offres", "DOMAINES D'INTERVENTION",
+    if domains:
+        domains_fig = horizontal_bar_chart(
+            domains, "normalized_domain", "offer_count", "DOMAINS OF INTERVENTION",
         )
-        taux_couv = executer(con, """
-            select round(100.0 * count(case when domaine_normalise in
-                       (select distinct domaine_canonique from mapping_domaines)
+        coverage_rate = execute(con, """
+            select round(100.0 * count(case when normalized_domain in
+                       (select distinct canonical_domain from mapping_domaines)
                      then 1 end) / nullif(count(*), 0), 1) as pct
-            from fct_offre_domaine
+            from fct_job_offer_domain
         """)[0]["pct"]
-        stat_couverture = big_stat_html(
-            f"{taux_couv:.1f} %",
-            "Couverture du mapping de domaines. La longue traîne n'est pas mappée, "
-            "par décision documentée",
-            centre=True,
+        coverage_stat = big_stat_html(
+            f"{coverage_rate:.1f} %",
+            "Domain mapping coverage. The long tail isn't mapped, "
+            "a documented decision",
+            centered=True,
         )
     else:
-        fig_domaines = figure_vide(MESSAGE_INDISPONIBLE)
-        stat_couverture = big_stat_html("N/A", "Couverture du mapping, indisponible en CI",
-                                        centre=True)
+        domains_fig = empty_figure(UNAVAILABLE_MESSAGE)
+        coverage_stat = big_stat_html("N/A", "Mapping coverage, unavailable in CI",
+                                       centered=True)
 
     con.close()
 
-    rendu = TEMPLATE_PATH.read_text(encoding="utf-8").format(
-        polices=css_polices(),
-        nb_offres=nb_offres,
-        date_generation=datetime.now(timezone.utc).strftime("%d/%m/%Y à %H:%M UTC"),
-        kpi_offres=kpi_offres,
-        kpi_sorties=kpi_sorties,
-        kpi_anonymat=kpi_anonymat,
-        kpi_transparence=kpi_transparence,
-        chart_flux=html_figure(fig_flux, premiere=True),
-        chart_anonymat=html_figure(fig_anonymat),
-        chart_salaire_cat=html_figure(fig_salaire_cat),
-        chart_salaire_exp=html_figure(fig_salaire_exp),
-        stat_transparence=stat_transparence,
-        chart_transparence_cat=html_figure(fig_transparence_cat),
-        chart_geo=html_figure(fig_geo),
-        chart_skills=html_figure(fig_skills),
-        chart_domaines=html_figure(fig_domaines),
-        stat_couverture=stat_couverture,
+    rendered = TEMPLATE_PATH.read_text(encoding="utf-8").format(
+        fonts=fonts_css(),
+        offer_count=offer_count,
+        generation_date=datetime.now(timezone.utc).strftime("%d/%m/%Y at %H:%M UTC"),
+        kpi_offers=kpi_offers,
+        kpi_exits=kpi_exits,
+        kpi_anonymity=kpi_anonymity,
+        kpi_transparency=kpi_transparency,
+        chart_flow=html_figure(flow_fig, first=True),
+        chart_anonymity=html_figure(anonymity_fig),
+        chart_salary_by_category=html_figure(salary_by_category_fig),
+        chart_salary_by_experience=html_figure(salary_by_experience_fig),
+        stat_transparency=transparency_stat,
+        chart_transparency_by_category=html_figure(transparency_by_category_fig),
+        chart_geo=html_figure(geo_fig),
+        chart_skills=html_figure(skills_fig),
+        chart_domains=html_figure(domains_fig),
+        stat_coverage=coverage_stat,
     )
-    SORTIE_PATH.write_text(rendu, encoding="utf-8")
+    OUTPUT_PATH.write_text(rendered, encoding="utf-8")
 
-    print(f"Rapport généré : {SORTIE_PATH}")
-    print(f"  Périmètre       : {nb_offres} offres")
-    print(f"  Semaines flux   : {len(flux)}")
-    print(f"  Semaines corpus : {len(hebdo)}")
-    print(f"  Technologies    : {len(skills) or 'indisponible (CI)'}")
-    print(f"  Domaines        : {len(domaines) or 'indisponible (CI)'}")
+    print(f"Report generated: {OUTPUT_PATH}")
+    print(f"  Scope        : {offer_count} offers")
+    print(f"  Flow weeks   : {len(flow)}")
+    print(f"  Corpus weeks : {len(weekly)}")
+    print(f"  Technologies : {len(skills) or 'unavailable (CI)'}")
+    print(f"  Domains      : {len(domains) or 'unavailable (CI)'}")
 
 
 if __name__ == "__main__":
-    generer()
+    generate()

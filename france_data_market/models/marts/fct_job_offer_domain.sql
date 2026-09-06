@@ -1,34 +1,32 @@
-{{ config(materialized='table') }}
--- Table de faits, grain fin : 1 ligne = 1 couple (offre, domaine).
--- Modèle distinct de fct_offre_technologie plutôt qu'une table unique avec
--- une colonne type_skill : décision explicite. Coût assumé : une
--- question portant sur tous les termes confondus demandera un union all.
+-- Fine-grained fact table: 1 row = 1 (job offer, domain) pair.
+-- A model distinct from fct_job_offer_technology rather than a single table
+-- with a skill_type column: an explicit decision. Cost assumed: a question
+-- spanning both kinds of terms will need a union all.
 --
--- LIMITE CONNUE : le modèle d'extraction (mistral-nemo) sous-extrait ce
--- champ sur les annonces de conseil. Les comptages de domaines sont donc
--- des planchers, pas des mesures exactes. Voir extraction_skills.py.
+-- KNOWN LIMIT: the extraction model (mistral-nemo) under-extracts this
+-- field on consulting listings. Domain counts are therefore floors, not
+-- exact measurements. See extract_skills.py.
 --
--- NORMALISATION : sur les 552 offres réelles, 1473 valeurs de domaine
--- distinctes pour 3489 mentions : fragmentation lexicale (casse, langue,
--- sigles : "BI"/"Business Intelligence", "Data Governance"/"gouvernance des
--- données") qui rend le champ brut inexploitable pour un group by. Un
--- mapping (seeds/mapping_domaines.csv) normalise les 12 clusters les plus
--- fréquents (>60 occurrences cumulées chacun) vers une forme canonique.
--- La longue traîne (valeurs à 1-10 occurrences) N'EST PAS mappée : pas de
--- règle construite sur un échantillon trop mince (principe du projet,
--- cf. assert_bornes_salaire_annuel). domaine_brut reste la source d'audit ;
--- domaine_normalise vaut domaine_brut inchangé si aucune correspondance
--- n'existe dans le mapping.
+-- NORMALIZATION: across the 552 real offers, 1473 distinct domain values
+-- for 3489 mentions: lexical fragmentation (case, language, acronyms:
+-- "BI"/"Business Intelligence", "Data Governance"/"gouvernance des
+-- données") that makes the raw field unusable for a group by. A mapping
+-- (seeds/mapping_domaines.csv) normalizes the 12 most frequent clusters
+-- (>60 cumulative occurrences each) to a canonical form. The long tail
+-- (values with 1-10 occurrences) is NOT mapped: no rule built on a sample
+-- too thin to defend (project principle, cf. assert_annual_salary_bounds).
+-- raw_domain stays the audit source; normalized_domain equals raw_domain
+-- unchanged when no match exists in the mapping.
 select
-    d.offre_id,
-    d.domaine as domaine_brut,
-    coalesce(m.domaine_canonique, d.domaine) as domaine_normalise
+    d.job_offer_id,
+    d.domain as raw_domain,
+    coalesce(m.canonical_domain, d.domain) as normalized_domain
 from (
     select
-        offre_id,
-        unnest(domaines) as domaine
-    from {{ ref('stg_offres_skills') }}
-    where statut_extraction = 'ok'
+        job_offer_id,
+        unnest(domains) as domain
+    from {{ ref('stg_extraction__skills') }}
+    where extraction_status = 'ok'
 ) as d
 left join {{ ref('mapping_domaines') }} as m
-    on d.domaine = m.variante
+    on d.domain = m.variant

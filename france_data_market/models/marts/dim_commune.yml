@@ -3,25 +3,26 @@ version: 2
 models:
   - name: dim_commune
     description: >
-      Référentiel géographique du périmètre. Grain : une ligne par clé
-      géographique, code postal quand il existe, code INSEE sinon.
+      Geographic reference table for the scope. Grain: one row per
+      geographic key, postal code when it exists, INSEE code otherwise.
     columns:
-      - name: cle_commune
+      - name: commune_key
         description: >
-          Clé du grain. Le test unique manquait jusqu'au 04/09, et son absence
-          se payait : la dimension portait alors deux clés en double (49000 et
-          95000, deux codes postaux couvrant chacun deux communes INSEE), 292
-          lignes pour 290 codes. Le défaut était apparu tout seul quand le
-          corpus est passé de 552 à 960 offres, sans rien casser de visible.
-          C'est un piège classique : un distinct sur plusieurs colonnes
-          ne déduplique jamais une seule colonne, revenu par la porte des
-          données plutôt que par celle du code.
+          Grain key. The unique test was missing until 2026-09-04, and its
+          absence cost something: the dimension then carried two duplicate
+          keys (49000 and 95000, two postal codes each covering two INSEE
+          communes), 292 rows for 290 codes. The defect had appeared on its
+          own when the corpus grew from 552 to 960 offers, without breaking
+          anything visible. It's a classic trap: a distinct on several
+          columns never deduplicates a single column -- it came back through
+          the data rather than through the code.
         data_tests:
           - unique
           - not_null
-      - name: nom_commune
+      - name: commune_name
         description: >
-          Nom résolu via geo.api.gouv.fr (enrichir_communes.py). NULL tant
-          qu'une clé nouvellement apparue n'a pas été résolue, 'NON_RESOLU'
-          quand l'API ne renvoie rien (99999, sentinelle France Travail pour
-          lieu non renseigné). Jamais de ligne perdue dans les deux cas.
+          Name resolved via geo.api.gouv.fr (enrich_communes.py). NULL as
+          long as a newly appeared key hasn't been resolved yet,
+          'UNRESOLVED' when the API returns nothing (99999, France Travail's
+          sentinel for an unspecified location). No row is ever lost in
+          either case.

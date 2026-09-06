@@ -1,41 +1,41 @@
--- Conservation du flux : les actives d'une semaine doivent etre exactement les
--- actives de la semaine precedente, moins les sorties, plus les nouvelles,
--- plus les reapparues.
+-- Flow conservation: a week's actives must be exactly the previous week's
+-- actives, minus exits, plus new offers, plus reappearances.
 --
---   552 - 463 + 408 + 0 = 497   (les deux premieres semaines mesurees)
+--   552 - 463 + 408 + 0 = 497   (the first two measured weeks)
 --
--- C'est le test le plus fort du modele de flux : il relie quatre mesures
--- calculees independamment (une agregation, une premiere occurrence, deux
--- anti-jointures symetriques). Si l'une derive, l'egalite casse.
+-- This is the flow model's strongest test: it ties together four
+-- independently computed measurements (an aggregation, a first occurrence,
+-- two symmetric anti-joins). If one drifts, the equality breaks.
 --
--- Il a deja servi. Le terme nb_reapparues manquait a la premiere version :
--- une offre republiee apres une absence n'etait ni nouvelle ni survivante et
--- entrait dans les actives sans figurer au bilan. Le defaut etait invisible
--- sur deux semaines et le test l'a fait echouer des le troisieme point, en CI.
+-- It's already proven useful. The reappearance_count term was missing from
+-- the first version: an offer reposted after an absence was neither new
+-- nor a survivor and entered the actives without appearing in the
+-- reconciliation. The defect was invisible over two weeks and the test
+-- caught it at the third data point, in CI.
 --
--- coalesce sur les trois termes : sans lui, un seul NULL rend la comparaison
--- inconnue et le test passe EN SILENCE au lieu d'echouer. C'est arrive dans la
--- meme session sur une semaine sans offre neuve. La premiere semaine reste
--- exclue par la clause sur nb_actives_precedente : sans predecesseur,
--- l'egalite n'a pas de sens.
+-- coalesce on the three terms: without it, a single NULL makes the
+-- comparison unknown and the test passes SILENTLY instead of failing. That
+-- happened in the same session on a week with no new offer. The first week
+-- stays excluded by the clause on previous_active_offer_count: with no
+-- predecessor, the equality is meaningless.
 
 with flux as (
 
     select
-        semaine,
-        nb_actives,
-        nb_nouvelles,
-        nb_sorties,
-        nb_reapparues,
-        lag(nb_actives) over (order by semaine) as nb_actives_precedente
-    from {{ ref('fct_marche_flux') }}
+        week_start_date,
+        active_offer_count,
+        new_offer_count,
+        exit_count,
+        reappearance_count,
+        lag(active_offer_count) over (order by week_start_date) as previous_active_offer_count
+    from {{ ref('fct_weekly_market_flow') }}
 
 )
 
-select semaine
+select week_start_date
 from flux
-where nb_actives_precedente is not null
-  and nb_actives != nb_actives_precedente
-                    - coalesce(nb_sorties, 0)
-                    + coalesce(nb_nouvelles, 0)
-                    + coalesce(nb_reapparues, 0)
+where previous_active_offer_count is not null
+  and active_offer_count != previous_active_offer_count
+                    - coalesce(exit_count, 0)
+                    + coalesce(new_offer_count, 0)
+                    + coalesce(reappearance_count, 0)

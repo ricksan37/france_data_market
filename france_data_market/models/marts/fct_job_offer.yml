@@ -2,137 +2,137 @@ version: 2
 
 models:
 
-  - name: fct_offre
+  - name: fct_job_offer
     description: >
-      Table de faits, grain fin. Une ligne par offre. Assemble stg_ft_offres
-      avec les enrichissements salaire (int_offres_salaire) et classification
-      employeur (int_classification_employeur). Modèle exposé : c'est la
-      table à interroger pour l'analyse, pas les couches staging/intermediate.
+      Fine-grained fact table. One row per job offer. Assembles
+      stg_raw__ft_job_offers with the salary (int_job_offer_salary) and
+      employer classification (int_employer_classification) enrichments.
+      Exposed model: this is the table to query for analysis, not the
+      staging/intermediate layers.
     columns:
-      - name: offre_id
-        description: identifiant unique de l'offre
+      - name: job_offer_id
+        description: Unique identifier of the job offer.
         data_tests:
           - not_null
           - unique
 
-      - name: intitule
-        description: intitulé du poste
+      - name: job_title
+        description: Job title.
         data_tests:
           - not_null
 
-      - name: date_creation
-        description: date de création de l'offre
+      - name: job_offer_creation_date
+        description: Date the offer was created.
         data_tests:
           - not_null
 
       - name: rome_code
-        description: code ROME du poste
+        description: ROME occupation code.
         data_tests:
           - not_null
           - relationships:
               to: ref('dim_rome')
               field: rome_code
-      
-      - name: code_postal
-        description: >
-          Code postal de la commune, tel que fourni par France Travail. Vide
-          pour Paris, Lyon et Marseille, qui n'en ont pas d'unique : leur
-          arrondissement n'est pas transmis, seul le code INSEE de commune
-          globale l'est. Conservé pour l'audit ; ne pas s'en servir comme clé
-          géographique, utiliser cle_commune.
 
-      - name: cle_commune
+      - name: postal_code
         description: >
-          Clé géographique unifiée : le code postal quand il existe, le code
-          INSEE sinon. Couvre 89,5 % du corpus contre 79,6 % pour le seul code
-          postal. C'est la clé de jointure vers dim_commune.
+          Postal code of the commune, as provided by France Travail. Empty
+          for Paris, Lyon and Marseille, which don't have a single one:
+          their arrondissement isn't transmitted, only the overall commune's
+          INSEE code is. Kept for audit; don't use it as a geographic key,
+          use commune_key.
+
+      - name: commune_key
+        description: >
+          Unified geographic key: postal code when it exists, INSEE code
+          otherwise. Covers 89.5% of the corpus versus 79.6% for the postal
+          code alone. This is the join key toward dim_commune.
         data_tests:
           - relationships:
               to: ref('dim_commune')
-              field: cle_commune
+              field: commune_key
 
-      - name: zone_geographique
+      - name: geographic_zone
         description: >
-          metropole, outre-mer ou inconnue. Dimension et non restriction de
-          périmètre : l'outre-mer pèse 17 offres sur 960 et l'exclure ne
-          déplace aucune métrique, mais la zone reste filtrable à la demande.
-          'inconnue' couvre les 101 offres sans aucune information de lieu, et
-          reste une valeur à part entière plutôt qu'un rattachement par défaut
-          à la métropole.
+          mainland, overseas or unknown. A dimension, not a restriction
+          of scope: overseas territories weigh 17 offers out of 960 and
+          excluding them doesn't move any metric, but the zone stays
+          filterable on demand. 'unknown' covers the 101 offers with no
+          location information at all, and remains a value in its own right
+          rather than a default attachment to mainland France.
         data_tests:
           - not_null
 
       - name: siren
         description: >
-          SIREN de l'entreprise employeuse, issu de l'enrichissement DINUM.
-          NULL pour les offres hors périmètre EMPLOYEUR_DIRECT (339) et pour
-          les 42 offres du périmètre non résolues par le matching (80,3 % de
-          taux de matching sur les 213 offres éligibles).
+          SIREN of the employing company, from the DINUM enrichment. NULL
+          for offers outside the DIRECT_EMPLOYER scope (339) and for the 42
+          in-scope offers unresolved by matching (80.3% matching rate on the
+          213 eligible offers).
         data_tests:
           - relationships:
-              to: ref('dim_entreprise')
+              to: ref('dim_company')
               field: siren
 
-      - name: entreprise_nom
+      - name: employer_name
         description: >
-          Nom de l'entreprise. Structuré (France Travail) sauf pour les 21
-          offres categorie_employeur = 'INTERMEDIAIRE_reclasse',
-          où il provient d'entreprise_nom_texte, extrait par LLM depuis le
-          texte de l'offre (Phase 4). NULL sur 5/21 de ces offres : le
-          masquage est détecté sans que le nom de l'intermédiaire soit
-          identifiable dans le texte : volontairement non forcé.
+          Employer name. Structured (France Travail) except for the 21
+          offers with employer_category = 'INTERMEDIARY_RECLASSIFIED', where
+          it comes from employer_name_text, LLM-extracted from the offer's
+          text. NULL on 5/21 of those offers: the masking is detected
+          without the intermediary's name being identifiable in the text --
+          deliberately not forced.
 
-      - name: categorie_employeur
+      - name: employer_category
         description: >
-          EMPLOYEUR_DIRECT / INTERMEDIAIRE / ANONYME / INTERMEDIAIRE_reclasse
-          (spec §6.1). Voir
-          int_classification_employeur pour la logique complète.
+          DIRECT_EMPLOYER / INTERMEDIARY / ANONYMOUS / INTERMEDIARY_RECLASSIFIED.
+          See int_employer_classification for the full logic.
 
-      - name: salaire_annuel_plausible
+      - name: annual_salary_plausible
         description: >
-          Le montant annuel tient-il dans les bornes de plausibilité
-          [10 000, 300 000 €] (spec §12.1). NULL quand la question ne se pose
-          pas : période non annuelle, ou aucun montant. Trois états et non
-          deux, parce que « non applicable » n'est pas « implausible ».
-          Toute agrégation salariale annuelle doit filtrer dessus : au
-          03/09/2026, 15 offres sur 275 sont marquées fausses, et elles
-          suffisent à faire tomber la médiane de Tableau à 1 800 € au lieu
-          de 37 000 €. Invisible sur l'agrégat global, qui vaut 45 000 € dans
-          les deux cas ; destructeur sur une tranche.
-          Cohérence garantie par assert_flag_salaire_plausible (severity
-          error), volumétrie suivie par assert_bornes_salaire_annuel (warn).
+          Does the annual amount fall within the plausibility bounds
+          [10,000, 300,000 €]? NULL when the question doesn't
+          apply: non-annual period, or no amount. Three states rather than
+          two, because "not applicable" isn't "implausible". Any annual
+          salary aggregation must filter on it: as of 2026-09-03, 15 offers
+          out of 275 are flagged false, and they're enough to drop Tableau's
+          median to 1,800 € instead of 37,000 €. Invisible on the overall
+          aggregate, which is 45,000 € either way; destructive on a slice.
+          Consistency guaranteed by assert_plausible_salary_flag (severity
+          error), volume tracked by assert_annual_salary_bounds (warn).
 
-      - name: signature_annonce
+      - name: listing_signature
         description: >
-          Empreinte du texte de l'annonce, normalisé en minuscules et espaces
-          réduits. Deux offres qui la partagent sont la même annonce publiée
-          plusieurs fois. 152 offres sur 960 sont dans ce cas au 04/09.
+          Fingerprint of the listing's text, normalized to lowercase with
+          collapsed whitespace. Two offers sharing it are the same listing
+          published more than once. 152 offers out of 960 are in this case
+          as of 2026-09-04.
 
-      - name: taille_grappe
+      - name: cluster_size
         description: >
-          Nombre d'offres partageant cette signature. 1 pour une annonce
-          publiée une seule fois. Maximum observé : 25, un employeur publiant
-          le même poste dans 24 communes.
+          Number of offers sharing this signature. 1 for a listing published
+          only once. Maximum observed: 25, one employer publishing the same
+          position in 24 communes.
         data_tests:
           - not_null
 
-      - name: est_annonce_canonique
+      - name: is_canonical_listing
         description: >
-          Vrai pour une seule offre par grappe, la plus ancienne. Filtrer
-          dessus compte des ANNONCES (865), ne pas filtrer compte des OFFRES
-          (960). L'écart n'est pas cosmétique : SQL perd 16,7 % de ses
-          mentions et la médiane salariale passe de 45 000 à 43 000 €.
-          Unicité garantie par assert_une_canonique_par_grappe (severity error).
+          True for exactly one offer per cluster, the oldest one. Filtering
+          on it counts LISTINGS (865), not filtering counts OFFERS (960).
+          The gap isn't cosmetic: SQL loses 16.7% of its mentions and the
+          salary median goes from 45,000 to 43,000 €. Uniqueness guaranteed
+          by assert_one_canonical_per_cluster (severity error).
         data_tests:
           - not_null
 
-      - name: description
+      - name: job_description
         description: >
-          Texte intégral de l'annonce, repris de stg_ft_offres. Ajouté
-          comme source de l'extraction LLM (Phase 4). Porté par fct_offre
-          plutôt que lu depuis stg_ft_offres parce que fct_offre est
-          matérialisée en table : elle s'interroge depuis n'importe quel
-          répertoire, là où une vue ne résout son chemin relatif que depuis
-          observatoire/.
+          Full text of the listing, carried over from stg_raw__ft_job_offers.
+          Added as the source for LLM extraction. Carried by fct_job_offer
+          rather than read from stg_raw__ft_job_offers because fct_job_offer
+          is materialized as a table: it can be queried from any directory,
+          where a view only resolves its relative path from the dbt
+          project's own root.
         data_tests:
           - not_null

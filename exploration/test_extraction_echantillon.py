@@ -7,13 +7,13 @@ annonces courtes, offres non-data mal taguées par ROME (limite connue),
 annonces d'intermédiaires sans aucune technologie. Vingt offres coûtent 4 minutes
 et évitent de découvrir un défaut systématique après 1h45 de calcul.
 
-L'échantillon est tiré avec un ordre déterministe (order by offre_id) plutôt
+L'échantillon est tiré avec un ordre déterministe (order by job_offer_id) plutôt
 qu'aléatoire : deux exécutions doivent porter sur les mêmes offres, sinon on ne
 peut pas comparer l'effet d'un changement de prompt.
 
-ATTENTION : stg_ft_offres est une vue -> lancement depuis observatoire/.
+ATTENTION : stg_raw__ft_job_offers est une vue -> lancement depuis france_data_market/.
 
-Lancement : depuis observatoire/  ->  python3 ../exploration/test_extraction_echantillon.py
+Lancement : depuis france_data_market/  ->  python3 ../exploration/test_extraction_echantillon.py
 """
 
 import sys
@@ -32,9 +32,9 @@ TAILLE_ECHANTILLON = 20
 def main() -> None:
     con = duckdb.connect(CHEMIN_DB, read_only=True)
     offres = con.execute(f"""
-        select offre_id, intitule, description
-        from stg_ft_offres
-        order by offre_id
+        select job_offer_id, job_title, job_description
+        from stg_raw__ft_job_offers
+        order by job_offer_id
         limit {TAILLE_ECHANTILLON}
     """).fetchall()
     con.close()
@@ -44,7 +44,7 @@ def main() -> None:
     debut_total = time.time()
     echecs = []
 
-    for i, (offre_id, intitule, description) in enumerate(offres, 1):
+    for i, (job_offer_id, job_title, description) in enumerate(offres, 1):
         debut = time.time()
         try:
             reponse = chat(
@@ -58,7 +58,7 @@ def main() -> None:
             extraction = ExtractionOffre.model_validate_json(reponse.message.content)
             duree = time.time() - debut
 
-            print(f"[{i:2}/{len(offres)}] {offre_id} ({intitule[:45]})")
+            print(f"[{i:2}/{len(offres)}] {job_offer_id} ({job_title[:45]})")
             print(f"        {duree:5.1f}s | techs: {len(extraction.technologies):2} "
                   f"| domaines: {len(extraction.domaines):2} "
                   f"| etudes: {extraction.niveau_etudes} "
@@ -69,8 +69,8 @@ def main() -> None:
         except Exception as err:
             # Un échec de validation est un fait à compter, pas une raison
             # d'interrompre : on veut connaître le TAUX d'échec sur l'échantillon.
-            echecs.append((offre_id, str(err)[:120]))
-            print(f"[{i:2}/{len(offres)}] {offre_id} -> ECHEC : {str(err)[:120]}")
+            echecs.append((job_offer_id, str(err)[:120]))
+            print(f"[{i:2}/{len(offres)}] {job_offer_id} -> ECHEC : {str(err)[:120]}")
 
     duree_totale = time.time() - debut_total
     moyenne = duree_totale / len(offres)
@@ -80,8 +80,8 @@ def main() -> None:
     print(f"Moyenne par offre : {moyenne:.1f}s")
     print(f"Projection 552    : {moyenne * 552 / 60:.0f} minutes")
     print(f"Echecs            : {len(echecs)}/{len(offres)}")
-    for offre_id, err in echecs:
-        print(f"   {offre_id} : {err}")
+    for job_offer_id, err in echecs:
+        print(f"   {job_offer_id} : {err}")
 
 
 if __name__ == "__main__":

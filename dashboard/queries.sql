@@ -1,151 +1,153 @@
--- Requêtes du rapport HTML (Observatoire du Marché Data France).
--- Ce fichier documente les requêtes indépendamment de leur usage en Python
--- (dashboard/generer_rapport.py), convention établie dans les Extensions du
--- Second Brain (queries.sql à côté de index.html).
+-- Queries for the HTML report (France Data Market Observatory).
+-- This file documents the queries independently of their use in Python
+-- (dashboard/generate_report.py), a convention established in the Second
+-- Brain Extensions (queries.sql next to index.html).
 --
--- Deux requêtes seulement dépendent de stg_offres_skills et dégradent à zéro
--- ligne en CI_SANS_EXTRACTION (SECTION 05 et SECTION 06). Toutes les autres,
--- y compris les quatre KPI et la section flux, sont peuplées sur un runner.
+-- Only two queries depend on stg_extraction__skills and degrade to zero rows
+-- in CI_WITHOUT_EXTRACTION (SECTION 05 and SECTION 06). All the others,
+-- including the four KPIs and the flow section, are populated on a runner.
 
 -- ============================================================
--- PÉRIMÈTRE ET KPI
--- Aucun de ces chiffres n'est écrit en dur dans le rapport. La version
--- précédente annonçait "552 offres" dans son sous-titre alors que le corpus
--- en comptait 960 : le périmètre était figé à trois endroits du code.
+-- SCOPE AND KPIs
+-- None of these figures is hardcoded in the report. The previous version
+-- announced "552 offers" in its subtitle while the corpus already held 960:
+-- the scope was frozen in three places in the code.
 -- ============================================================
 
--- PERIMETRE : nombre d'offres analysées, affiché en sous-titre et en KPI
-select count(*) as n from fct_offre;
+-- SCOPE: number of offers analyzed, shown in the subtitle and as a KPI
+select count(*) as n from fct_job_offer;
 
--- KPI_TRANSPARENCE : part des offres affichant un salaire
-select round(100.0 * count(case when salaire_mentionne then 1 end)
+-- KPI_TRANSPARENCY: share of offers disclosing a salary
+select round(100.0 * count(case when salary_mentioned then 1 end)
              / nullif(count(*), 0), 1) as pct
-from fct_offre;
+from fct_job_offer;
 
--- KPI_ANONYMAT : dernière valeur connue du taux d'employeur masqué.
--- Vient de fct_marche_hebdo et non d'un calcul direct sur fct_offre : le KPI
--- doit être le dernier point de la série affichée juste en dessous, sinon
--- les deux chiffres peuvent diverger d'un run à l'autre.
-select semaine, nb_offres_total, taux_anonymat_pct
-from fct_marche_hebdo
-order by semaine;
+-- KPI_ANONYMITY: latest known value of the masked-employer rate.
+-- Comes from fct_weekly_market rather than a direct computation on
+-- fct_job_offer: the KPI must be the same last point as the series
+-- displayed just below it, otherwise the two figures could diverge from one
+-- run to the next.
+select week_start_date, total_offer_count, anonymous_rate_pct
+from fct_weekly_market
+order by week_start_date;
 
--- KPI_SORTIES : taux de disparition, dernière semaine où il est mesurable.
--- NULL sur la première semaine enregistrée, faute de point de comparaison :
--- le rapport retombe alors sur "N/A" plutôt que d'afficher zéro.
-select semaine, semaines_depuis_precedente, nb_actives,
-       nb_nouvelles, nb_sorties, taux_sortie_pct
-from fct_marche_flux
-order by semaine;
-
--- ============================================================
--- SECTION 01 : FLUX DU MARCHÉ
--- Mesuré sur fct_marche_flux, donc sur la présence réelle des offres dans
--- chaque collecte. Le mesurer sur fct_offre serait faux : le corpus cumule
--- les dumps et ne décroît jamais (960 offres au 31/08, dont 463 avaient déjà
--- disparu de France Travail).
--- ============================================================
--- Les deux requêtes sont celles des KPI ci-dessus, réutilisées telles quelles.
+-- KPI_EXITS: exit rate, latest week where it's measurable.
+-- NULL on the first recorded week, for lack of a comparison point: the
+-- report then falls back to "N/A" rather than showing zero.
+select week_start_date, weeks_since_previous, active_offer_count,
+       new_offer_count, exit_count, exit_rate_pct
+from fct_weekly_market_flow
+order by week_start_date;
 
 -- ============================================================
--- SECTION 02 : RÉMUNÉRATION
--- Filtre sur salaire_annuel_plausible, pas sur un offre_id écrit en dur.
--- La version précédente excluait nommément l'offre 4933945, seul cas connu
--- jusque là. Au 03/09 il y en a 15, en deux mécanismes : un salaire
--- mensuel étiqueté annuel (11 annonces à 1800 €, un seul annonceur) et un
--- taux horaire étiqueté annuel (4 annonces, 15 à 40 €). Une exclusion
--- nominative ne passe pas à l'échelle, une règle si.
+-- SECTION 01: MARKET FLOW
+-- Measured on fct_weekly_market_flow, i.e. on offers' actual presence in
+-- each collection. Measuring it on fct_job_offer would be wrong: the corpus
+-- accumulates the dumps and never shrinks (960 offers on 2026-08-31, 463 of
+-- which had already disappeared from France Travail).
+-- ============================================================
+-- The two queries are the KPI ones above, reused as-is.
+
+-- ============================================================
+-- SECTION 02: COMPENSATION
+-- Filters on annual_salary_plausible, not on a hardcoded job_offer_id.
+-- The previous version explicitly excluded offer 4933945, the only known
+-- case at the time. As of 2026-09-03 there are 15, via two mechanisms: a
+-- monthly salary labeled annual (11 listings at 1800 €, a single
+-- advertiser) and an hourly rate labeled annual (4 listings, 15 to 40 €).
+-- A named exclusion doesn't scale, a rule does.
 --
--- L'effectif est remonté avec la médiane et affiché sur chaque barre. Sous
--- 10 offres la catégorie est écartée du graphique et nommée en note :
--- INTERMEDIAIRE_reclasse affichait 65 000 € en tête, calculés sur 3 offres.
+-- Sample size is carried alongside the median and displayed on every bar.
+-- Below 10 offers the category is dropped from the chart and named in a
+-- note: INTERMEDIARY_RECLASSIFIED used to show 65,000 € at the top, computed
+-- on 3 offers.
 -- ============================================================
 
--- SALAIRE_PAR_CATEGORIE
-select categorie_employeur,
+-- SALARY_BY_CATEGORY
+select employer_category,
        count(*) as n,
-       median(salaire_min) as salaire_median
-from fct_offre
-where salaire_periode = 'annuel' and salaire_annuel_plausible
-group by categorie_employeur
-order by salaire_median desc;
+       median(salary_min) as median_salary
+from fct_job_offer
+where salary_period = 'annual' and annual_salary_plausible
+group by employer_category
+order by median_salary desc;
 
--- SALAIRE_PAR_EXPERIENCE
--- experience_exige porte les codes bruts France Travail. Mesure du 31/08 :
--- seules D et E sont présentes (540 et 420 offres), S est absente. La
--- traduction en libellés lisibles vit dans le générateur, jamais ici ni dans
--- les modèles dbt, qui gardent les valeurs canoniques.
-select experience_exige,
+-- SALARY_BY_EXPERIENCE
+-- required_experience carries France Travail's raw codes. Measured
+-- 2026-08-31: only D and E are present (540 and 420 offers), S is absent.
+-- Translation to readable labels lives in the generator, never here nor in
+-- the dbt models, which keep the canonical values.
+select required_experience,
        count(*) as n,
-       median(salaire_min) as salaire_median
-from fct_offre
-where salaire_periode = 'annuel' and salaire_annuel_plausible
-group by experience_exige
-order by salaire_median;
+       median(salary_min) as median_salary
+from fct_job_offer
+where salary_period = 'annual' and annual_salary_plausible
+group by required_experience
+order by median_salary;
 
 -- ============================================================
--- SECTION 03 : TRANSPARENCE SALARIALE
+-- SECTION 03: SALARY TRANSPARENCY
 -- ============================================================
 
--- TRANSPARENCE_PAR_CATEGORIE
-select categorie_employeur,
-       round(100.0 * count(distinct case when salaire_mentionne then offre_id end)
-             / nullif(count(distinct offre_id), 0), 1) as taux_pct
-from fct_offre
-group by categorie_employeur
-order by taux_pct desc;
+-- TRANSPARENCY_BY_CATEGORY
+select employer_category,
+       round(100.0 * count(distinct case when salary_mentioned then job_offer_id end)
+             / nullif(count(distinct job_offer_id), 0), 1) as rate_pct
+from fct_job_offer
+group by employer_category
+order by rate_pct desc;
 
 -- ============================================================
--- SECTION 04 : GÉOGRAPHIE
+-- SECTION 04: GEOGRAPHY
 -- ============================================================
 
 -- TOP_COMMUNES
--- Jointure sur cle_commune, pas sur code_postal. Paris, Lyon et Marseille sont
--- les trois communes à arrondissements : elles n'ont pas de code postal unique
--- et arrivent avec leur seul code INSEE de commune globale. Avant ce correctif,
--- le rapport affichait 71 offres parisiennes là où il y en a 148.
-select c.nom_commune, count(distinct o.offre_id) as nb_offres
-from fct_offre o
-join dim_commune c on c.cle_commune = o.cle_commune
-where c.nom_commune is not null and c.nom_commune != 'NON_RESOLU'
-group by c.nom_commune
-order by nb_offres desc
+-- Joined on commune_key, not on postal_code. Paris, Lyon and Marseille are
+-- the three communes with arrondissements: they have no single postal code
+-- and arrive with only their overall commune's INSEE code. Before this fix,
+-- the report showed 71 Parisian offers where there are actually 148.
+select c.commune_name, count(distinct o.job_offer_id) as offer_count
+from fct_job_offer o
+join dim_commune c on c.commune_key = o.commune_key
+where c.commune_name is not null and c.commune_name != 'UNRESOLVED'
+group by c.commune_name
+order by offer_count desc
 limit 10;
 
 -- ============================================================
--- SECTION 05 : TECHNOLOGIES
--- Dépend de stg_offres_skills, donc zéro ligne en CI. La dégradation est
--- détectée sur le résultat vide et non sur la variable d'environnement :
--- on mesure l'état réel des données plutôt qu'un signal indirect.
+-- SECTION 05: TECHNOLOGIES
+-- Depends on stg_extraction__skills, hence zero rows in CI. The degradation
+-- is detected on the empty result, not on the environment variable: we
+-- measure the data's actual state rather than an indirect signal.
 -- ============================================================
 
--- TECHNOLOGIES_TOP10
-select technologie, count(distinct offre_id) as nb_offres
-from fct_offre_technologie
-group by technologie
-order by nb_offres desc
+-- TOP10_TECHNOLOGIES
+select technology, count(distinct job_offer_id) as offer_count
+from fct_job_offer_technology
+group by technology
+order by offer_count desc
 limit 10;
 
 -- ============================================================
--- SECTION 06 : DOMAINES
--- Même dépendance que la section 05.
+-- SECTION 06: DOMAINS
+-- Same dependency as section 05.
 -- ============================================================
 
--- DOMAINES_CLUSTERS
--- Filtre par appartenance aux formes canoniques, et non par is not null :
--- domaine_normalise n'est jamais NULL, le coalesce de fct_offre_domaine
--- retombe sur la valeur brute quand le mapping ne matche pas.
-select domaine_normalise, count(distinct offre_id) as nb_offres
-from fct_offre_domaine
-where domaine_normalise in (select distinct domaine_canonique from mapping_domaines)
-group by domaine_normalise
-order by nb_offres desc;
+-- DOMAIN_CLUSTERS
+-- Filtered by membership in the canonical forms, not by is not null:
+-- normalized_domain is never NULL, fct_job_offer_domain's coalesce falls
+-- back to the raw value when the mapping doesn't match.
+select normalized_domain, count(distinct job_offer_id) as offer_count
+from fct_job_offer_domain
+where normalized_domain in (select distinct canonical_domain from mapping_domaines)
+group by normalized_domain
+order by offer_count desc;
 
--- DOMAINES_COUVERTURE
--- Mesuré le 31/08 sur 960 offres : 19,7 %, identique au 19,7 % mesuré précédemment
--- sur 552 offres. La longue traîne grossit au même rythme que les
--- douze clusters de tête, donc le mapping ne se dilue pas.
-select round(100.0 * count(case when domaine_normalise in
-             (select distinct domaine_canonique from mapping_domaines)
+-- DOMAIN_COVERAGE
+-- Measured 2026-08-31 on 960 offers: 19.7%, identical to the 19.7% measured
+-- previously on 552 offers. The long tail grows at the same pace as the
+-- twelve top clusters, so the mapping isn't being diluted.
+select round(100.0 * count(case when normalized_domain in
+             (select distinct canonical_domain from mapping_domaines)
            then 1 end) / nullif(count(*), 0), 1) as pct
-from fct_offre_domaine;
+from fct_job_offer_domain;

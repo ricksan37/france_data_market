@@ -1,0 +1,22 @@
+version: 2
+
+models:
+  - name: stg_presence__job_offer_presence
+    description: >
+      Staging model for the presence history snapshot (Phase 5, output of
+      offer_presence.py). Grain is 1 row = 1 (job offer, week it was seen
+      in a pull) pair. No business logic here: explicit typing, nothing
+      else.
+    columns:
+      - name: week_start_date
+        description: Monday of the ISO week this pull was run.
+        data_tests:
+          - not_null
+
+      - name: job_offer_id
+        description: >
+          Job offer identifier, as seen in that week's pull. Kept as varchar
+          -- France Travail identifiers have leading zeros (e.g. 0020136)
+          that a numeric cast would silently destroy.
+        data_tests:
+          - not_null

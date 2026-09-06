@@ -1,13 +1,13 @@
--- Test singulier : categorie_employeur ne doit jamais sortir d'une valeur
--- hors des 4 catégories connues. Comme pour type_contrat, on évite
--- accepted_values / IN / NOT IN qui déclenchent le bug d'optimiseur DuckDB
--- 1.5.4 (INTERNAL Error: index 4 within vector of size 4).
--- Contrat dbt : 0 ligne = pass, >= 1 ligne = fail.
+-- Singular test: employer_category must never take a value outside the 4
+-- known categories. As with contract_type, we avoid accepted_values / IN /
+-- NOT IN, which trigger the DuckDB 1.5.4 optimizer bug (INTERNAL Error:
+-- index 4 within vector of size 4).
+-- dbt contract: 0 rows = pass, >= 1 row = fail.
 select
-    offre_id,
-    categorie_employeur
-from {{ ref('int_classification_employeur') }}
-where categorie_employeur != 'EMPLOYEUR_DIRECT'
-  and categorie_employeur != 'INTERMEDIAIRE'
-  and categorie_employeur != 'ANONYME'
-  and categorie_employeur != 'INTERMEDIAIRE_reclasse'
+    job_offer_id,
+    employer_category
+from {{ ref('int_employer_classification') }}
+where employer_category != 'DIRECT_EMPLOYER'
+  and employer_category != 'INTERMEDIARY'
+  and employer_category != 'ANONYMOUS'
+  and employer_category != 'INTERMEDIARY_RECLASSIFIED'

@@ -1,16 +1,13 @@
-{{ config(materialized='table') }}
-
--- Table de faits, grain fin : 1 ligne = 1 couple (offre, technologie).
--- C'est ce grain qui permet de compter combien d'offres demandent Python :
--- un simple group by technologie, impossible sur une colonne LIST.
+-- Fine-grained fact table: 1 row = 1 (job offer, technology) pair.
+-- This grain is what lets you count how many offers ask for Python: a
+-- simple group by technology, impossible on a LIST column.
 --
--- Les offres sans aucune technologie (annonces de conseil, ~60 % de
--- l'échantillon testé) DISPARAISSENT ici : unnest sur une liste vide ne
--- produit aucune ligne. Ce n'est pas une perte de donnée : fct_offre reste
--- la table de référence pour le compte d'offres. Ce modèle sert à compter
--- des occurrences de termes, pas des offres.
+-- Offers with no technology at all (consulting listings, ~60% of the
+-- tested sample) DISAPPEAR here: unnest on an empty list produces no row.
+-- This isn't data loss: fct_job_offer remains the reference table for
+-- counting offers. This model is for counting term occurrences, not offers.
 select
-    offre_id,
-    unnest(technologies) as technologie
-from {{ ref('stg_offres_skills') }}
-where statut_extraction = 'ok'
+    job_offer_id,
+    unnest(technologies) as technology
+from {{ ref('stg_extraction__skills') }}
+where extraction_status = 'ok'

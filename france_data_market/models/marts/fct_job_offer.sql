@@ -1,84 +1,85 @@
-{{ config(materialized='table') }}
--- fct_offre : table de faits, grain fin.
--- Grain : une ligne par offre. Clé : offre_id.
--- Assemble stg_ft_offres (faits bruts) avec les enrichissements des couches int_ :
--- parsing salaire (int_offres_salaire) et classification employeur
--- (int_classification_employeur). Left join depuis stg_ft_offres : la table de faits
--- ne doit jamais perdre de lignes à cause d'un enrichissement absent ou en retard.
--- rome_code et code_postal restent en clés étrangères brutes vers dim_rome /
--- dim_commune (pas de jointure ici, voir tests relationships, point 6).
+-- fct_job_offer: fine-grained fact table.
+-- Grain: one row per job offer. Key: job_offer_id.
+-- Assembles stg_raw__ft_job_offers (raw facts) with the int_ layer's
+-- enrichments: salary parsing (int_job_offer_salary) and employer
+-- classification (int_employer_classification). Left join from
+-- stg_raw__ft_job_offers: the fact table must never lose rows because an
+-- enrichment is missing or late.
+-- rome_code and postal_code stay as raw foreign keys toward dim_rome /
+-- dim_commune (no join here, see the relationships tests, point 6).
 --
--- entreprise_nom : par défaut la valeur structurée France Travail (fiable à
--- 100 %). Scopée uniquement sur categorie_employeur = 'INTERMEDIAIRE_reclasse'
--- (21 offres), elle est remplacée par entreprise_nom_texte, extrait
--- par LLM depuis le corps de l'offre. Le scope est volontairement restreint à
--- ce seul statut : c'est justement la colonne qui trace qu'une valeur vient du
--- texte plutôt que du champ structuré, donc pas de mélange silencieux : un nom
--- non structuré n'apparaît que là où le statut le signale déjà.
+-- employer_name: defaults to France Travail's structured value (100%
+-- reliable). Scoped only to employer_category = 'INTERMEDIARY_RECLASSIFIED'
+-- (21 offers), it's replaced by employer_name_text, LLM-extracted from the
+-- offer's body. The scope is deliberately restricted to that one status:
+-- it's precisely the column that traces that a value comes from text rather
+-- than the structured field, so no silent mixing -- an unstructured name
+-- only appears where the status already signals it.
 select
-    f.offre_id,
-    f.intitule,
-    f.date_creation,
-    f.date_actualisation,
+    f.job_offer_id,
+    f.job_title,
+    f.job_offer_creation_date,
+    f.job_offer_last_updated_date,
     f.rome_code,
-    f.rome_libelle,
-    f.type_contrat,
-    f.experience_exige,
-    f.code_postal,
-    f.commune,
+    f.rome_label,
+    f.contract_type,
+    f.required_experience,
+    f.postal_code,
+    f.commune_code,
 
-    -- Clé géographique unifiée : le code postal quand il existe, le code INSEE
-    -- sinon. Voir dim_commune pour le pourquoi (Paris, Lyon et Marseille n'ont
-    -- pas de code postal unique et arrivent sans).
-    coalesce(f.code_postal, f.commune) as cle_commune,
+    -- Unified geographic key: postal code when it exists, INSEE code
+    -- otherwise. See dim_commune for why (Paris, Lyon and Marseille have no
+    -- single postal code and arrive without one).
+    coalesce(f.postal_code, f.commune_code) as commune_key,
 
-    -- Zone plutôt que restriction de périmètre. La question « et si on se
-    -- limitait à la métropole ? » a été mesurée le 04/09 : l'outre-mer pèse 17
-    -- offres sur 960, et l'exclure ne déplace aucune métrique (employeur masqué
-    -- 33,6 -> 33,0 %, médiane salariale identique). Restreindre coûterait la
-    -- perte de 5 employeurs réels et distincts, sans rien gagner. La zone est
-    -- donc exposée comme dimension : filtrer devient une clause d'une ligne,
-    -- disponible à la demande, sans toucher à la spec ni jeter de données.
-    -- Comparaisons chaînées et non IN() : bug d'optimiseur DuckDB connu.
+    -- Zone rather than a restriction of scope. The question "what if we
+    -- limited to mainland France?" was measured on 2026-09-04: overseas
+    -- territories weigh 17 offers out of 960, and excluding them doesn't
+    -- move any metric (masked employer 33.6 -> 33.0%, identical salary
+    -- median). Restricting would cost 5 real, distinct employers for no
+    -- gain. The zone is therefore exposed as a dimension: filtering becomes
+    -- a one-line clause, available on demand, without touching the spec or
+    -- discarding data. Chained comparisons and not IN(): known DuckDB
+    -- optimizer bug.
     case
-        when coalesce(f.code_postal, f.commune) is null then 'inconnue'
-        when substr(coalesce(f.code_postal, f.commune), 1, 2) = '97'
-          or substr(coalesce(f.code_postal, f.commune), 1, 2) = '98'
-            then 'outre-mer'
-        else 'metropole'
-    end as zone_geographique,
+        when coalesce(f.postal_code, f.commune_code) is null then 'unknown'
+        when substr(coalesce(f.postal_code, f.commune_code), 1, 2) = '97'
+          or substr(coalesce(f.postal_code, f.commune_code), 1, 2) = '98'
+            then 'overseas'
+        else 'mainland'
+    end as geographic_zone,
     case
-        when c.categorie_employeur = 'INTERMEDIAIRE_reclasse' then k.entreprise_nom_texte
-        else f.entreprise_nom
-    end as entreprise_nom,
-    f.code_naf,
-    f.salaire_libelle,
-    f.nombre_postes,
-    f.description,
-    s.salaire_min,
-    s.salaire_max,
-    s.salaire_periode,
-    s.salaire_mentionne,
-    s.salaire_annuel_plausible,
+        when c.employer_category = 'INTERMEDIARY_RECLASSIFIED' then k.employer_name_text
+        else f.employer_name_raw
+    end as employer_name,
+    f.naf_code_on_offer as naf_code,
+    f.salary_label,
+    f.position_count,
+    f.job_description,
+    s.salary_min,
+    s.salary_max,
+    s.salary_period,
+    s.salary_mentioned,
+    s.annual_salary_plausible,
 
-    -- Grappes d'annonces identiques. Voir int_grappes_annonces : un même poste
-    -- publié dans plusieurs villes reçoit un identifiant par ville et compte
-    -- donc autant de fois dans tous les agrégats. Filtrer sur
-    -- est_annonce_canonique compte des annonces, ne pas filtrer compte des
-    -- offres. Les deux questions sont légitimes.
-    g.signature_annonce,
-    g.taille_grappe,
-    g.est_annonce_canonique,
-    c.categorie_employeur,
+    -- Identical listing clusters. See int_job_listing_clusters: the same
+    -- position published in several cities gets one identifier per city and
+    -- so counts that many times in every aggregate. Filtering on
+    -- is_canonical_listing counts listings, not filtering counts offers.
+    -- Both questions are legitimate.
+    g.listing_signature,
+    g.cluster_size,
+    g.is_canonical_listing,
+    c.employer_category,
     d.siren
-from {{ ref('stg_ft_offres') }} as f
-left join {{ ref('int_offres_salaire') }} as s
-    on f.offre_id = s.offre_id
-left join {{ ref('int_classification_employeur') }} as c
-    on f.offre_id = c.offre_id
-left join {{ ref('stg_dinum_entreprises') }} as d
-    on f.offre_id = d.offre_id
-left join {{ ref('stg_offres_skills') }} as k
-    on f.offre_id = k.offre_id
-left join {{ ref('int_grappes_annonces') }} as g
-    on f.offre_id = g.offre_id
+from {{ ref('stg_raw__ft_job_offers') }} as f
+left join {{ ref('int_job_offer_salary') }} as s
+    on f.job_offer_id = s.job_offer_id
+left join {{ ref('int_employer_classification') }} as c
+    on f.job_offer_id = c.job_offer_id
+left join {{ ref('stg_dinum__companies') }} as d
+    on f.job_offer_id = d.job_offer_id
+left join {{ ref('stg_extraction__skills') }} as k
+    on f.job_offer_id = k.job_offer_id
+left join {{ ref('int_job_listing_clusters') }} as g
+    on f.job_offer_id = g.job_offer_id

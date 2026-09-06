@@ -1,49 +1,47 @@
-{{ config(materialized='table') }}
-
--- Fait hebdomadaire : etat du corpus d'offres, semaine par semaine.
--- Grain : 1 ligne = 1 semaine ISO (lundi). L'unicite est garantie a la source
--- par l'upsert de snapshot_hebdo.py, et verifiee ici par un test plutot que
--- supposee -- l'ancienne ecriture en append avait produit trois lignes pour la
--- seule semaine du 09/08.
+-- Weekly fact: state of the offer corpus, week by week.
+-- Grain: 1 row = 1 ISO week (Monday). Uniqueness is guaranteed at the
+-- source by weekly_snapshot.py's upsert, and verified here by a test rather
+-- than assumed -- the old append-only write had produced three rows for the
+-- single week of 2026-08-09.
 --
--- PORTEE DE LA MESURE, a lire avant d'interpreter une courbe :
--- nb_offres_total compte le CORPUS ACCUMULE (union dedoublonnee de tous les
--- dumps presents sur disque), pas les offres actives sur France Travail cette
--- semaine-la. Une offre de juillet retiree de l'API y reste comptee. Mesurer
--- le flux reel -- apparitions, disparitions -- demande un historique au grain
--- de l'offre, hors de portee d'un fichier d'agregats. Documente ici pour que
--- personne ne lise cette table comme une mesure de marche.
+-- SCOPE OF THE MEASUREMENT, to read before interpreting a chart:
+-- total_offer_count counts the ACCUMULATED CORPUS (deduplicated union of
+-- every dump present on disk), not the offers active on France Travail that
+-- week. A July offer removed from the API stays counted there. Measuring
+-- the actual flow -- appearances, disappearances -- needs a history at the
+-- offer's grain, beyond the reach of an aggregate file. Documented here so
+-- no one reads this table as a market measurement.
 --
--- variation_offres est NULL sur la premiere semaine : l'absence de point de
--- comparaison n'est pas une variation nulle. Meme principe que la cellule vide
--- de nb_intermediaire_reclasse en CI.
+-- offer_count_change is NULL on the first week: the absence of a comparison
+-- point isn't a zero change. Same principle as the empty
+-- reclassified_intermediary_offer_count cell in CI.
 
 with hebdo as (
 
-    select * from {{ ref('stg_marche_hebdo') }}
+    select * from {{ ref('stg_history__weekly_market') }}
 
 )
 
 select
-    semaine,
-    nb_offres_total,
-    nb_anonyme,
-    nb_intermediaire,
-    nb_intermediaire_reclasse,
-    nb_employeur_direct,
-    salaire_median_annuel,
-    top_technologie,
-    extraction_llm,
+    week_start_date,
+    total_offer_count,
+    anonymous_offer_count,
+    intermediary_offer_count,
+    reclassified_intermediary_offer_count,
+    direct_employer_offer_count,
+    median_annual_salary,
+    top_technology,
+    llm_extraction_available,
 
-    nb_offres_total - lag(nb_offres_total) over (order by semaine)
-        as variation_offres,
+    total_offer_count - lag(total_offer_count) over (order by week_start_date)
+        as offer_count_change,
 
-    -- nullif : une semaine a zero offre serait une anomalie a diagnostiquer,
-    -- pas une raison de faire echouer la construction du mart.
-    round(nb_anonyme * 100.0 / nullif(nb_offres_total, 0), 1)
-        as taux_anonymat_pct,
+    -- nullif: a week with zero offers would be an anomaly to diagnose, not
+    -- a reason to fail the mart's build.
+    round(anonymous_offer_count * 100.0 / nullif(total_offer_count, 0), 1)
+        as anonymous_rate_pct,
 
-    round(nb_employeur_direct * 100.0 / nullif(nb_offres_total, 0), 1)
-        as taux_employeur_direct_pct
+    round(direct_employer_offer_count * 100.0 / nullif(total_offer_count, 0), 1)
+        as direct_employer_rate_pct
 
 from hebdo

@@ -1,23 +1,22 @@
 """
-Theme Plotly "Millimeter Dark", enregistre une fois et applique a chaque
-figure via template="millimeter_dark". Couleurs et regles data-viz reprises
-du skill millimeter-visual-identity (references/dataviz.md) : fond Slate,
-grille Hairline sur l'axe de valeur uniquement, texte Paper Muted en mono,
-un seul accent qui mene par chart (Signal Blue par defaut).
+Dark Plotly theme, registered once and applied to every figure via
+template="dark". Colors and data-viz rules taken from the project's visual
+identity guide: Slate background, Hairline grid on the value axis only,
+Paper Muted mono text, a single accent leading each chart (Signal Blue by
+default).
 
-POLICES. Le theme declarait des polices systeme pour
-garder un fichier autonome. Mesure du 31/08 : rendu sur une machine sans
-Arial Black, les titres perdent leurs accents : le HTML contient bien
-\\u00c9, l'affichage sort "DEMANDEES". Les trois familles de l'identite sont
-desormais embarquees en base64 (cf. preparer_polices.py) ; ce module ne
-declare plus que leurs noms, avec un repli systeme au cas ou le CSS ne
-serait pas charge.
+FONTS. The theme used to declare system fonts to keep a self-contained file.
+Measured 2026-08-31: rendered on a machine without Arial Black, titles lose
+their accents: the HTML does contain \\u00c9, the display shows "DEMANDEES".
+The identity's three font families are now embedded in base64 (see
+prepare_fonts.py); this module only declares their names, with a system
+fallback in case the CSS doesn't load.
 """
 
 import plotly.graph_objects as go
 import plotly.io as pio
 
-# Palette exacte du skill millimeter-visual-identity
+# Exact palette from the project's visual identity guide
 VOID = "#0B0C0F"
 SLATE = "#15171C"
 SLATE_RAISED = "#1E2128"
@@ -26,36 +25,36 @@ HAIRLINE_BRIGHT = "#3A404C"
 PAPER = "#F2F3F5"
 PAPER_MUTED = "#9BA1AC"
 
-BLUE = "#4C8DFF"      # accent principal, serie unique par defaut
-AMBER = "#FFC24B"     # deuxieme serie (paire imposee : Blue + Amber)
-VERMILION = "#FF6B5A" # delta negatif uniquement
-GREEN = "#4ADE80"     # delta positif uniquement
-# Violet volontairement absent : reserve aux CTA, jamais aux charts (regle skill)
+BLUE = "#4C8DFF"      # primary accent, single series by default
+AMBER = "#FFC24B"     # second series (mandated pair: Blue + Amber)
+VERMILION = "#FF6B5A" # negative delta only
+GREEN = "#4ADE80"     # positive delta only
+# Violet deliberately absent: reserved for CTAs, never for charts (skill rule)
 
-FONT_TITRE = "'Archivo Black', 'Arial Black', sans-serif"
-FONT_CORPS = "'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif"
-FONT_MONO = "'JetBrains Mono', 'SF Mono', 'Consolas', monospace"
+TITLE_FONT = "'Archivo Black', 'Arial Black', sans-serif"
+BODY_FONT = "'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif"
+MONO_FONT = "'JetBrains Mono', 'SF Mono', 'Consolas', monospace"
 
 _template = go.layout.Template()
 
 _template.layout = go.Layout(
     paper_bgcolor=SLATE,
     plot_bgcolor=SLATE,
-    font=dict(family=FONT_MONO, color=PAPER_MUTED, size=11),
-    # AUCUN TITRE DANS LA FIGURE. Mesure du 31/08 : Plotly cale la boite de
-    # son titre sur la hauteur des capitales, et les accents qui depassent
-    # au-dessus sont rognes -- "CATEGORIE" s'affichait sans accent alors que
-    # le DOM contenait bien \u00c9 et que la police embarquee possede le
-    # glyphe (verifie en isolant HTML et SVG cote a cote). Les titres vivent
-    # desormais dans la carte HTML, ou rien ne les rogne. C'est aussi plus
-    # conforme : dans ce systeme, la carte porte le libelle.
+    font=dict(family=MONO_FONT, color=PAPER_MUTED, size=11),
+    # NO TITLE IN THE FIGURE. Measured 2026-08-31: Plotly sizes its title box
+    # on the height of capital letters, and accents that rise above it get
+    # clipped -- "CATEGORIE" displayed without its accent even though the DOM
+    # did contain É and the embedded font has the glyph (verified by
+    # isolating HTML and SVG side by side). Titles now live in the HTML card,
+    # where nothing clips them. It's also more consistent: in this system,
+    # the card carries the label.
     title=dict(text=None),
     colorway=[BLUE, AMBER, VERMILION, GREEN],
     xaxis=dict(
         showgrid=False,
         showline=True,
         linecolor=HAIRLINE,
-        tickfont=dict(family=FONT_MONO, color=PAPER_MUTED, size=10),
+        tickfont=dict(family=MONO_FONT, color=PAPER_MUTED, size=10),
         ticks="",
         automargin=True,
     ),
@@ -64,7 +63,7 @@ _template.layout = go.Layout(
         gridcolor=HAIRLINE,
         gridwidth=1,
         showline=False,
-        tickfont=dict(family=FONT_MONO, color=PAPER_MUTED, size=10),
+        tickfont=dict(family=MONO_FONT, color=PAPER_MUTED, size=10),
         ticks="",
         automargin=True,
     ),
@@ -73,171 +72,169 @@ _template.layout = go.Layout(
         orientation="h",
         yanchor="bottom", y=1.02,
         xanchor="left", x=0,
-        font=dict(family=FONT_MONO, color=PAPER_MUTED, size=10),
+        font=dict(family=MONO_FONT, color=PAPER_MUTED, size=10),
         bgcolor="rgba(0,0,0,0)",
     ),
     hoverlabel=dict(
         bgcolor=SLATE_RAISED,
         bordercolor=HAIRLINE_BRIGHT,
-        font=dict(family=FONT_MONO, color=PAPER, size=11),
+        font=dict(family=MONO_FONT, color=PAPER, size=11),
     ),
     autosize=True,
 )
 
-pio.templates["millimeter_dark"] = _template
+pio.templates["dark"] = _template
 
-_FONT_LABEL = dict(family=FONT_MONO, size=10, color=PAPER)
+_LABEL_FONT = dict(family=MONO_FONT, size=10, color=PAPER)
 
 
-def chart_barres_horizontales(lignes, cat_col, val_col, titre, suffixe="",
-                              couleur=BLUE, hauteur=None, note=None,
-                              etiquettes=None):
-    """Barres horizontales : le format par defaut des que les libelles sont longs.
+def horizontal_bar_chart(rows, cat_col, val_col, title, suffix="",
+                         color=BLUE, height=None, note=None,
+                         labels=None):
+    """Horizontal bars: the default format as soon as labels get long.
 
-    Les barres verticales obligeaient a incliner les libelles a 45 degres ;
-    sur les douze clusters de domaines, ils se chevauchaient et debordaient de
-    la carte. A l'horizontale, un libelle se lit sans rotation quelle que soit
-    sa longueur, et l'ordre decroissant devient une lecture naturelle de haut
-    en bas.
+    Vertical bars forced labels to tilt at 45 degrees; on the twelve domain
+    clusters, they overlapped and overflowed the card. Horizontally, a label
+    reads without rotation regardless of its length, and descending order
+    becomes a natural top-to-bottom read.
 
-    Plotly dessine la premiere categorie en bas : on trie donc en croissant
-    pour que la plus grande valeur arrive en haut.
+    Plotly draws the first category at the bottom: we therefore sort
+    ascending so the largest value ends up on top.
     """
-    donnees = sorted(lignes, key=lambda l: l[val_col])
-    cats = [l[cat_col] for l in donnees]
-    vals = [l[val_col] for l in donnees]
+    data = sorted(rows, key=lambda l: l[val_col])
+    cats = [l[cat_col] for l in data]
+    vals = [l[val_col] for l in data]
 
-    if etiquettes:
-        textes = [etiquettes[l[cat_col]] for l in donnees]
+    if labels:
+        texts = [labels[l[cat_col]] for l in data]
     else:
-        textes = [f"{v:,.0f}{suffixe}".replace(",", " ") for v in vals]
+        texts = [f"{v:,.0f}{suffix}".replace(",", " ") for v in vals]
 
     fig = go.Figure(go.Bar(
         x=vals, y=cats,
         orientation="h",
-        text=textes,
+        text=texts,
         textposition="outside",
-        textfont=_FONT_LABEL,
-        marker_color=couleur,
-        cliponaxis=False,  # sinon le label de la plus longue barre est rogne
-        # Reutilise `text` (deja formate avec suffixe) plutot que reformater
-        # %{x} : une seule source de verite pour la valeur affichee, sur la
-        # barre et dans l'infobulle. <extra></extra> retire la boite "trace 0"
-        # que Plotly ajoute par defaut a cote de l'infobulle.
+        textfont=_LABEL_FONT,
+        marker_color=color,
+        cliponaxis=False,  # otherwise the longest bar's label gets clipped
+        # Reuses `text` (already formatted with the suffix) rather than
+        # reformatting %{x}: a single source of truth for the displayed
+        # value, on the bar and in the tooltip. <extra></extra> removes the
+        # "trace 0" box Plotly adds next to the tooltip by default.
         hovertemplate="<b>%{y}</b><br>%{text}<extra></extra>",
     ))
     fig.update_layout(
-        template="millimeter_dark",
-        meta=dict(titre=titre, note=note),
-        height=hauteur or max(240, 42 * len(cats) + 60),
+        template="dark",
+        meta=dict(title=title, note=note),
+        height=height or max(240, 42 * len(cats) + 60),
         xaxis=dict(showgrid=True, gridcolor=HAIRLINE, showline=False,
                    showticklabels=False, zeroline=False),
         yaxis=dict(showgrid=False, showline=False,
-                   tickfont=dict(family=FONT_MONO, color=PAPER_MUTED, size=11)),
-        # Marges calculees sur la longueur des libelles et non fixees, a
-        # gauche comme a droite. La droite existait deja (etiquettes de
-        # valeur qui sortent du bout des barres) ; la gauche manquait, et un
-        # nom de categorie comme "Databricks" (10 caracteres) se faisait
-        # tronquer par une marge fixe de 20px calibree pour des sigles courts
-        # (mesure du 04/09, cf. compte rendu). JetBrains Mono a une chasse
-        # fixe : la largeur d'un libelle est exactement proportionnelle a son
-        # nombre de caracteres.
+                   tickfont=dict(family=MONO_FONT, color=PAPER_MUTED, size=11)),
+        # Margins computed from label length rather than fixed, on both left
+        # and right. The right one already existed (value labels sticking
+        # out past the bars); the left one was missing, and a category name
+        # like "Databricks" (10 characters) got truncated by a fixed 20px
+        # margin calibrated for short acronyms (measured 2026-09-04, see
+        # session report). JetBrains Mono is monospaced: a label's width is
+        # exactly proportional to its character count.
         margin=dict(l=24 + 7 * max(len(str(c)) for c in cats),
-                    r=30 + 7 * max(len(t) for t in textes),
+                    r=30 + 7 * max(len(t) for t in texts),
                     t=16, b=16, autoexpand=True),
     )
     return fig
 
 
-def chart_colonnes(lignes, cat_col, val_col, titre, y_titre="", suffixe="",
-                   couleur=BLUE, hauteur=340, note=None, etiquettes=None):
-    """Colonnes verticales : reserve aux categories peu nombreuses et courtes.
+def column_chart(rows, cat_col, val_col, title, y_title="", suffix="",
+                 color=BLUE, height=340, note=None, labels=None):
+    """Vertical columns: reserved for a small number of short categories.
 
-    Une seule teinte, labels directs au-dessus des barres (regle skill :
-    "Direct labels. Label the data, not a legend").
+    A single hue, direct labels above the bars (skill rule: "Direct labels.
+    Label the data, not a legend").
     """
-    cats = [l[cat_col] for l in lignes]
-    vals = [l[val_col] for l in lignes]
+    cats = [l[cat_col] for l in rows]
+    vals = [l[val_col] for l in rows]
 
     fig = go.Figure(go.Bar(
         x=cats, y=vals,
-        text=([etiquettes[l[cat_col]] for l in lignes] if etiquettes
-              else [f"{v:,.0f}{suffixe}".replace(",", " ") for v in vals]),
+        text=([labels[l[cat_col]] for l in rows] if labels
+              else [f"{v:,.0f}{suffix}".replace(",", " ") for v in vals]),
         textposition="outside",
-        textfont=_FONT_LABEL,
-        marker_color=couleur,
+        textfont=_LABEL_FONT,
+        marker_color=color,
         cliponaxis=False,
         hovertemplate="<b>%{x}</b><br>%{text}<extra></extra>",
     ))
-    fig.update_layout(template="millimeter_dark", meta=dict(titre=titre, note=note),
-                      yaxis_title=y_titre, height=hauteur)
+    fig.update_layout(template="dark", meta=dict(title=title, note=note),
+                      yaxis_title=y_title, height=height)
     return fig
 
 
-def chart_barres_groupees(lignes, cat_col, series, titre, hauteur=340):
-    """Deux series comparees : Blue + Amber, la paire imposee par l'identite.
+def grouped_bar_chart(rows, cat_col, series, title, height=340):
+    """Two compared series: Blue + Amber, the pair mandated by the identity.
 
-    `series` : liste de (colonne, libelle). Plafonnee a deux -- au-dela,
-    l'identite impose de regrouper la queue plutot que d'ajouter une teinte.
+    `series`: list of (column, label). Capped at two -- beyond that, the
+    identity requires grouping the tail rather than adding a hue.
     """
-    assert len(series) <= 2, "Deux series maximum (regle d'identite)"
-    cats = [l[cat_col] for l in lignes]
+    assert len(series) <= 2, "Two series maximum (identity rule)"
+    cats = [l[cat_col] for l in rows]
     fig = go.Figure()
-    for (col, libelle), couleur in zip(series, [BLUE, AMBER]):
-        vals = [l[col] for l in lignes]
+    for (col, label), color in zip(series, [BLUE, AMBER]):
+        vals = [l[col] for l in rows]
         fig.add_trace(go.Bar(
-            x=cats, y=vals, name=libelle,
-            text=vals, textposition="outside", textfont=_FONT_LABEL,
-            marker_color=couleur, cliponaxis=False,
-            hovertemplate=f"<b>%{{x}}</b><br>{libelle} : %{{text}}<extra></extra>",
+            x=cats, y=vals, name=label,
+            text=vals, textposition="outside", textfont=_LABEL_FONT,
+            marker_color=color, cliponaxis=False,
+            hovertemplate=f"<b>%{{x}}</b><br>{label}: %{{text}}<extra></extra>",
         ))
-    fig.update_layout(template="millimeter_dark", meta=dict(titre=titre, note=None),
-                      barmode="group", height=hauteur)
+    fig.update_layout(template="dark", meta=dict(title=title, note=None),
+                      barmode="group", height=height)
     return fig
 
 
-def chart_ligne(lignes, x_col, y_col, titre, suffixe="", couleur=BLUE, hauteur=340):
-    """Tendance : segments droits, aucun lissage.
+def line_chart(rows, x_col, y_col, title, suffix="", color=BLUE, height=340):
+    """Trend: straight segments, no smoothing.
 
-    Le lissage inventerait des valeurs entre deux mesures. Sur quatre points,
-    ce serait particulierement malhonnete. Marqueurs cercles bagues de Void
-    pour rester lisibles quand deux points se chevauchent (regle skill).
+    Smoothing would invent values between two measurements. On four points,
+    that would be particularly dishonest. Ringed circle markers on Void to
+    stay legible when two points overlap (skill rule).
     """
-    xs = [l[x_col] for l in lignes]
-    ys = [l[y_col] for l in lignes]
+    xs = [l[x_col] for l in rows]
+    ys = [l[y_col] for l in rows]
 
     fig = go.Figure(go.Scatter(
         x=xs, y=ys,
         mode="lines+markers+text",
-        line=dict(color=couleur, width=2, shape="linear"),
-        marker=dict(size=8, color=couleur, line=dict(color=VOID, width=1.5)),
-        text=[f"{v}{suffixe}" for v in ys],
+        line=dict(color=color, width=2, shape="linear"),
+        marker=dict(size=8, color=color, line=dict(color=VOID, width=1.5)),
+        text=[f"{v}{suffix}" for v in ys],
         textposition="top center",
-        textfont=_FONT_LABEL,
+        textfont=_LABEL_FONT,
         hovertemplate="<b>%{x}</b><br>%{text}<extra></extra>",
     ))
-    fig.update_layout(template="millimeter_dark", meta=dict(titre=titre, note=None), height=hauteur)
+    fig.update_layout(template="dark", meta=dict(title=title, note=None), height=height)
     return fig
 
 
-def figure_vide(message: str) -> go.Figure:
-    """Etat "section indisponible" plutot qu'un graphique casse ou une exception.
+def empty_figure(message: str) -> go.Figure:
+    """"Section unavailable" state rather than a broken chart or an exception.
 
-    Utilise quand la requete source depend de stg_offres_skills et que
-    CI_SANS_EXTRACTION=true a renvoye 0 ligne (schema present, donnees
-    absentes). Documente l'absence au lieu de la cacher, coherent avec le
-    principe du projet : jamais de correction silencieuse.
+    Used when the source query depends on stg_extraction__skills and
+    CI_WITHOUT_EXTRACTION=true returned 0 rows (schema present, data
+    absent). Documents the absence instead of hiding it, consistent with the
+    project principle: never a silent correction.
     """
     fig = go.Figure()
     fig.update_layout(
-        template="millimeter_dark",
-        meta=dict(titre="", note=None),
+        template="dark",
+        meta=dict(title="", note=None),
         xaxis=dict(visible=False), yaxis=dict(visible=False),
         height=200,
         annotations=[dict(
             text=message, xref="paper", yref="paper", x=0.5, y=0.5,
             showarrow=False,
-            font=dict(family=FONT_MONO, color=PAPER_MUTED, size=12),
+            font=dict(family=MONO_FONT, color=PAPER_MUTED, size=12),
         )],
     )
     return fig

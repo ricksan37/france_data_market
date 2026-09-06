@@ -1,49 +1,50 @@
 {{ config(materialized='table') }}
 
--- dim_commune : référentiel géographique du périmètre.
--- Grain : une ligne par clé géographique. Clé : cle_commune.
+-- dim_commune: geographic reference table for the scope.
+-- Grain: one row per geographic key. Key: commune_key.
 --
--- POURQUOI LA CLÉ N'EST PLUS LE CODE POSTAL. Paris, Lyon et
--- Marseille sont les trois communes françaises à arrondissements : elles n'ont
--- pas de code postal unique, donc France Travail renvoie leur code INSEE de
--- commune globale (75056, 69123, 13055) avec un code postal VIDE. Indexée sur
--- le seul code postal, cette dimension ratait donc systématiquement les trois
--- plus grandes villes du pays. Mesure du 04/09 : 95 offres concernées, dont 77
--- à Paris : le rapport affichait 71 offres parisiennes là où il y en a 148.
--- La couverture géographique passe de 79,6 % à 89,5 % du corpus.
+-- WHY THE KEY IS NO LONGER THE POSTAL CODE. Paris, Lyon and Marseille are
+-- the three French communes with arrondissements: they have no single
+-- postal code, so France Travail returns their overall commune's INSEE code
+-- (75056, 69123, 13055) with an EMPTY postal code. Indexed on postal code
+-- alone, this dimension therefore systematically missed the country's three
+-- largest cities. Measured 2026-09-04: 95 offers affected, 77 of them in
+-- Paris: the report showed 71 Parisian offers where there are actually 148.
+-- Geographic coverage goes from 79.6% to 89.5% of the corpus.
 --
--- C'est une leçon déjà tirée qui se répète : « la spec disait code postal,
--- les données disaient code INSEE ». Elle avait été appliquée à l'enrichissement
--- entreprise (§7.5) et jamais à la dimension géographique.
+-- It's a lesson already learned that repeats itself: what was assumed
+-- (postal code) didn't match reality (INSEE code). The same fix had
+-- already been applied to the company enrichment and never carried over to
+-- the geographic dimension.
 --
--- code_postal et commune restent exposés à côté de la clé : ils permettent
--- d'auditer laquelle des deux sources a fourni la valeur.
+-- postal_code and commune_code stay exposed alongside the key: they let you
+-- audit which of the two sources supplied the value.
 
-with cles as (
+with keys as (
 
     select
-        coalesce(code_postal, commune) as cle_commune,
-        code_postal,
-        commune
-    from {{ ref('stg_ft_offres') }}
-    where coalesce(code_postal, commune) is not null
+        coalesce(postal_code, commune_code) as commune_key,
+        postal_code,
+        commune_code
+    from {{ ref('stg_raw__ft_job_offers') }}
+    where coalesce(postal_code, commune_code) is not null
 
-    -- Un code postal peut couvrir plusieurs communes INSEE : un select distinct
-    -- sur le couple produirait alors deux lignes pour une même clé et casserait
-    -- le grain. C'est exactement le piège déjà rencontré (196 lignes au lieu
-    -- de 193). qualify tranche sur la clé elle-même, jamais sur le couple.
+    -- A postal code can cover several INSEE communes: a select distinct on
+    -- the pair would then produce two rows for the same key and break the
+    -- grain. That's exactly the trap already hit (196 rows instead of 193).
+    -- qualify decides on the key itself, never on the pair.
     qualify row_number() over (
-        partition by coalesce(code_postal, commune)
-        order by code_postal nulls last, commune
+        partition by coalesce(postal_code, commune_code)
+        order by postal_code nulls last, commune_code
     ) = 1
 
 )
 
 select
-    c.cle_commune,
-    c.code_postal,
-    c.commune,
-    m.nom_commune
-from cles as c
+    k.commune_key,
+    k.postal_code,
+    k.commune_code,
+    m.commune_name
+from keys as k
 left join {{ ref('mapping_communes') }} as m
-    on m.cle_commune = c.cle_commune
+    on m.commune_key = k.commune_key

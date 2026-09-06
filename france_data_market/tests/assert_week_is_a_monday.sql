@@ -1,11 +1,11 @@
--- La cle du snapshot est le lundi de la semaine ISO (snapshot_hebdo.py,
--- fonction lundi_de_la_semaine). Une date qui n'est pas un lundi signale un
--- retour a l'ancienne cle (la date d'execution), qui avait produit trois
--- lignes distinctes pour la seule semaine du 09/08.
+-- The snapshot's key is the Monday of the ISO week (weekly_snapshot.py,
+-- function lundi_de_la_semaine). A date that isn't a Monday signals a
+-- regression to the old key (the run date), which had produced three
+-- distinct rows for the single week of 2026-08-09.
 --
--- dayofweek() en DuckDB : 0 = dimanche, 1 = lundi. Comparaison a une seule
--- valeur, donc le bug d'optimiseur DuckDB connu ne s'applique pas ici.
+-- dayofweek() in DuckDB: 0 = Sunday, 1 = Monday. Comparison to a single
+-- value, so the known DuckDB optimizer bug doesn't apply here.
 
-select semaine
-from {{ ref('fct_marche_hebdo') }}
-where dayofweek(semaine) != 1
+select week_start_date
+from {{ ref('fct_weekly_market') }}
+where dayofweek(week_start_date) != 1

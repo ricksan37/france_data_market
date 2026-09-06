@@ -1,5 +1,5 @@
 """
-Schéma d'extraction des offres, Phase 4 (spec §8.1, §8.2).
+Schéma d'extraction des offres.
 
 Contrat central : TOUS les champs sont obligatoires, aucun n'a de valeur par
 défaut. Un champ optionnel permettrait au modèle de l'omettre, rendant

@@ -1,0 +1,68 @@
+version: 2
+
+models:
+  - name: stg_extraction__skills
+    description: >
+      Staging model for the LLM extraction dump (Phase 4, mistral-nemo via
+      Ollama). Grain is 1 row = 1 job offer. technologies and domains stay
+      LIST-typed at this stage -- flattening to 1 row per (offer, term) is a
+      modeling transformation and belongs to the marts, not staging. In CI
+      (CI_WITHOUT_EXTRACTION=true) the extraction dump doesn't exist -- Ollama
+      never runs on a GitHub runner -- so this model returns 0 rows with the
+      same schema instead of failing.
+    columns:
+      - name: job_offer_id
+        description: Unique identifier of the job offer. Grain of this model.
+
+      - name: extraction_status
+        description: >
+          Outcome of the LLM extraction for this offer (e.g. "ok"). Only rows
+          with status "ok" carry usable technologies/domains -- see
+          fct_job_offer_technology and fct_job_offer_domain.
+
+      - name: error
+        description: Raw error payload when extraction failed, NULL otherwise.
+
+      - name: technologies
+        description: >
+          Technologies mentioned in the offer, as extracted by the LLM. LIST
+          column: flattened downstream by fct_job_offer_technology.
+
+      - name: domains
+        description: >
+          Business/functional domains mentioned in the offer, as extracted by
+          the LLM. LIST column: flattened and normalized downstream by
+          fct_job_offer_domain. Known limit: under-extracted on consulting
+          listings (assumed, documented, not corrected by prompt iteration
+          without a measured cost/benefit).
+
+      - name: education_level
+        description: Minimum education level required, as extracted by the LLM.
+
+      - name: min_years_experience
+        description: Minimum years of experience required, as extracted by the LLM.
+
+      - name: remote_work
+        description: Remote-work arrangement mentioned in the offer, as extracted by the LLM.
+
+      - name: english_required
+        description: Whether the offer explicitly requires English, as extracted by the LLM.
+
+      - name: salary_text
+        description: >
+          Salary as free text extracted by the LLM from the offer body, when
+          not captured by France Travail's structured salary_label.
+
+      - name: employer_name_text
+        description: >
+          Employer name extracted by the LLM from the offer body, used only
+          when the structured employer name is masked by an intermediary
+          (see end_client_masked and int_employer_classification).
+
+      - name: end_client_masked
+        description: >
+          True when the offer's text reveals that the advertiser is acting
+          for a masked end client, even though no employer name/NAF let the
+          structural classification detect it. Drives the
+          INTERMEDIARY_RECLASSIFIED category in int_employer_classification.
+          Always NULL in CI (see model description).

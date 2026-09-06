@@ -1,0 +1,53 @@
+version: 2
+
+models:
+  - name: dim_company
+    description: >
+      Company dimension, deduplicated from the DINUM enrichment dump. Grain
+      is 1 row = 1 SIREN. No is_startup flag: age + NAF + headcount don't
+      reliably distinguish a startup from any other SME -- that threshold
+      is made visible at analysis time rather than hidden in this mart.
+    columns:
+      - name: siren
+        description: French national company identifier (9 digits). Grain of this model.
+        data_tests:
+          - unique
+          - not_null
+
+      - name: siret_headquarters
+        description: SIRET of the company's headquarters establishment (SIREN + 5-digit NIC).
+
+      - name: company_legal_name
+        description: Full legal name of the company as registered.
+
+      - name: company_naf_code
+        description: NAF code of the company's main registered activity.
+
+      - name: company_naf_section
+        description: NAF section (broad activity category) the company belongs to.
+
+      - name: employee_count_range
+        description: INSEE employee-count bracket for the company (coded range, not an exact headcount).
+
+      - name: employee_count_reference_year
+        description: Reference year for employee_count_range.
+
+      - name: company_category
+        description: INSEE company-size category (e.g. PME / ETI / GE).
+
+      - name: company_creation_date
+        description: Date the company was legally registered.
+
+      - name: age_years
+        description: >
+          Raw measurement (company_creation_date -> today), not a judgment
+          call. See the model description for why there's no is_startup flag.
+
+      - name: establishment_count
+        description: Number of establishments (sites) the company operates.
+
+      - name: headquarters_city
+        description: Commune of the company's registered headquarters.
+
+      - name: headquarters_postal_code
+        description: Postal code of the company's registered headquarters.

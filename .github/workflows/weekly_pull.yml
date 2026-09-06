@@ -1,92 +1,92 @@
-# .github/workflows/pull_hebdo.yml
+# .github/workflows/weekly_pull.yml
 #
-# Phase 5 (spec §13.1) : ingest -> dbt build -> snapshot, automatisé.
+# Phase 5 (spec §13.1): ingest -> dbt build -> snapshot, automated.
 #
-# Le runner GitHub Actions est jetable : rien ne persiste d'un run à l'autre
-# sauf ce qui est explicitement commité. data/warehouse.duckdb et les dumps
-# JSON restent donc éphémères (gitignorés, comme en local) ; seul
-# data/snapshots/marche_hebdo.csv est committé à chaque run, un fichier léger
-# qui accumule l'historique nécessaire à fct_marche_hebdo sans jamais
-# recommitter les 552+ offres brutes (décision assumée, non rouverte).
+# The GitHub Actions runner is disposable: nothing persists from one run to
+# the next except what's explicitly committed. data/warehouse.duckdb and the
+# JSON dumps therefore stay ephemeral (gitignored, as locally); only
+# data/snapshots/marche_hebdo.csv is committed on every run, a lightweight
+# file that accumulates the history fct_weekly_market needs without ever
+# recommitting the 552+ raw offers (accepted decision, not reopened).
 
-name: Pull hebdomadaire
+name: Weekly pull
 
 on:
   schedule:
-    # Lundi 06:00 UTC. Cron GitHub Actions : minute heure jour mois jour_semaine.
+    # Monday 06:00 UTC. GitHub Actions cron: minute hour day month weekday.
     - cron: '0 6 * * 1'
-  workflow_dispatch: {}  # déclenchement manuel depuis l'onglet Actions, pour tester sans attendre lundi
+  workflow_dispatch: {}  # manual trigger from the Actions tab, to test without waiting for Monday
 
 permissions:
-  contents: write  # nécessaire pour le git push du snapshot en fin de job
+  contents: write  # needed for the snapshot's git push at the end of the job
 
 jobs:
-  pull-et-snapshot:
+  pull-and-snapshot:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout du repo
-        uses: actions/checkout@v5  # v5 = Node 24. PAS v6 : v6.0.0 persiste les
-        # identifiants git dans un fichier separe, dont depend le git push final.
+      - name: Checkout the repo
+        uses: actions/checkout@v5  # v5 = Node 24. NOT v6: v6.0.0 persists
+        # git credentials in a separate file, which the final git push depends on.
 
       - name: Setup Python 3.13
         uses: actions/setup-python@v6  # Node 24
         with:
           python-version: '3.13'
 
-      - name: Installer les dépendances
+      - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Ingestion France Travail
+      - name: France Travail ingestion
         env:
           FT_CLIENT_ID: ${{ secrets.FT_CLIENT_ID }}
           FT_CLIENT_SECRET: ${{ secrets.FT_CLIENT_SECRET }}
-        run: python3 pull_complet.py
+        run: python3 full_pull.py
 
-      - name: Historique de presence des offres
-        # Doit tourner APRES l'ingestion (il lit le dump fraichement ecrit) et
-        # AVANT dbt build (fct_marche_flux consomme le CSV comme source).
-        # Idempotent : la cle est le couple (semaine, offre_id), donc un
-        # redeclenchement manuel dans la meme semaine n'ajoute aucune ligne.
-        run: python3 presence_offres.py
+      - name: Job offer presence history
+        # Must run AFTER ingestion (it reads the freshly written dump) and
+        # BEFORE dbt build (fct_weekly_market_flow consumes the CSV as a
+        # source). Idempotent: the key is the (week, job_offer_id) pair, so a
+        # manual re-trigger within the same week adds no row.
+        run: python3 offer_presence.py
 
       - name: dbt build
-        working-directory: observatoire
+        working-directory: france_data_market
         env:
-          CI_SANS_EXTRACTION: "true"
+          CI_WITHOUT_EXTRACTION: "true"
         run: dbt build
 
-      - name: Calcul du snapshot hebdomadaire
-        run: python3 snapshot_hebdo.py
+      - name: Compute the weekly snapshot
+        run: python3 weekly_snapshot.py
 
-      - name: Rafraîchir le mart d'historique
-        # snapshot_hebdo.py vient d'ajouter la semaine au CSV, que
-        # stg_marche_hebdo lit comme source. Sans ce second build, le rapport
-        # genere juste apres afficherait une serie amputee de la semaine que
-        # le run vient lui-meme de mesurer -- un rapport hebdomadaire en
-        # retard d'une semaine sur lui-meme. Cible restreinte : le reste du
-        # graphe n'a pas bouge depuis le build precedent.
-        working-directory: observatoire
+      - name: Refresh the history mart
+        # weekly_snapshot.py just appended the week to the CSV, which
+        # stg_history__weekly_market reads as a source. Without this second
+        # build, the report generated right after would show a series missing
+        # the very week this run just measured -- a weekly report a week
+        # behind itself. Restricted target: the rest of the graph hasn't
+        # moved since the previous build.
+        working-directory: france_data_market
         env:
-          CI_SANS_EXTRACTION: "true"
-        run: dbt build --select stg_marche_hebdo+
+          CI_WITHOUT_EXTRACTION: "true"
+        run: dbt build --select stg_history__weekly_market+
 
-      - name: Génération du rapport HTML (Phase 6a)
-        # dashboard/rapport.html est gitignoré (artefact régénérable, comme
-        # warehouse.duckdb) -- jamais commité. Exporté comme artifact GitHub
-        # Actions pour rester consultable depuis l'onglet Actions du run,
-        # sans polluer l'historique git à chaque exécution hebdomadaire.
-        run: python3 dashboard/generer_rapport.py
-      - name: Upload du rapport en artifact
+      - name: Generate the HTML report (Phase 6a)
+        # dashboard/report.html is gitignored (a regenerable artifact, like
+        # warehouse.duckdb) -- never committed. Exported as a GitHub Actions
+        # artifact to stay reviewable from the run's Actions tab, without
+        # polluting the git history on every weekly run.
+        run: python3 dashboard/generate_report.py
+      - name: Upload the report as an artifact
         uses: actions/upload-artifact@v5  # Node 24
         with:
-          name: rapport-marche-data
-          path: dashboard/rapport.html
+          name: france-data-market-report
+          path: dashboard/report.html
           retention-days: 90
 
-      - name: Commit et push du snapshot
+      - name: Commit and push the snapshot
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/snapshots/marche_hebdo.csv data/snapshots/presence_offres.csv
-          git diff --staged --quiet && echo "Rien à committer" || git commit -m "Snapshot hebdomadaire automatique"
+          git diff --staged --quiet && echo "Nothing to commit" || git commit -m "Automated weekly snapshot"
           git push

@@ -1,4 +1,4 @@
-observatoire:
+france_data_market:
   target: dev
   outputs:
     dev:

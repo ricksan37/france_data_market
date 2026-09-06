@@ -1,29 +1,78 @@
 version: 2
 
 models:
-  - name: stg_ft_offres
-    description: données brutes des offres de l'observatoire France Travail
+  - name: stg_raw__ft_job_offers
+    description: >
+      Staging model for the France Travail raw job offers dump. Grain is 1
+      row = 1 job offer, deduplicated to the most recently updated version
+      per job_offer_id (1094 raw rows -> 552 unique offers, measured -- see
+      spec). No business logic beyond deduplication and renaming.
     columns:
-      - name: offre_id
-        description: identifiant unique de l'offre
+      - name: job_offer_id
+        description: Unique identifier of the job offer (France Travail's own id). Grain of this model.
         data_tests:
-          - not_null
           - unique
+          - not_null
 
-      - name: intitule
-        description: intitulé du poste
+      - name: job_title
+        description: Job title as published on the offer.
         data_tests:
           - not_null
 
-      - name: date_creation
-        description: date de création de l'offre
+      - name: job_offer_creation_date
+        description: Date the offer was first published by France Travail.
         data_tests:
           - not_null
+
+      - name: job_offer_last_updated_date
+        description: >
+          Date the offer was last refreshed by France Travail. Used to keep
+          the most recently updated version of a duplicated job_offer_id at
+          this model's grain.
 
       - name: rome_code
-        description: code ROME du poste
+        description: ROME occupation code of the job offer.
         data_tests:
           - not_null
 
-      - name: type_contrat
-        description: type de contrat de l'offre
+      - name: rome_label
+        description: Human-readable label of the ROME occupation code.
+
+      - name: contract_type
+        description: "Contract type code: CDI, CDD, MIS, LIB or CCE."
+
+      - name: required_experience
+        description: >
+          Experience requirement as coded by France Travail (e.g. accepted
+          without experience, experience desired, experience required).
+
+      - name: postal_code
+        description: >
+          Postal code of the job offer's location. Empty for the three
+          French communes with arrondissements (Paris, Lyon, Marseille) --
+          see dim_commune for why commune_code is exposed alongside it.
+
+      - name: commune_code
+        description: >
+          INSEE commune code of the job offer's location. Always populated
+          for Paris, Lyon and Marseille, where postal_code is empty.
+
+      - name: employer_name_raw
+        description: >
+          Employer name as it appears on the job offer (free text, not
+          validated). NULL when the offer is anonymous.
+
+      - name: naf_code_on_offer
+        description: NAF code associated with the job offer, as published by France Travail.
+
+      - name: salary_label
+        description: >
+          Salary as a free-text label published by France Travail (e.g.
+          "Annuel de 45000.0 Euros à 60000.0 Euros"). Parsed downstream by
+          int_job_offer_salary.
+
+      - name: position_count
+        description: Number of positions to fill for this job offer.
+
+      - name: job_description
+        description: Full text of the job offer.

@@ -143,7 +143,7 @@ def consolider_groupe(candidats):
     return max(avec_etabs, key=lambda r: r.get('nombre_etablissements', 0))
 
 
-def selectionner(nom_offre, code_naf_offre, candidats_actifs):
+def selectionner(nom_offre, naf_code_on_offer, candidats_actifs):
     """
     Cascade sur des candidats déjà filtrés géographiquement.
     Retourne (statut, nom_matché) ou None.
@@ -164,8 +164,8 @@ def selectionner(nom_offre, code_naf_offre, candidats_actifs):
         return ("match_nom", par_nom[0].get('nom_complet'))
 
     if len(par_nom) > 1:
-        if code_naf_offre:
-            par_naf = [r for r in par_nom if r.get('activite_principale') == code_naf_offre]
+        if naf_code_on_offer:
+            par_naf = [r for r in par_nom if r.get('activite_principale') == naf_code_on_offer]
             if len(par_naf) == 1:
                 return ("match_nom_puis_naf", par_naf[0].get('nom_complet'))
             if len(par_naf) > 1:
@@ -186,8 +186,8 @@ def selectionner(nom_offre, code_naf_offre, candidats_actifs):
         return ("match_nom_prefixe", par_prefixe[0].get('nom_complet'))
 
     if len(par_prefixe) > 1:
-        if code_naf_offre:
-            par_naf = [r for r in par_prefixe if r.get('activite_principale') == code_naf_offre]
+        if naf_code_on_offer:
+            par_naf = [r for r in par_prefixe if r.get('activite_principale') == naf_code_on_offer]
             if len(par_naf) == 1:
                 return ("match_prefixe_puis_naf", par_naf[0].get('nom_complet'))
             if len(par_naf) > 1:
@@ -207,9 +207,9 @@ def selectionner(nom_offre, code_naf_offre, candidats_actifs):
         return ("match_mots_inclus", par_inclusion[0].get('nom_complet'))
 
     if len(par_inclusion) > 1:
-        if code_naf_offre:
+        if naf_code_on_offer:
             par_naf = [r for r in par_inclusion
-                       if r.get('activite_principale') == code_naf_offre]
+                       if r.get('activite_principale') == naf_code_on_offer]
             if len(par_naf) == 1:
                 return ("match_mots_inclus_puis_naf", par_naf[0].get('nom_complet'))
             if len(par_naf) > 1:
@@ -275,13 +275,13 @@ def selectionner_national(nom_offre, candidats_actifs, suffixe):
 
 
 # --- Population cible ---
-# À lancer depuis observatoire/ (chemin relatif ../data/)
+# À lancer depuis france_data_market/ (chemin relatif ../data/)
 
 con = duckdb.connect('../data/warehouse.duckdb', read_only=True)
 offres = con.execute("""
-    select entreprise_nom, commune, code_naf
-    from fct_offre
-    where categorie_employeur = 'EMPLOYEUR_DIRECT'
+    select employer_name, commune_code, naf_code
+    from fct_job_offer
+    where employer_category = 'DIRECT_EMPLOYER'
 """).fetchall()
 con.close()
 
@@ -291,7 +291,7 @@ compteurs = {}
 exemples = {}
 resultats_audit = []
 
-for i, (nom, commune, code_naf) in enumerate(offres, start=1):
+for i, (nom, commune, naf_code) in enumerate(offres, start=1):
 
     if nom.strip().upper() == "EY":
         # Déjà diagnostiqué : sigle sans correspondance légale.
@@ -308,7 +308,7 @@ for i, (nom, commune, code_naf) in enumerate(offres, start=1):
                 actifs = [r for r in resultats
                           if r.get('siege', {}).get('commune') == commune
                           and r.get('siege', {}).get('etat_administratif') == 'A']
-                issue = selectionner(nom, code_naf, actifs)
+                issue = selectionner(nom, naf_code, actifs)
 
                 # NIVEAU 2 : élargissement au département
                 if issue is None:
@@ -317,7 +317,7 @@ for i, (nom, commune, code_naf) in enumerate(offres, start=1):
                         resultats_d = chercher(nom, {"departement": dept})
                         actifs_d = [r for r in resultats_d
                                     if r.get('siege', {}).get('etat_administratif') == 'A']
-                        issue = selectionner(nom, code_naf, actifs_d)
+                        issue = selectionner(nom, naf_code, actifs_d)
                         if issue:
                             issue = (issue[0] + "_dept", issue[1])
 
@@ -351,7 +351,7 @@ for i, (nom, commune, code_naf) in enumerate(offres, start=1):
             "nom_offre": nom,
             "nom_matche": detail,
             "voie": statut,
-            "naf_offre": code_naf,
+            "naf_offre": naf_code,
         })
 
     print(f"[{i}/{len(offres)}] {nom} -> {statut}")

@@ -2,10 +2,10 @@
 check_repartition_categorie.py
 
 Objectif : vérifier après dbt build que la répartition réelle de
-categorie_employeur correspond au chiffre attendu mesuré en exploration
+employer_category correspond au chiffre attendu mesuré en exploration
 (187 ANONYME, 21 INTERMEDIAIRE_reclasse, total inchangé à 552).
 
-Lancement : depuis observatoire/ -> python3 ../exploration/check_repartition_categorie.py
+Lancement : depuis france_data_market/ -> python3 ../exploration/check_repartition_categorie.py
 """
 
 import duckdb
@@ -14,9 +14,9 @@ CHEMIN_DB = "../data/warehouse.duckdb"
 con = duckdb.connect(CHEMIN_DB, read_only=True)
 
 res = con.execute("""
-    select categorie_employeur, count(*) as nb
-    from int_classification_employeur
-    group by categorie_employeur
+    select employer_category, count(*) as nb
+    from int_employer_classification
+    group by employer_category
     order by nb desc
 """).fetchall()
 

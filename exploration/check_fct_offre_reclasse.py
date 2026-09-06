@@ -1,11 +1,11 @@
 """
 check_fct_offre_reclasse.py
 
-Objectif : vérifier que fct_offre.entreprise_nom est bien rempli sur les 21
+Objectif : vérifier que fct_job_offer.employer_name est bien rempli sur les 21
 offres INTERMEDIAIRE_reclasse (chiffre attendu), et vide
 nulle part ailleurs par erreur.
 
-Lancement : depuis observatoire/ -> python3 ../exploration/check_fct_offre_reclasse.py
+Lancement : depuis france_data_market/ -> python3 ../exploration/check_fct_offre_reclasse.py
 """
 
 import duckdb
@@ -13,17 +13,17 @@ import duckdb
 CHEMIN_DB = "../data/warehouse.duckdb"
 con = duckdb.connect(CHEMIN_DB, read_only=True)
 
-print("--- Répartition entreprise_nom rempli/vide par categorie_employeur ---")
+print("--- Répartition employer_name rempli/vide par employer_category ---")
 res = con.execute("""
     select
-        categorie_employeur,
+        employer_category,
         count(*) as total,
-        count(entreprise_nom) as nom_rempli
-    from fct_offre
-    group by categorie_employeur
+        count(employer_name) as nom_rempli
+    from fct_job_offer
+    group by employer_category
     order by total desc
 """).fetchall()
 for cat, total, rempli in res:
-    print(f"  {cat} : {rempli}/{total} avec entreprise_nom rempli")
+    print(f"  {cat} : {rempli}/{total} avec employer_name rempli")
 
 con.close()

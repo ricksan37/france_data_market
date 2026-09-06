@@ -1,0 +1,21 @@
+version: 2
+
+models:
+  - name: dim_rome
+    description: >
+      Reference table of ROME occupations present in the scope. Grain: one
+      row per ROME code. Fed from the offers themselves, not from the
+      exported ROME reference table (export and live API can diverge in
+      version, measured).
+    columns:
+      - name: rome_code
+        description: >
+          ROME occupation code. Grain of this model. The scope is hybrid
+          (codeROME + motsCles), so codes go beyond the two explicitly
+          targeted (M1405, M1811).
+        data_tests:
+          - unique
+          - not_null
+
+      - name: rome_label
+        description: Human-readable label of the ROME occupation code.

@@ -3,24 +3,24 @@
     tags = ['known_issue']
 ) }}
 
--- Détecte les noms d'entreprise (issus de l'offre brute, avant matching DINUM)
--- portant un préfixe numérique parasite : un identifiant interne du recruteur
--- (code de service, référence RH) collé devant le vrai nom, séparé par un tiret.
--- Exemples mesurés : "751163-DIR STRATEGIE INNOVATION ET TRANSFO",
--- "929840-PARIS DIRECTION...". Ce n'est pas un nom d'entreprise exploitable tel quel.
+-- Detects employer names (from the raw offer, before DINUM matching)
+-- carrying a parasitic numeric prefix: an internal recruiter identifier
+-- (service code, HR reference) glued in front of the real name, separated
+-- by a hyphen. Measured examples: "751163-DIR STRATEGIE INNOVATION ET
+-- TRANSFO", "929840-PARIS DIRECTION...". Not a usable employer name as-is.
 --
--- SEVERITY: WARN, décision assumée le 01/08/2026 : 2 occurrences sur 213,
--- pas assez pour construire une règle de nettoyage défendable (principe projet :
--- jamais de correction sur un cas isolé, et 2 cas ne garantissent pas encore que
--- le motif "chiffres + tiret" est stable, sans faux positif type "3M" ou "42Data").
--- Le WARN garde le pipeline vert tout en surveillant une dérive : si ce nombre
--- augmente avec de nouvelles données, ça devient un signal pour construire un
--- vrai nettoyage (regexp_replace en staging) plutôt qu'une simple alerte.
+-- SEVERITY: WARN, decision accepted on 2026-08-01: 2 occurrences out of
+-- 213, not enough to build a defensible cleanup rule (project principle:
+-- never correct on an isolated case, and 2 cases don't yet guarantee that
+-- the "digits + hyphen" pattern is stable, without a false positive like
+-- "3M" or "42Data"). The WARN keeps the pipeline green while watching for
+-- drift: if this number grows with new data, it becomes a signal to build
+-- real cleanup (regexp_replace in staging) rather than a simple alert.
 --
--- Contrat dbt : 0 ligne = pass, >= 1 ligne = warn (pas fail).
+-- dbt contract: 0 rows = pass, >= 1 row = warn (not fail).
 
 select
-    offre_id,
-    entreprise_nom_offre
-from {{ ref('stg_dinum_entreprises') }}
-where regexp_matches(entreprise_nom_offre, '^[0-9]+-')
+    job_offer_id,
+    employer_name_raw
+from {{ ref('stg_dinum__companies') }}
+where regexp_matches(employer_name_raw, '^[0-9]+-')

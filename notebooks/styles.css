@@ -1,10 +1,10 @@
-/* Millimeter Dark -- habillage du notebook d'exploration rendu par Quarto.
-   Le contenu (cellules markdown) porte deja ses styles en ligne ; cette
-   feuille couvre ce que Quarto genere lui-meme et que les cellules ne
-   controlent pas : fond de page, cellules de code, tables pandas, sommaire.
-   Polices embarquees en base64 : meme raison que dashboard/rapport.html,
-   un livrable autonome ne doit pas dependre des polices de la machine qui
-   l'ouvre. */
+/* Dark theme -- styling for the exploration notebook rendered by Quarto.
+   The content (markdown cells) already carries its own inline styles; this
+   sheet covers what Quarto generates on its own and cells don't control:
+   page background, code cells, pandas tables, table of contents.
+   Fonts embedded in base64: same reason as dashboard/rapport.html, a
+   standalone deliverable shouldn't depend on the fonts of the machine that
+   opens it. */
 
 @font-face {
   font-family: 'Archivo Black';

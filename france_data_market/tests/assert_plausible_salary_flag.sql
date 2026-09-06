@@ -1,36 +1,36 @@
--- Coherence du drapeau salaire_annuel_plausible avec les bornes qu'il resume.
+-- Consistency of the annual_salary_plausible flag with the bounds it summarizes.
 --
--- SEVERITY: ERROR, et c'est le changement de doctrine du 03/09. Jusqu'ici le
--- seul garde-fou sur les salaires aberrants etait assert_bornes_salaire_annuel,
--- en warn : il comptait le probleme a chaque run sans que personne ne
--- consomme le signal, et les agregations continuaient a l'ingerer. Le drapeau
--- devient la regle ; ce test protege la regle, donc il bloque.
+-- SEVERITY: ERROR, and this is the 2026-09-03 doctrine change. Until now the
+-- only guard against outlier salaries was assert_annual_salary_bounds, at
+-- warn: it counted the problem on every run without anyone consuming the
+-- signal, and aggregations kept ingesting it. The flag becomes the rule;
+-- this test protects the rule, so it blocks.
 --
--- Trois facons de le casser, toutes attrapees ici :
---   1. drapeau vrai sur une valeur hors bornes
---   2. drapeau faux sur une valeur dans les bornes
---   3. drapeau absent alors que la question se pose (periode annuelle et
---      montant renseigne) -- le cas le plus insidieux, parce qu'un NULL
---      disparait silencieusement de tout filtre `where salaire_annuel_plausible`
+-- Three ways to break it, all caught here:
+--   1. flag true on a value outside the bounds
+--   2. flag false on a value within the bounds
+--   3. flag absent when the question applies (annual period and amount
+--      given) -- the most insidious case, because a NULL silently
+--      disappears from any `where annual_salary_plausible` filter
 --
--- Le troisieme point est la lecon de assert_conservation_flux, deux jours plus
--- tot : un NULL non traite ne fait pas echouer un test, il le fait passer.
+-- The third point is the lesson from assert_flow_conservation, two days
+-- earlier: an unhandled NULL doesn't fail a test, it passes it.
 
 select
-    offre_id,
-    salaire_periode,
-    salaire_min,
-    salaire_annuel_plausible
-from {{ ref('fct_offre') }}
+    job_offer_id,
+    salary_period,
+    salary_min,
+    annual_salary_plausible
+from {{ ref('fct_job_offer') }}
 where
-    -- 1 et 2 : le drapeau ne dit pas ce que disent les bornes
+    -- 1 and 2: the flag doesn't say what the bounds say
     (
-        salaire_annuel_plausible is not null
-        and salaire_annuel_plausible != (salaire_min >= 10000 and salaire_min <= 300000)
+        annual_salary_plausible is not null
+        and annual_salary_plausible != (salary_min >= 10000 and salary_min <= 300000)
     )
-    -- 3 : la question se pose et le drapeau ne repond pas
+    -- 3: the question applies and the flag doesn't answer
     or (
-        salaire_annuel_plausible is null
-        and salaire_periode = 'annuel'
-        and salaire_min is not null
+        annual_salary_plausible is null
+        and salary_period = 'annual'
+        and salary_min is not null
     )

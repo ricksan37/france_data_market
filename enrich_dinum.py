@@ -1,57 +1,57 @@
 """
-Enrichissement entreprise via l'API Recherche d'entreprises (DINUM).
-Phase 3, spec FR-014 / FR-015.
+Company enrichment via the Company Search API (DINUM).
 
-Enrichit les offres EMPLOYEUR_DIRECT avec SIREN, NAF, effectif et date de
-création, en résolvant le nom d'entreprise saisi par l'employeur vers une
-entité légale du répertoire SIRENE.
+Enriches DIRECT_EMPLOYER offers with SIREN, NAF, headcount and creation
+date, by resolving the employer name entered by the employer to a legal
+entity in the SIRENE registry.
 
-STRATÉGIE DE MATCHING : construite par paliers mesurés
-(19,2% -> 80,3% de taux de matching) :
+MATCHING STRATEGY: built through measured stages (19.2% -> 80.3% matching
+rate):
 
-  Clé géographique : code INSEE commune, PAS le code postal.
-    Rouvre §7.5 de la spec, qui prévoyait le code postal. Justification
-    mesurée sur les 213 offres cibles : code postal renseigné 166/213,
-    code INSEE 198/213 (sur-ensemble strict). Le code INSEE a en outre
-    une relation 1:1 avec la commune (§4.1), contrairement au code postal.
+  Geographic key: INSEE commune code, NOT the postal code.
+    The initial plan called for the postal code. Reopened and justified by
+    measurement on the 213 target offers: postal code populated 166/213,
+    INSEE code 198/213 (strict superset). The INSEE code also has a 1:1
+    relationship with the commune, unlike the postal code.
 
-  Cascade géographique : commune -> département -> national.
-    Le siège social est souvent hors de la commune de l'offre (universités,
-    banques régionales, groupes nationaux).
+  Geographic cascade: commune -> department -> national.
+    The registered head office is often outside the offer's commune
+    (universities, regional banks, national groups).
 
-  Comparaison de noms, du plus strict au plus souple :
-    1. nom exact, sur variantes (DINUM concatène raison sociale ET
-       enseignes/sigles entre parenthèses)
-    2. préfixe sur frontière de mot (troncature côté France Travail,
-       ou mot ajouté par l'employeur)
-    3. inclusion de mots (mot inséré au milieu de la raison sociale)
+  Name comparison, from strictest to loosest:
+    1. exact name, across variants (DINUM concatenates the legal name AND
+       trade names/acronyms in parentheses)
+    2. prefix on a word boundary (truncation on France Travail's side, or a
+       word added by the employer)
+    3. word inclusion (a word inserted in the middle of the legal name)
 
-  Le NAF sert UNIQUEMENT de disambiguant entre candidats déjà retenus par
-  le nom. La voie "NAF seul" a été supprimée après audit : 2 matchs sur 172,
-  dont 2 douteux. Règle retenue : le nom doit toujours corroborer.
+  NAF is used ONLY as a tiebreaker among candidates already retained by
+  name. The "NAF alone" path was removed after audit: 2 matches out of 172,
+  2 of them doubtful. Rule kept: the name must always corroborate.
 
-  Consolidation groupe sur homonymes : on retient l'entité au plus grand
-  nombre d'établissements. Aligné sur l'objectif analytique du projet
-  (caractériser le TYPE de structure qui recrute) : une offre de KEOLIS SUD
-  LORRAINE relève bien d'un grand groupe de transport.
+  Group consolidation on homonyms: the entity with the largest number of
+  establishments is kept. Aligned with the project's analytical goal
+  (characterizing the TYPE of structure that's hiring): a KEOLIS SUD
+  LORRAINE offer does belong to a large transport group.
 
-LIMITES CONNUES ET ASSUMÉES :
-  - "EY" (28 offres, 13%) : sigle commercial absent de SIRENE, et 5+ entités
-    juridiques du groupe sans critère de départage. Non matché volontairement.
-  - Libellés de service interne ("FONCTIONS SUPPORTS", "751163-DIR STRATEGIE
-    INNOVATION ET TRANSFO", "BNP Paribas Mission Handicap") : ce ne sont pas
-    des noms d'entreprise, aucune règle ne peut les rattacher correctement.
-    Toute règle assez souple pour leur trouver un candidat trouvera un
-    MAUVAIS candidat (un CSE, une association satellite). 2 faux positifs
-    résiduels mesurés sur 171 matchs. Non filtrés en amont : le critère
-    aurait reposé sur une liste de mots-clés construite sur 5 exemples.
-  - Consolidation groupe (27 matchs, 16%) : rattache à tort les homonymes
-    sans lien capitalistique. Statut distinct pour filtrer en aval.
-  - 14 offres (6,6%) non résolues : nom commercial ou libellé interne absent
-    du répertoire SIRENE.
+KNOWN AND ACCEPTED LIMITS:
+  - "EY" (28 offers, 13%): a commercial acronym absent from SIRENE, and 5+
+    legal entities in the group with no tiebreaking criterion. Deliberately
+    not matched.
+  - Internal department labels ("FONCTIONS SUPPORTS", "751163-DIR STRATEGIE
+    INNOVATION ET TRANSFO", "BNP Paribas Mission Handicap"): these aren't
+    company names, no rule can attach them correctly. Any rule loose enough
+    to find them a candidate will find a WRONG candidate (a works council, a
+    satellite association). 2 residual false positives measured out of 171
+    matches. Not filtered upstream: the criterion would have relied on a
+    keyword list built from 5 examples.
+  - Group consolidation (27 matches, 16%): wrongly attaches homonyms with no
+    capital link. Distinct status to filter downstream.
+  - 14 offers (6.6%) unresolved: trade name or internal label absent from
+    the SIRENE registry.
 
-USAGE : à lancer depuis la RACINE du projet.
-    python3 enrichissement_dinum.py
+USAGE: run from the project ROOT.
+    python3 enrich_dinum.py
 """
 
 import duckdb
@@ -62,492 +62,494 @@ import json
 import unicodedata
 from datetime import datetime
 
-URL_DINUM = "https://recherche-entreprises.api.gouv.fr/search"
-CHEMIN_BASE = "data/warehouse.duckdb"
-DOSSIER_SORTIE = "data/raw"
+DINUM_URL = "https://recherche-entreprises.api.gouv.fr/search"
+DB_PATH = "data/warehouse.duckdb"
+OUTPUT_DIR = "data/raw"
 
-# Rate limit DINUM : 7 req/s par IP, HTTP 429 au-delà (spec §7.5)
-DELAI_ENTRE_APPELS = 1 / 7
+# DINUM rate limit: 7 req/s per IP, HTTP 429 beyond that
+DELAY_BETWEEN_CALLS = 1 / 7
 
-MOTS_VIDES = {"DE", "LA", "LE", "DU", "DES", "ET", "D", "L"}
+STOP_WORDS = {"DE", "LA", "LE", "DU", "DES", "ET", "D", "L"}
 
-# Formes juridiques accolées à la raison sociale dans SIRENE, quasi jamais
-# écrites par l'employeur dans l'offre (ex. "Keolis" vs "KEOLIS SA").
-FORMES_JURIDIQUES = {
+# Legal forms appended to the legal name in SIRENE, almost never written by
+# the employer in the offer (e.g. "Keolis" vs "KEOLIS SA").
+LEGAL_FORMS = {
     "SA", "SAS", "SASU", "SARL", "EURL", "SNC", "SCS", "SCA",
     "SE", "SCOP", "SCIC", "GIE", "GEIE", "EARL", "SCI", "SEM",
     "SELARL", "SELAS", "SPRL", "GMBH", "LTD", "BV", "NV", "AG", "SPA",
 }
 
-# Sigles connus sans correspondance exploitable dans SIRENE.
-# Documenté plutôt que contourné : voir LIMITES CONNUES ci-dessus.
-SIGLES_NON_MATCHABLES = {"EY"}
+# Known acronyms with no usable match in SIRENE.
+# Documented rather than worked around: see KNOWN LIMITS above.
+NON_MATCHABLE_ACRONYMS = {"EY"}
 
 
 # ─────────────────────────────────────────────────────────────
-# Normalisation et comparaison de noms
+# Name normalization and comparison
 # ─────────────────────────────────────────────────────────────
 
-def normaliser_nom(nom):
+def normalize_name(name):
     """
-    Neutralise ce qui varie entre le nom saisi par l'employeur et la raison
-    sociale SIRENE : casse, accents, ponctuation, mots vides, forme juridique.
+    Neutralizes what varies between the name entered by the employer and
+    SIRENE's legal name: case, accents, punctuation, stop words, legal form.
 
-    Les accents sont critiques : SIRENE stocke sans accents ("DEFI RH",
-    "CREDIT AGRICOLE ASSURANCES") alors que l'offre les conserve.
+    Accents are critical: SIRENE stores names without accents ("DEFI RH",
+    "CREDIT AGRICOLE ASSURANCES") while the offer keeps them.
 
-    Garde-fou : on ne retire mots vides et formes juridiques que s'il reste
-    au moins un mot. Certaines entreprises s'appellent littéralement "LTd" ;
-    les retirer viderait le nom et rendrait toute comparaison impossible.
+    Safeguard: stop words and legal forms are only stripped if at least one
+    word remains. Some companies are literally named "LTd"; stripping them
+    would empty the name and make any comparison impossible.
     """
-    nom = nom.strip().upper()
+    name = name.strip().upper()
 
-    nom = unicodedata.normalize("NFD", nom)
-    nom = "".join(c for c in nom if unicodedata.category(c) != "Mn")
+    name = unicodedata.normalize("NFD", name)
+    name = "".join(c for c in name if unicodedata.category(c) != "Mn")
 
-    nom = re.sub(r"[.,'\-&]", " ", nom)
+    name = re.sub(r"[.,'\-&]", " ", name)
 
-    mots = nom.split()
-    mots_filtres = [m for m in mots
-                    if m not in MOTS_VIDES and m not in FORMES_JURIDIQUES]
+    words = name.split()
+    filtered_words = [w for w in words
+                       if w not in STOP_WORDS and w not in LEGAL_FORMS]
 
-    return " ".join(mots_filtres) if mots_filtres else " ".join(mots)
+    return " ".join(filtered_words) if filtered_words else " ".join(words)
 
 
-def variantes_nom(nom_complet):
+def name_variants(full_name):
     """
-    DINUM concatène dans nom_complet la raison sociale ET les enseignes ou
-    sigles entre parenthèses : "LEIHIA (LEIHIA) (LEIHIA)", "AGENCE FRANCAISE
-    DE DEVELOPPEMENT (AFD)". Comparer la chaîne entière échoue donc sur des
-    correspondances parfaites.
+    DINUM concatenates into nom_complet the legal name AND trade names or
+    acronyms in parentheses: "LEIHIA (LEIHIA) (LEIHIA)", "AGENCE FRANCAISE
+    DE DEVELOPPEMENT (AFD)". Comparing the whole string therefore fails on
+    otherwise perfect matches.
 
-    Retourne toutes les formes normalisées comparables : chaîne entière,
-    raison sociale seule, et chaque contenu de parenthèses isolément.
+    Returns every comparable normalized form: the whole string, the legal
+    name alone, and each parenthesized content in isolation.
     """
-    formes = {normaliser_nom(nom_complet)}
-    formes.add(normaliser_nom(re.sub(r"\([^)]*\)", " ", nom_complet)))
-    for contenu in re.findall(r"\(([^)]*)\)", nom_complet):
-        for morceau in contenu.split(","):
-            forme = normaliser_nom(morceau)
-            if forme:
-                formes.add(forme)
-    return {f for f in formes if f}
+    forms = {normalize_name(full_name)}
+    forms.add(normalize_name(re.sub(r"\([^)]*\)", " ", full_name)))
+    for content in re.findall(r"\(([^)]*)\)", full_name):
+        for piece in content.split(","):
+            form = normalize_name(piece)
+            if form:
+                forms.add(form)
+    return {f for f in forms if f}
 
 
-def est_prefixe_sur_mot(court, long):
+def is_prefix_on_word_boundary(short_name, long_name):
     """
-    Vrai si `court` est un préfixe de `long` s'arrêtant sur un mot entier.
+    True if `short_name` is a prefix of `long_name` stopping on a whole word.
 
-    "STEP UP" est préfixe de "STEP UP LILLE" (suivi d'un espace).
-    "FED" n'est PAS préfixe de "FEDERATION SPORTIVE" (coupe en plein mot).
+    "STEP UP" is a prefix of "STEP UP LILLE" (followed by a space).
+    "FED" is NOT a prefix of "FEDERATION SPORTIVE" (cuts mid-word).
 
-    Remplace un garde-fou arbitraire sur la longueur : plus sûr, car il
-    devient impossible de matcher sur une troncature de mot.
+    Replaces an arbitrary length safeguard: safer, since it becomes
+    impossible to match on a truncated word.
     """
-    if not court or not long:
+    if not short_name or not long_name:
         return False
-    if court == long:
+    if short_name == long_name:
         return True
-    return long.startswith(court + " ")
+    return long_name.startswith(short_name + " ")
 
 
-def mots_inclus(nom_court, nom_long):
+def words_included(short_name, long_name):
     """
-    Vrai si TOUS les mots de `nom_court` sont présents dans `nom_long`.
+    True if EVERY word of `short_name` is present in `long_name`.
 
-    Gère les mots insérés au milieu, que le préfixe ne peut pas attraper :
-    "CAISSE EPARGNE LANGUEDOC ROUSSILLON" est inclus dans
+    Handles words inserted in the middle, which a prefix check can't catch:
+    "CAISSE EPARGNE LANGUEDOC ROUSSILLON" is included in
     "CAISSE EPARGNE PREVOYANCE LANGUEDOC ROUSSILLON".
 
-    Deux garde-fous :
-    - au moins 2 mots, pour éviter qu'un nom d'un seul mot générique soit
-      inclus dans des dizaines de candidats ;
-    - le candidat ne doit pas faire plus du double de mots. Sans cette borne,
-      un libellé de service interne comme "FONCTIONS SUPPORTS" se rattachait
-      à "AIDE AUX FONCTIONS SUPPORTS DES ENTREPRISES" : inclusion vraie au
-      sens strict, mais entité sans rapport. Un écart de cette ampleur signale
-      qu'on a attrapé une entité satellite, pas l'employeur.
+    Two safeguards:
+    - at least 2 words, to avoid a single generic-word name matching dozens
+      of candidates;
+    - the candidate must not have more than double the word count. Without
+      this bound, an internal department label like "FONCTIONS SUPPORTS"
+      used to attach to "AIDE AUX FONCTIONS SUPPORTS DES ENTREPRISES":
+      strictly true inclusion, but an unrelated entity. A gap this large
+      signals a satellite entity was caught, not the employer.
     """
-    mots_court = set(nom_court.split())
-    if len(mots_court) < 2:
+    short_words = set(short_name.split())
+    if len(short_words) < 2:
         return False
 
-    mots_long = set(nom_long.split())
-    if not mots_court.issubset(mots_long):
+    long_words = set(long_name.split())
+    if not short_words.issubset(long_words):
         return False
 
-    return len(mots_long) <= 2 * len(mots_court)
+    return len(long_words) <= 2 * len(short_words)
 
 
 # ─────────────────────────────────────────────────────────────
-# Appels API
+# API calls
 # ─────────────────────────────────────────────────────────────
 
-def departement_depuis_commune(code_commune):
+def department_from_commune(commune_code):
     """
-    Code département depuis le code INSEE commune.
-    Cas DOM : codes en 97x / 98x -> département sur 3 chiffres.
+    Department code from the INSEE commune code.
+    Overseas territory case: codes in 97x / 98x -> 3-digit department.
     """
-    if not code_commune:
+    if not commune_code:
         return None
-    if code_commune.startswith("97") or code_commune.startswith("98"):
-        return code_commune[:3]
-    return code_commune[:2]
+    if commune_code.startswith("97") or commune_code.startswith("98"):
+        return commune_code[:3]
+    return commune_code[:2]
 
 
-def chercher(nom, params_geo):
-    """Un appel API avec un jeu de paramètres géographiques donné."""
-    params = {"q": nom, **params_geo}
-    resp = requests.get(URL_DINUM, params=params)
+def search(name, geo_params):
+    """A single API call with a given set of geographic parameters."""
+    params = {"q": name, **geo_params}
+    resp = requests.get(DINUM_URL, params=params)
     resp.raise_for_status()
-    time.sleep(DELAI_ENTRE_APPELS)
+    time.sleep(DELAY_BETWEEN_CALLS)
     return resp.json().get("results", [])
 
 
 # ─────────────────────────────────────────────────────────────
-# Sélection du candidat
+# Candidate selection
 # ─────────────────────────────────────────────────────────────
 
-def consolider_groupe(candidats):
+def consolidate_group(candidates):
     """
-    Départage des homonymes par nombre d'établissements.
+    Breaks ties among homonyms by number of establishments.
 
-    Objectif analytique du projet = caractériser le TYPE de structure qui
-    recrute (secteur, taille, âge). Rattacher une offre d'une filiale
-    régionale à sa maison mère est donc le comportement souhaité, pas une
-    approximation regrettable.
+    The project's analytical goal is to characterize the TYPE of structure
+    hiring (sector, size, age). Attaching an offer from a regional
+    subsidiary to its parent company is therefore the desired behavior, not
+    a regrettable approximation.
 
-    Angle mort assumé : les homonymes SANS lien capitalistique sont
-    rattachés à tort -> statut distinct pour mesurer et filtrer en aval.
+    Accepted blind spot: homonyms with NO capital link get wrongly attached
+    -> distinct status to measure and filter downstream.
     """
-    avec_etabs = [r for r in candidats if r.get("nombre_etablissements") is not None]
-    if not avec_etabs:
+    with_establishments = [r for r in candidates if r.get("nombre_etablissements") is not None]
+    if not with_establishments:
         return None
-    return max(avec_etabs, key=lambda r: r.get("nombre_etablissements", 0))
+    return max(with_establishments, key=lambda r: r.get("nombre_etablissements", 0))
 
 
-def _departager(candidats, code_naf_offre, statut_naf, statut_groupe, autoriser_naf):
+def _break_tie(candidates, offer_naf_code, naf_status, group_status, allow_naf):
     """
-    Départage un ensemble de candidats déjà retenus par le nom.
-    Facteur commun aux trois modes de correspondance.
+    Breaks ties among a set of candidates already retained by name.
+    Common factor across the three matching modes.
 
-    `autoriser_naf` est False au niveau national : sans ancrage géographique,
-    un NAF rapprocherait des entreprises du même secteur situées n'importe où.
+    `allow_naf` is False at the national level: with no geographic anchor,
+    a NAF match would bring together same-sector companies located
+    anywhere.
     """
-    if len(candidats) == 1:
-        return (statut_naf.replace("_puis_naf", ""), candidats[0])
+    if len(candidates) == 1:
+        return (naf_status.replace("_then_naf", ""), candidates[0])
 
-    if autoriser_naf and code_naf_offre:
-        par_naf = [r for r in candidats
-                   if r.get("activite_principale") == code_naf_offre]
-        if len(par_naf) == 1:
-            return (statut_naf, par_naf[0])
-        if len(par_naf) > 1:
-            candidats = par_naf
+    if allow_naf and offer_naf_code:
+        by_naf = [r for r in candidates
+                  if r.get("activite_principale") == offer_naf_code]
+        if len(by_naf) == 1:
+            return (naf_status, by_naf[0])
+        if len(by_naf) > 1:
+            candidates = by_naf
 
-    principal = consolider_groupe(candidats)
-    if principal:
-        return (statut_groupe, principal)
+    leading_candidate = consolidate_group(candidates)
+    if leading_candidate:
+        return (group_status, leading_candidate)
     return None
 
 
-def selectionner_nom_exact(nom_offre, code_naf_offre, candidats_actifs, autoriser_naf=True):
+def select_exact_name(offer_name, offer_naf_code, active_candidates, allow_naf=True):
     """
-    PASSE 1 : correspondance exacte du nom uniquement.
+    PASS 1: exact name match only.
 
-    Exécutée sur toute la cascade géographique AVANT toute règle souple :
-    un nom exact au niveau national vaut mieux qu'une correspondance
-    approximative dans la bonne commune.
+    Run across the whole geographic cascade BEFORE any fuzzy rule: an exact
+    name found nationally is more reliable than an approximate match in the
+    offer's own commune.
 
-    Contre-exemple qui a motivé cette séparation : "UNIVERSITE PARIS-SACLAY"
-    matchait par inclusion de mots avec "ASSOCIATION DES ETUDIANTS ... DE
-    L'UNIVERSITE PARIS-SACLAY" dans la bonne commune, ce qui court-circuitait
-    la découverte de l'université elle-même au niveau département.
+    Counter-example that motivated this separation: "UNIVERSITE
+    PARIS-SACLAY" used to match by word inclusion with "ASSOCIATION DES
+    ETUDIANTS ... DE L'UNIVERSITE PARIS-SACLAY" in the right commune, which
+    short-circuited discovering the university itself at the department
+    level.
     """
-    if not candidats_actifs:
+    if not active_candidates:
         return None
 
-    nom_cible = normaliser_nom(nom_offre)
-    par_nom = [r for r in candidats_actifs
-               if nom_cible in variantes_nom(r.get("nom_complet", ""))]
+    target_name = normalize_name(offer_name)
+    by_name = [r for r in active_candidates
+               if target_name in name_variants(r.get("nom_complet", ""))]
 
-    if not par_nom:
+    if not by_name:
         return None
 
-    return _departager(par_nom, code_naf_offre,
-                       "match_nom_puis_naf", "match_consolide_groupe",
-                       autoriser_naf)
+    return _break_tie(by_name, offer_naf_code,
+                       "match_name_then_naf", "match_consolidated_group",
+                       allow_naf)
 
 
-def selectionner_souple(nom_offre, code_naf_offre, candidats_actifs, autoriser_naf=True):
+def select_fuzzy(offer_name, offer_naf_code, active_candidates, allow_naf=True):
     """
-    PASSE 2 : correspondances assouplies, dans l'ordre de fiabilité
-    décroissante : préfixe sur frontière de mot, puis inclusion de mots.
+    PASS 2: loosened matches, in decreasing order of reliability: prefix on
+    a word boundary, then word inclusion.
 
-    N'est tentée qu'après échec de la passe exacte sur TOUS les niveaux
-    géographiques.
+    Only attempted after the exact pass fails at EVERY geographic level.
     """
-    if not candidats_actifs:
+    if not active_candidates:
         return None
 
-    nom_cible = normaliser_nom(nom_offre)
+    target_name = normalize_name(offer_name)
 
-    par_prefixe = [
-        r for r in candidats_actifs
-        if any(est_prefixe_sur_mot(nom_cible, v) or est_prefixe_sur_mot(v, nom_cible)
-               for v in variantes_nom(r.get("nom_complet", "")))
+    by_prefix = [
+        r for r in active_candidates
+        if any(is_prefix_on_word_boundary(target_name, v) or is_prefix_on_word_boundary(v, target_name)
+               for v in name_variants(r.get("nom_complet", "")))
     ]
-    if par_prefixe:
-        issue = _departager(par_prefixe, code_naf_offre,
-                            "match_prefixe_puis_naf", "match_consolide_groupe_prefixe",
-                            autoriser_naf)
-        if issue:
-            return (issue[0].replace("match_prefixe", "match_nom_prefixe"), issue[1])
+    if by_prefix:
+        outcome = _break_tie(by_prefix, offer_naf_code,
+                              "match_prefix_then_naf", "match_consolidated_group_prefix",
+                              allow_naf)
+        if outcome:
+            return (outcome[0].replace("match_prefix", "match_name_prefix"), outcome[1])
 
-    par_inclusion = [
-        r for r in candidats_actifs
-        if any(mots_inclus(nom_cible, v)
-               for v in variantes_nom(r.get("nom_complet", "")))
+    by_inclusion = [
+        r for r in active_candidates
+        if any(words_included(target_name, v)
+               for v in name_variants(r.get("nom_complet", "")))
     ]
-    if par_inclusion:
-        return _departager(par_inclusion, code_naf_offre,
-                           "match_mots_inclus_puis_naf",
-                           "match_consolide_groupe_inclusion",
-                           autoriser_naf)
+    if by_inclusion:
+        return _break_tie(by_inclusion, offer_naf_code,
+                           "match_word_inclusion_then_naf",
+                           "match_consolidated_group_inclusion",
+                           allow_naf)
 
     return None
 
 
-def resoudre_entreprise(nom, commune, code_naf):
+def resolve_company(name, commune_code, naf_code):
     """
-    Deux passes successives, chacune parcourant toute la cascade géographique.
+    Two successive passes, each running across the whole geographic
+    cascade.
 
-    PASSE 1 (nom exact) : commune -> département -> national
-    PASSE 2 (règles souples) : commune -> département -> national
+    PASS 1 (exact name): commune -> department -> national
+    PASS 2 (fuzzy rules): commune -> department -> national
 
-    L'ordre est délibéré : la QUALITÉ du match sur le nom prime sur la
-    PROXIMITÉ géographique. Un nom exact trouvé au national est plus fiable
-    qu'une correspondance approximative dans la commune de l'offre.
+    The order is deliberate: match QUALITY on the name outweighs
+    geographic PROXIMITY. An exact name found nationally is more reliable
+    than an approximate match in the offer's own commune.
 
-    Coût : jusqu'à 6 appels API par offre au lieu de 3, mais les résultats
-    de chaque niveau sont mis en cache local pour éviter tout doublon.
+    Cost: up to 6 API calls per offer instead of 3, but each level's
+    results are cached locally to avoid any duplicate call.
     """
-    if nom.strip().upper() in SIGLES_NON_MATCHABLES:
-        return ("non_matchable_sigle_connu", None)
+    if name.strip().upper() in NON_MATCHABLE_ACRONYMS:
+        return ("non_matchable_known_acronym", None)
 
-    # Les candidats de chaque niveau sont récupérés une seule fois et
-    # réutilisés par les deux passes.
-    niveaux = []
+    # Each level's candidates are fetched once and reused by both passes.
+    levels = []
 
-    if commune:
-        candidats = chercher(nom, {"code_commune": commune})
-        actifs = [r for r in candidats
-                  if r.get("siege", {}).get("commune") == commune
+    if commune_code:
+        candidates = search(name, {"code_commune": commune_code})
+        active = [r for r in candidates
+                  if r.get("siege", {}).get("commune") == commune_code
                   and r.get("siege", {}).get("etat_administratif") == "A"]
-        niveaux.append(("", actifs, True))
+        levels.append(("", active, True))
 
-        dept = departement_depuis_commune(commune)
+        dept = department_from_commune(commune_code)
         if dept:
-            candidats_d = chercher(nom, {"departement": dept})
-            actifs_d = [r for r in candidats_d
-                        if r.get("siege", {}).get("etat_administratif") == "A"]
-            niveaux.append(("_dept", actifs_d, True))
+            dept_candidates = search(name, {"departement": dept})
+            dept_active = [r for r in dept_candidates
+                           if r.get("siege", {}).get("etat_administratif") == "A"]
+            levels.append(("_dept", dept_active, True))
 
-    candidats_n = chercher(nom, {})
-    actifs_n = [r for r in candidats_n
-                if r.get("siege", {}).get("etat_administratif") == "A"]
-    suffixe_national = "_national_sans_geo" if not commune else "_national"
-    # autoriser_naf=False au national : voir docstring de _departager
-    niveaux.append((suffixe_national, actifs_n, False))
+    national_candidates = search(name, {})
+    national_active = [r for r in national_candidates
+                       if r.get("siege", {}).get("etat_administratif") == "A"]
+    national_suffix = "_national_sans_geo" if not commune_code else "_national"
+    # allow_naf=False at the national level: see _break_tie's docstring
+    levels.append((national_suffix, national_active, False))
 
-    # PASSE 1 : nom exact sur tous les niveaux
-    for suffixe, actifs, naf_ok in niveaux:
-        issue = selectionner_nom_exact(nom, code_naf, actifs, naf_ok)
-        if issue:
-            return (issue[0] + suffixe, issue[1])
+    # PASS 1: exact name at every level
+    for suffix, active, naf_allowed in levels:
+        outcome = select_exact_name(name, naf_code, active, naf_allowed)
+        if outcome:
+            return (outcome[0] + suffix, outcome[1])
 
-    # PASSE 2 : règles souples sur tous les niveaux
-    for suffixe, actifs, naf_ok in niveaux:
-        issue = selectionner_souple(nom, code_naf, actifs, naf_ok)
-        if issue:
-            return (issue[0] + suffixe, issue[1])
+    # PASS 2: fuzzy rules at every level
+    for suffix, active, naf_allowed in levels:
+        outcome = select_fuzzy(name, naf_code, active, naf_allowed)
+        if outcome:
+            return (outcome[0] + suffix, outcome[1])
 
-    return ("non_resolu_sans_geo" if not commune else "non_resolu", None)
+    return ("unresolved_no_geo" if not commune_code else "unresolved", None)
 
 
-def extraire_champs(candidat):
+def extract_fields(candidate):
     """
-    Ne conserve du retour API que les champs utiles à dim_entreprise.
-    Le reste (dirigeants, finances, liste des établissements...) est hors
-    scope et alourdirait inutilement le dump.
+    Keeps only the API response fields useful to dim_company.
+    The rest (executives, financials, list of establishments...) is out of
+    scope and would needlessly bloat the dump.
     """
-    siege = candidat.get("siege", {})
+    headquarters = candidate.get("siege", {})
     return {
-        "siren": candidat.get("siren"),
-        "siret_siege": siege.get("siret"),
-        "nom_complet": candidat.get("nom_complet"),
-        "code_naf": candidat.get("activite_principale"),
-        "section_naf": candidat.get("section_activite_principale"),
-        "tranche_effectif": candidat.get("tranche_effectif_salarie"),
-        "annee_effectif": candidat.get("annee_tranche_effectif_salarie"),
-        "categorie_entreprise": candidat.get("categorie_entreprise"),
-        "date_creation": candidat.get("date_creation"),
-        "nombre_etablissements": candidat.get("nombre_etablissements"),
-        "commune_siege": siege.get("commune"),
-        "code_postal_siege": siege.get("code_postal"),
+        "siren": candidate.get("siren"),
+        "headquarters_siret": headquarters.get("siret"),
+        "full_name": candidate.get("nom_complet"),
+        "naf_code": candidate.get("activite_principale"),
+        "naf_section": candidate.get("section_activite_principale"),
+        "employee_count_range": candidate.get("tranche_effectif_salarie"),
+        "employee_count_reference_year": candidate.get("annee_tranche_effectif_salarie"),
+        "company_category": candidate.get("categorie_entreprise"),
+        "creation_date": candidate.get("date_creation"),
+        "establishment_count": candidate.get("nombre_etablissements"),
+        "headquarters_commune": headquarters.get("commune"),
+        "headquarters_postal_code": headquarters.get("code_postal"),
     }
 
 
 # ─────────────────────────────────────────────────────────────
-# Programme principal
+# Main program
 # ─────────────────────────────────────────────────────────────
 
 def main():
-    print("Lecture de la population cible depuis DuckDB...")
+    print("Reading the target population from DuckDB...")
 
-    # Lecture seule : aucun risque de verrou concurrent avec dbt
-    con = duckdb.connect(CHEMIN_BASE, read_only=True)
-    offres = con.execute("""
-        select offre_id, entreprise_nom, commune, code_naf
-        from fct_offre
-        where categorie_employeur = 'EMPLOYEUR_DIRECT'
+    # Read-only: no risk of a concurrent lock with dbt
+    con = duckdb.connect(DB_PATH, read_only=True)
+    offers = con.execute("""
+        select job_offer_id, employer_name, commune_code, naf_code
+        from fct_job_offer
+        where employer_category = 'DIRECT_EMPLOYER'
     """).fetchall()
     con.close()
 
-    print(f"Population cible : {len(offres)} offres EMPLOYEUR_DIRECT")
+    print(f"Target population: {len(offers)} DIRECT_EMPLOYER offers")
 
-    # Déduplication des appels : un même couple (nom, commune) revient
-    # souvent (un employeur poste plusieurs offres au même endroit).
-    # Le cache évite des dizaines d'appels API identiques.
+    # Call deduplication: the same (name, commune) pair often recurs (an
+    # employer posts several offers at the same location). The cache avoids
+    # dozens of identical API calls.
     cache = {}
-    resultats = []
-    compteurs = {}
+    results = []
+    counters = {}
 
-    for i, (offre_id, nom, commune, code_naf) in enumerate(offres, start=1):
-        cle = (nom, commune, code_naf)
+    for i, (offer_id, name, commune_code, naf_code) in enumerate(offers, start=1):
+        key = (name, commune_code, naf_code)
 
-        if cle in cache:
-            statut, candidat = cache[cle]
+        if key in cache:
+            status, candidate = cache[key]
         else:
             try:
-                statut, candidat = resoudre_entreprise(nom, commune, code_naf)
+                status, candidate = resolve_company(name, commune_code, naf_code)
             except requests.exceptions.HTTPError as e:
-                statut, candidat = "erreur_technique", None
-                print(f"  erreur HTTP pour '{nom}' : {e}")
-            cache[cle] = (statut, candidat)
+                status, candidate = "technical_error", None
+                print(f"  HTTP error for '{name}': {e}")
+            cache[key] = (status, candidate)
 
-        compteurs[statut] = compteurs.get(statut, 0) + 1
+        counters[status] = counters.get(status, 0) + 1
 
-        resultats.append({
-            "offre_id": offre_id,
-            "entreprise_nom_offre": nom,
-            "commune_offre": commune,
-            "code_naf_offre": code_naf,
-            "statut_matching": statut,
-            "entreprise": extraire_champs(candidat) if candidat else None,
+        results.append({
+            "job_offer_id": offer_id,
+            "employer_name_on_offer": name,
+            "offer_commune_code": commune_code,
+            "offer_naf_code": naf_code,
+            "match_status": status,
+            "company": extract_fields(candidate) if candidate else None,
         })
 
-        print(f"[{i}/{len(offres)}] {nom} -> {statut}")
+        print(f"[{i}/{len(offers)}] {name} -> {status}")
 
-    total_match = sum(n for s, n in compteurs.items() if s.startswith("match"))
-    taux = 100 * total_match / len(offres)
+    total_matches = sum(n for s, n in counters.items() if s.startswith("match"))
+    rate = 100 * total_matches / len(offers)
 
-    # Structure {metadata, resultats}, identique au dump d'ingestion
-    # France Travail : cohérence des sources brutes.
-    horodatage = datetime.now().strftime("%Y-%m-%d_%H%M")
-    chemin_sortie = f"{DOSSIER_SORTIE}/enrichissement_dinum_{horodatage}.json"
+    # {metadata, resultats} structure, identical to the France Travail
+    # ingestion dump: consistency across raw sources.
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H%M")
+    output_path = f"{OUTPUT_DIR}/enrich_dinum_{timestamp}.json"
 
-    sortie = {
+    output = {
         "metadata": {
-            "date_execution": datetime.now().isoformat(),
-            "source": "API Recherche d'entreprises (DINUM)",
-            "endpoint": URL_DINUM,
-            "population_cible": "fct_offre where categorie_employeur = 'EMPLOYEUR_DIRECT'",
-            "nb_offres": len(offres),
-            "nb_appels_uniques": len(cache),
-            "nb_matches": total_match,
-            "taux_matching_pct": round(taux, 1),
-            "repartition_statuts": compteurs,
+            "execution_date": datetime.now().isoformat(),
+            "source": "Company Search API (DINUM)",
+            "endpoint": DINUM_URL,
+            "target_population": "fct_job_offer where employer_category = 'DIRECT_EMPLOYER'",
+            "offer_count": len(offers),
+            "unique_call_count": len(cache),
+            "match_count": total_matches,
+            "matching_rate_pct": round(rate, 1),
+            "status_breakdown": counters,
         },
-        "resultats": resultats,
+        "resultats": results,
     }
 
-    with open(chemin_sortie, "w", encoding="utf-8") as f:
-        json.dump(sortie, f, ensure_ascii=False, indent=2)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(output, f, ensure_ascii=False, indent=2)
 
-# --- Audit qualité ---
-    # Deux signaux complémentaires, appris du faux positif Paris-Saclay :
-    #   1. mots de l'offre absents du candidat (match trop lâche)
-    #   2. mots du candidat absents de l'offre (candidat trop large :
+# --- Quality audit ---
+    # Two complementary signals, learned from the Paris-Saclay false
+    # positive:
+    #   1. offer words absent from the candidate (too loose a match)
+    #   2. candidate words absent from the offer (too broad a candidate:
     #      "ASSOCIATION DES ETUDIANTS ... DE L'UNIVERSITE PARIS-SACLAY"
-    #      contient tous les mots de "UNIVERSITE PARIS-SACLAY", mais en
-    #      ajoute huit, signe qu'on a attrapé une entité satellite)
-    print("\n--- Audit qualité ---")
+    #      contains every word of "UNIVERSITE PARIS-SACLAY", but adds eight
+    #      more, a sign a satellite entity was caught)
+    print("\n--- Quality audit ---")
 
-    familles = {}
+    families = {}
     suspects = []
 
-    for r in resultats:
-        if not r["entreprise"]:
+    for r in results:
+        if not r["company"]:
             continue
 
-        voie = r["statut_matching"]
-        if "consolide_groupe" in voie:
-            f = "consolidation groupe (arbitrage)"
-        elif "mots_inclus" in voie:
-            f = "inclusion de mots"
-        elif "prefixe" in voie:
-            f = "prefixe"
+        path = r["match_status"]
+        if "consolidated_group" in path:
+            family = "group consolidation (arbitration)"
+        elif "word_inclusion" in path:
+            family = "word inclusion"
+        elif "prefix" in path:
+            family = "prefix"
         else:
-            f = "nom exact (le plus sûr)"
-        familles[f] = familles.get(f, 0) + 1
+            family = "exact name (safest)"
+        families[family] = families.get(family, 0) + 1
 
-        mots_offre = set(normaliser_nom(r["entreprise_nom_offre"]).split())
-        if not mots_offre:
+        offer_words = set(normalize_name(r["employer_name_on_offer"]).split())
+        if not offer_words:
             continue
 
-        # On mesure l'écart contre la variante la PLUS PROCHE, pas contre la
-        # chaîne entière : DINUM empile toutes les enseignes dans nom_complet
-        # ("ADECCO FRANCE (ADECCO FRANCE, LHH RECRUITMENT SOLUTIONS, AKKODIS
-        # TALENT, QAPA)"), ce qui gonflait artificiellement le signal "en trop"
-        # sur des matchs parfaits. L'audit s'aligne ainsi sur la logique de
-        # matching, qui compare déjà variante par variante.
-        meilleur = None
-        for v in variantes_nom(r["entreprise"]["nom_complet"]):
-            mots_v = set(v.split())
-            if not mots_v:
+        # The gap is measured against the CLOSEST variant, not the whole
+        # string: DINUM stacks every trade name into nom_complet ("ADECCO
+        # FRANCE (ADECCO FRANCE, LHH RECRUITMENT SOLUTIONS, AKKODIS TALENT,
+        # QAPA)"), which artificially inflated the "extra words" signal on
+        # perfect matches. The audit thus aligns with the matching logic,
+        # which already compares variant by variant.
+        best = None
+        for v in name_variants(r["company"]["full_name"]):
+            variant_words = set(v.split())
+            if not variant_words:
                 continue
-            manquants = len(mots_offre - mots_v) / len(mots_offre)
-            en_trop = len(mots_v - mots_offre) / len(mots_v)
-            score = max(manquants, en_trop)
-            if meilleur is None or score < meilleur[0]:
-                meilleur = (score, manquants, en_trop)
+            missing = len(offer_words - variant_words) / len(offer_words)
+            extra = len(variant_words - offer_words) / len(variant_words)
+            score = max(missing, extra)
+            if best is None or score < best[0]:
+                best = (score, missing, extra)
 
-        if meilleur is None:
+        if best is None:
             continue
 
-        score, manquants, en_trop = meilleur
-        if manquants > 0.5 or en_trop > 0.6:
-            suspects.append((score, r, manquants, en_trop))
+        score, missing, extra = best
+        if missing > 0.5 or extra > 0.6:
+            suspects.append((score, r, missing, extra))
 
-    print("\nRépartition par niveau de confiance :")
-    for f, n in sorted(familles.items(), key=lambda x: -x[1]):
-        print(f"  {f} : {n} ({100 * n / total_match:.1f}% des matchs)")
+    print("\nBreakdown by confidence level:")
+    for family, n in sorted(families.items(), key=lambda x: -x[1]):
+        print(f"  {family}: {n} ({100 * n / total_matches:.1f}% of matches)")
 
-    print("\nMatchs à vérifier :")
-    for score, r, manq, trop in sorted(suspects, key=lambda x: -x[0])[:15]:
-        print(f"  [{manq:.0%} manquants, {trop:.0%} en trop] {r['entreprise_nom_offre']}")
-        print(f"      -> {r['entreprise']['nom_complet']}  ({r['statut_matching']})")
+    print("\nMatches to review:")
+    for score, r, missing, extra in sorted(suspects, key=lambda x: -x[0])[:15]:
+        print(f"  [{missing:.0%} missing, {extra:.0%} extra] {r['employer_name_on_offer']}")
+        print(f"      -> {r['company']['full_name']}  ({r['match_status']})")
 
-    print(f"\nTotal matchs à vérifier : {len(suspects)} / {total_match}")
+    print(f"\nTotal matches to review: {len(suspects)} / {total_matches}")
 
-    print("\n--- Répartition des statuts ---")
-    for statut, n in sorted(compteurs.items(), key=lambda x: -x[1]):
-        print(f"  {statut} : {n} ({100 * n / len(offres):.1f}%)")
+    print("\n--- Status breakdown ---")
+    for status, n in sorted(counters.items(), key=lambda x: -x[1]):
+        print(f"  {status}: {n} ({100 * n / len(offers):.1f}%)")
 
-    print(f"\nTAUX DE MATCHING : {total_match}/{len(offres)} ({taux:.1f}%)")
-    print(f"Appels API économisés par le cache : {len(offres) - len(cache)}")
-    print(f"\nDump écrit : {chemin_sortie}")
+    print(f"\nMATCHING RATE: {total_matches}/{len(offers)} ({rate:.1f}%)")
+    print(f"API calls saved by the cache: {len(offers) - len(cache)}")
+    print(f"\nDump written: {output_path}")
 
 
 if __name__ == "__main__":

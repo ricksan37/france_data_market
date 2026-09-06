@@ -1,0 +1,5 @@
+week_start_date,total_offer_count,anonymous_offer_count,intermediary_offer_count,reclassified_intermediary_offer_count,direct_employer_offer_count,median_annual_salary,top_technology,llm_extraction_available
+2026-08-10,918,314,197,,407,42000.0,not available (CI),False
+2026-08-17,960,335,205,,420,42000.0,not available (CI),False
+2026-08-24,958,348,185,,425,44000.0,not available (CI),False
+2026-08-31,961,343,201,,417,42000.0,not available (CI),False

@@ -8,5 +8,5 @@ docs/
 .venv/
 logs/
 .ipynb_checkpoints/
-dashboard/rapport.html
+dashboard/report.html
 CLAUDE.md
