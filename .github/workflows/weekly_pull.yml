@@ -5,7 +5,7 @@
 # The GitHub Actions runner is disposable: nothing persists from one run to
 # the next except what's explicitly committed. data/warehouse.duckdb and the
 # JSON dumps therefore stay ephemeral (gitignored, as locally); only
-# data/snapshots/marche_hebdo.csv is committed on every run, a lightweight
+# data/snapshots/weekly_market.csv is committed on every run, a lightweight
 # file that accumulates the history fct_weekly_market needs without ever
 # recommitting the 552+ raw offers (accepted decision, not reopened).
 
@@ -87,6 +87,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/snapshots/marche_hebdo.csv data/snapshots/presence_offres.csv
+          git add data/snapshots/weekly_market.csv data/snapshots/offer_presence.csv
           git diff --staged --quiet && echo "Nothing to commit" || git commit -m "Automated weekly snapshot"
           git push
