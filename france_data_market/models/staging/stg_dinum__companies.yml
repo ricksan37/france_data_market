@@ -33,6 +33,13 @@ models:
           when a known acronym was recognized but couldn't be resolved to a
           specific company, or `unresolved` (`_no_geo` variant) when no
           match was attempted successfully at all.
+        # Every status resolve_company() can emit, not only those observed:
+        # the July list held the 20 seen on 213 offers, and the first
+        # 929-offer run produced 5 legitimate ones it lacked. Derivation:
+        # 6 base outcomes x 4 levels ("", _dept, _national,
+        # _national_no_geo), plus 3 _then_naf outcomes on the two levels
+        # where NAF tie-breaking is allowed (commune, _dept), plus 3
+        # no-match statuses = 33.
         data_tests:
           - accepted_values:
               arguments:
@@ -41,19 +48,32 @@ models:
                   - match_name_dept
                   - match_name_national
                   - match_name_national_no_geo
+                  - match_name_then_naf
+                  - match_name_then_naf_dept
                   - match_name_prefix
                   - match_name_prefix_dept
                   - match_name_prefix_national
-                  - match_name_then_naf
+                  - match_name_prefix_national_no_geo
+                  - match_name_prefix_then_naf
+                  - match_name_prefix_then_naf_dept
+                  - match_word_inclusion
+                  - match_word_inclusion_dept
+                  - match_word_inclusion_national
+                  - match_word_inclusion_national_no_geo
+                  - match_word_inclusion_then_naf
+                  - match_word_inclusion_then_naf_dept
                   - match_consolidated_group
                   - match_consolidated_group_dept
                   - match_consolidated_group_national
                   - match_consolidated_group_national_no_geo
-                  - match_consolidated_group_inclusion
                   - match_consolidated_group_prefix
                   - match_consolidated_group_prefix_dept
-                  - match_word_inclusion_national
-                  - match_word_inclusion_then_naf
+                  - match_consolidated_group_prefix_national
+                  - match_consolidated_group_prefix_national_no_geo
+                  - match_consolidated_group_inclusion
+                  - match_consolidated_group_inclusion_dept
+                  - match_consolidated_group_inclusion_national
+                  - match_consolidated_group_inclusion_national_no_geo
                   - non_matchable_known_acronym
                   - unresolved
                   - unresolved_no_geo

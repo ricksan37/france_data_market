@@ -131,6 +131,7 @@ Each run produces a distinct timestamped file: nothing is overwritten.
 
 - **France Travail API cap**: 1,150 results per search. Beyond that, the search would need narrowing (e.g. by date).
 - **Live pagination index**: causes measured, uncorrected duplicates within a category (deduplication happens downstream in `stg_raw__ft_job_offers`, by design).
+- **Company enrichment is manual, not weekly** (known debt): `enrich_dinum.py` isn't part of `weekly_pull.yml`, and the `dinum` source points to one explicitly named dump, the most recent. Each run re-enriches every `DIRECT_EMPLOYER` offer in `fct_job_offer`, so the latest file is a superset of the earlier ones and no glob is needed — but a new run means updating the filename in `_sources.yml` by hand. Offers collected after the last run have no SIREN until then.
 - **"EY" left unmatched** (28 offers): a commercial acronym absent from the SIRENE registry, with 5+ legal entities and no reliable tiebreaker.
 - **Group consolidation on homonyms** (27 cases): subsidiaries sharing a name with their parent are attached to the largest entity — a deliberate choice aligned with the analytical goal, flagged with a distinct status.
 - **LLM extraction under-extracts the `domains` field** on consulting listings, in exchange for much higher reliability on `technologies`, the field prioritized for this project.

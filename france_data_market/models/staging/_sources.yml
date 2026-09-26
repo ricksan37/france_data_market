@@ -7,9 +7,14 @@ sources:
     tables:
       - name: ft_job_offers
 
+  # One explicitly named file, the most recent, not a glob: each
+  # enrich_dinum.py run re-enriches every DIRECT_EMPLOYER offer in
+  # fct_job_offer, so the latest dump supersedes the earlier ones, and a glob
+  # would duplicate job_offer_id. Cost: the name must be updated by hand after
+  # each run (enrichment isn't in the weekly workflow; known debt, README).
   - name: dinum
     meta:
-      external_location: "read_json_auto('../data/raw/enrich_dinum_2026-08-01_1727.json')"
+      external_location: "read_json_auto('../data/raw/enrich_dinum_2026-09-26_2208.json')"
     tables:
       - name: companies
 

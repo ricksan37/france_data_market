@@ -69,6 +69,14 @@ OUTPUT_DIR = "data/raw"
 # DINUM rate limit: 7 req/s per IP, HTTP 429 beyond that
 DELAY_BETWEEN_CALLS = 1 / 7
 
+# Transient failures: the 2026-09-26 run (929 offers, 4x the July population)
+# died at offer 61 on a "connection reset by peer" during the TLS handshake,
+# with nothing written -- the API answered normally seconds later. Retried
+# with growing waits (2, 4, 8, 16 s) on network errors, 429 and 5xx; any
+# other HTTP error, or a failure persisting past the last try, still raises.
+MAX_ATTEMPTS = 5
+REQUEST_TIMEOUT_SECONDS = 30
+
 STOP_WORDS = {"DE", "LA", "LE", "DU", "DES", "ET", "D", "L"}
 
 # Legal forms appended to the legal name in SIRENE, almost never written by
@@ -198,8 +206,23 @@ def department_from_commune(commune_code):
 def search(name, geo_params):
     """A single API call with a given set of geographic parameters."""
     params = {"q": name, **geo_params}
-    resp = requests.get(DINUM_URL, params=params)
-    resp.raise_for_status()
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            resp = requests.get(DINUM_URL, params=params,
+                                timeout=REQUEST_TIMEOUT_SECONDS)
+            retryable = resp.status_code == 429 or resp.status_code >= 500
+            if not retryable or attempt == MAX_ATTEMPTS:
+                resp.raise_for_status()
+                break
+            reason = f"HTTP {resp.status_code}"
+        except (requests.exceptions.ConnectionError,
+                requests.exceptions.Timeout) as err:
+            if attempt == MAX_ATTEMPTS:
+                raise
+            reason = type(err).__name__
+        wait = 2 ** attempt
+        print(f"  {reason} for '{name}', retry {attempt}/{MAX_ATTEMPTS - 1} in {wait}s")
+        time.sleep(wait)
     time.sleep(DELAY_BETWEEN_CALLS)
     return resp.json().get("results", [])
 
@@ -357,7 +380,7 @@ def resolve_company(name, commune_code, naf_code):
     national_candidates = search(name, {})
     national_active = [r for r in national_candidates
                        if r.get("siege", {}).get("etat_administratif") == "A"]
-    national_suffix = "_national_sans_geo" if not commune_code else "_national"
+    national_suffix = "_national_no_geo" if not commune_code else "_national"
     # allow_naf=False at the national level: see _break_tie's docstring
     levels.append((national_suffix, national_active, False))
 
