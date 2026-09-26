@@ -41,6 +41,13 @@ classified as (
                 or s.employer_name_raw = 'Randstad professional'
                 or s.employer_name_raw = 'ADECCO'
                 or s.employer_name_raw = 'CRIT INTERIM'
+                -- Freelance mission platform, not an employer: "notre client
+                -- recherche...", daily rate (TJM) caps, "- Freelance" titles.
+                -- Measured 2026-09-26: 222 offers (all created from
+                -- 2026-09-11), 206 of them mentioning freelance/mission/TJM/
+                -- portage. Left as DIRECT_EMPLOYER, it made up 24% of that
+                -- category and 222 of the 275 unresolved DINUM matches.
+                or s.employer_name_raw = 'Collective.work'
                 then 'INTERMEDIARY'
             when s.employer_name_raw is not null then 'DIRECT_EMPLOYER'
             -- Reclassification: offers with no usable NAF/name (hence
