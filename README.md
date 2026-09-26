@@ -1,16 +1,22 @@
 # France Data Market
 
-A dbt + DuckDB pipeline that ingests French data-job postings from the **France Travail** API, transforms them, and enriches them with company data (SIRENE registry) and a local-LLM skill extraction.
+A dbt + DuckDB pipeline that collects French data-job postings from the France Travail API every week, enriches them with company data (SIRENE) and a local-LLM skill extraction, and publishes a market report.
 
-I built this while retraining into **Analytics Engineering**, for a few concrete reasons:
+**Every non-trivial choice below is backed by a measurement on real data, not a guess.**
 
-- Figure out which skills are actually worth focusing on for the switch.
-- See what the market really asks for, rather than guess.
-- Test myself on a real, messy dataset instead of a tutorial one.
-- Put dbt's **Certified Developer Path** into practice on something real.
-- Get hands-on with tools I hadn't used before — **DuckDB** and **Ollama**.
+**[→ Open the live report](https://ricksan37.github.io/france_data_market/)** (regenerated every Monday by GitHub Actions)
 
-Every non-trivial choice below (scope, deduplication, matching, LLM model) is backed by a measurement on real data, not a guess — and documented as such.
+[![Report preview](dashboard/report_preview.png)](https://ricksan37.github.io/france_data_market/)
+
+## What the market says
+
+Measured on 981 distinct listings (1,132 offers) collected between July and September 2026, data analyst, data scientist and data engineer roles (ROME codes M1405 and M1811).
+
+1. **Offers are short-lived.** Of the 552 offers live in mid-July, 463 (84%) had disappeared from France Travail six weeks later. A corpus that only accumulates overstates the market; the report counts actual presence week by week.
+2. **Salaries are rarely shown, and almost never when the employer is hidden.** 31% of listings disclose a salary: 55% for recruitment intermediaries, 38% for direct employers, 9% when the employer's name is masked (about 3 offers in 10).
+3. **Where a salary is shown, it sits in a narrow band.** The median annual salary is €42.5k–45k whatever the employer type. Required experience is what moves it: €45k when experience is required (n=208) vs €38.5k when beginners are accepted (n=50).
+
+Built as a hands-on Analytics Engineering project on a real, messy public dataset. The rest of this page is for technical readers.
 
 ---
 
@@ -29,6 +35,10 @@ Every non-trivial choice below (scope, deduplication, matching, LLM model) is ba
 **Counting offers vs. counting listings.** Deduplication catches the API's own index duplicates, not marketing campaigns: the same position posted in several cities gets one identifier per city. Measured: 152 offers out of 960 (15.8%) share their exact text with another. Once campaigns are neutralized, two rankings flip: Python (262) overtakes SQL (235), and Data Analysis overtakes Data Governance. Nothing is deleted — a `cluster_size` / `is_canonical_listing` pair exposes the choice, and every report metric states which one it counts.
 
 ---
+
+## Repository layout
+
+The eight Python scripts at the root are the pipeline's standalone stages (ingestion, enrichment, extraction, snapshots). The 23 scripts in `exploration/` are diagnostic scripts, kept for traceability: each one produced a measurement cited on this page (matching rates, deduplication, geographic key, salary plausibility), so every figure can be re-derived.
 
 ## Architecture
 
@@ -58,7 +68,9 @@ dbt makes no HTTP or LLM calls. Every enrichment follows the same pattern: stand
 
 ## Continuous integration
 
-Two workflows, two jobs. `.github/workflows/ci.yml` runs on every push and pull request: compiles the Python scripts, rebuilds the full dbt graph with its tests, generates the report. **No secret required** — the reference dumps and snapshot CSVs are versioned, so the pipeline rebuilds from the repo's own data alone. `.github/workflows/weekly_pull.yml` runs every Monday: ingestion, presence history, build, snapshot, report, commit.
+Two workflows, two jobs. `.github/workflows/ci.yml` runs on every push and pull request: compiles the Python scripts, rebuilds the full dbt graph with its tests, generates the report. **No secret required** — the reference dumps and snapshot CSVs are versioned, so the pipeline rebuilds from the repo's own data alone. `.github/workflows/weekly_pull.yml` runs every Monday: ingestion, presence history, build, snapshot, report, commit, then deploys the report to GitHub Pages. The runner only has the versioned July dump plus that week's pull (earlier weekly dumps aren't kept), so the live report's corpus figures differ from the ones measured locally above; the weekly presence history (`offer_presence.csv`) is complete on both.
+
+The versioned reference dump is stripped of the `contact` and `agence` fields (recruiter names, emails, phone numbers): France Travail's reuse licence excludes contact data, and `full_pull.py` now drops them at ingestion.
 
 The weekly run can't execute the LLM extraction (Ollama doesn't run on a GitHub runner), so an env var (`CI_WITHOUT_EXTRACTION`) makes the extraction source degrade to zero rows with the same schema. The affected metrics are marked explicitly unavailable rather than silently zero.
 
