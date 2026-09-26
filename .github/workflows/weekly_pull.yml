@@ -83,6 +83,17 @@ jobs:
           path: dashboard/report.html
           retention-days: 90
 
+      - name: Stage the report for GitHub Pages
+        # Pages serves a directory; the report becomes its index.html so the
+        # public URL opens straight on it. Still never committed to git.
+        run: |
+          mkdir -p _site
+          cp dashboard/report.html _site/index.html
+      - name: Upload the Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
       - name: Commit and push the snapshot
         run: |
           git config user.name "github-actions[bot]"
@@ -90,3 +101,21 @@ jobs:
           git add data/snapshots/weekly_market.csv data/snapshots/offer_presence.csv
           git diff --staged --quiet && echo "Nothing to commit" || git commit -m "Automated weekly snapshot"
           git push
+
+  # Publishes the report on GitHub Pages, so a recruiter gets a clickable
+  # link instead of having to clone the repo. Separate job: deploy-pages
+  # needs the github-pages environment and an OIDC token, which the
+  # ingestion job has no reason to hold.
+  deploy-pages:
+    needs: pull-and-snapshot
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
