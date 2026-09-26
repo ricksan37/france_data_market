@@ -55,8 +55,8 @@ def get_all_offers(params: dict, token: str | None = None) -> tuple[list[dict], 
     Fetches ALL offers for a given search, paginating past the 150-result
     per-call limit.
 
-    params: query parameter dict (motsCles, codeROME, etc.). The Range
-            header is handled internally, no need to pass it.
+    params: query parameter dict (motsCles, codeROME, etc.). The `range`
+            parameter is handled internally, no need to pass it.
     token: an already-obtained token (avoids re-authenticating per category
            during a multi-category pull). If None, requests a new one.
 
@@ -90,12 +90,15 @@ def get_all_offers(params: dict, token: str | None = None) -> tuple[list[dict], 
         if total is not None:
             end = min(end, total - 1)
 
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Range": f"offres={start}-{end}",  # pagination via the Range header
-        }
+        headers = {"Authorization": f"Bearer {token}"}
+        # Pagination goes through the `range` QUERY parameter. An HTTP
+        # `Range: offres=...` header is silently ignored by this API: it
+        # answers 206 with the first page (offres 0-149/total) whatever the
+        # header asks for. Measured on 2026-09-26; see check_completeness in
+        # full_pull.py for the guard that now catches it.
+        page_params = {**params, "range": f"{start}-{end}"}
 
-        response = requests.get(SEARCH_URL, headers=headers, params=params)
+        response = requests.get(SEARCH_URL, headers=headers, params=page_params)
         response.raise_for_status()
 
         data = response.json()
