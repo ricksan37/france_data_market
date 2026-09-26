@@ -36,6 +36,14 @@ CATEGORIES = [
 
 OUTPUT_DIR = Path("data/raw")  # "raw" layer: raw drop, never transformed here
 
+# Dropped at ingestion, never written to disk. They carry recruiter names,
+# emails and phone numbers (254 of the 1,094 offers in the July dump), and
+# France Travail's reuse licence explicitly excludes contact data from
+# republication. The pipeline never reads them, and a dump can end up
+# versioned in a public repo (the July reference dump is), so the only safe
+# place to remove them is here, before the file exists.
+PERSONAL_DATA_FIELDS = ("contact", "agence")
+
 
 def full_pull() -> None:
     """
@@ -48,7 +56,8 @@ def full_pull() -> None:
 
     No transformation is applied to the offers (no filtering, no
     deduplication): that's the downstream dbt layer's job. Here we only
-    measure and drop the file.
+    measure and drop the file. One exception: the "contact" and "agence"
+    fields are dropped before writing (see PERSONAL_DATA_FIELDS).
     """
     token, _ = get_access_token()  # a single token reused for the 6 requests
 
@@ -73,6 +82,9 @@ def full_pull() -> None:
             "internal_duplicates": internal_duplicate_count,
         })
 
+        for offer in offers:
+            for field in PERSONAL_DATA_FIELDS:
+                offer.pop(field, None)
         all_offers.extend(offers)
 
     # Global count of unique ids (informational): cross-category duplicates
