@@ -38,8 +38,11 @@ MONO_FONT = "'JetBrains Mono', 'SF Mono', 'Consolas', monospace"
 _template = go.layout.Template()
 
 _template.layout = go.Layout(
-    paper_bgcolor=SLATE,
-    plot_bgcolor=SLATE,
+    # Transparent rather than SLATE: the figure inherits its card's
+    # background, so a chart placed in the raised feature card doesn't
+    # draw a darker SLATE rectangle inside it.
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)",
     font=dict(family=MONO_FONT, color=PAPER_MUTED, size=11),
     # NO TITLE IN THE FIGURE. Measured 2026-08-31: Plotly sizes its title box
     # on the height of capital letters, and accents that rise above it get

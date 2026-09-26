@@ -47,13 +47,10 @@
             margin: 0 auto;
         }
 
+        /* Header sits directly on the grid background, no card: the page
+       title is the one element that must not look like a data tile. */
         header {
-            background: var(--slate);
-            border: 1px solid var(--hairline);
-            border-radius: 16px;
-            padding: 28px 32px;
             margin-bottom: 40px;
-            box-sizing: border-box;
         }
 
         /* Mono tracking aligned on the identity token --track-mono (0.14em):
@@ -64,22 +61,22 @@
             letter-spacing: 0.14em;
             text-transform: uppercase;
             color: var(--blue);
-            margin-bottom: 10px;
+            margin-bottom: 14px;
         }
 
         /* H1 aligned on the identity's step (40px), not an intermediate value. */
         h1 {
             font-family: var(--font-title);
-            font-size: 28px;
+            font-size: 40px;
             line-height: 1.1;
             letter-spacing: -0.02em;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
             color: var(--paper);
         }
 
         .subtitle {
             color: var(--paper-muted);
-            font-size: 14px;
+            font-size: 16px;
             margin-bottom: 6px;
         }
 
@@ -104,7 +101,7 @@
 
         h2 {
             font-family: var(--font-title);
-            font-size: 20px;
+            font-size: 24px;
             letter-spacing: -0.02em;
             margin-bottom: 18px;
             color: var(--paper);
@@ -127,7 +124,7 @@
             line-height: 1.7;
             color: var(--paper-muted);
             margin-top: -8px;
-            margin-bottom: 10px;
+            margin-bottom: 14px;
         }
 
         /* Card title. Moved out of the Plotly figure, which clipped the accents
@@ -140,7 +137,7 @@
             letter-spacing: 0.14em;
             text-transform: uppercase;
             color: var(--paper);
-            margin-bottom: 10px;
+            margin-bottom: 14px;
         }
 
         /* align-items: start: without it, a stat card stretches to the height of
