@@ -64,8 +64,9 @@ def get_all_offers(params: dict, token: str | None = None) -> tuple[list[dict], 
     search would need to be narrowed down (e.g. by date), out of scope for
     now.
 
-    Returns (offers, api_total). offers: possible duplicates included (live search
-    index, see the earlier observation): deduplication is
+    Returns (offers, api_total). offers: raw, not deduplicated; with correct
+    pagination a category comes back with no internal duplicate (measured
+    2026-09-26), and cross-category duplicates are
     stg_raw__ft_job_offers's job on the dbt side, not this function's.
     api_total: the total announced by the last Content-Range read (None if the
     API never sent one). Returned rather than only used for the loop, so the
@@ -115,13 +116,16 @@ def get_all_offers(params: dict, token: str | None = None) -> tuple[list[dict], 
 
         start += page_size
 
-    # Quality measurement: actual volume per occupation. Informational only:
-    # nothing is filtered here, dedup happens downstream via dbt.
+    # Internal duplicates were long read as live-index noise. They weren't:
+    # they were the same first page returned over and over by a pagination
+    # the API ignored (449 of the 542 July duplicates). Correctly paginated,
+    # a category has none, so any that show up now are worth a look. Still
+    # informational: completeness is enforced by check_completeness.
     ids = [offer["id"] for offer in all_results]
     duplicate_count = len(ids) - len(set(ids))
     if duplicate_count > 0:
         print(f"⚠ {duplicate_count} duplicate(s) detected out of {len(ids)} offers "
-              f"(pagination on a live index, expected; dedup downstream via dbt)")
+              f"(unexpected with correct pagination; dedup downstream via dbt)")
 
     return all_results, total
 

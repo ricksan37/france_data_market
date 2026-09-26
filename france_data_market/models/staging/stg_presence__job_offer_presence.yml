@@ -6,7 +6,10 @@ models:
       Staging model for the presence history snapshot (Phase 5, output of
       offer_presence.py). Grain is 1 row = 1 (job offer, week it was seen
       in a pull) pair. No business logic here: explicit typing, nothing
-      else.
+      else. HISTORY BREAK on 2026-09-26: weeks up to and including
+      2026-09-21 come from truncated pulls (pagination bug, M1811 and "data
+      analyst" capped at 150 offers); presence before and after the break
+      is not comparable. See fct_weekly_market_flow.
     columns:
       - name: week_start_date
         description: Monday of the ISO week this pull was run.

@@ -128,8 +128,10 @@ def full_pull(dry_run: bool = False) -> None:
         # The token is passed explicitly to avoid re-authenticating per category.
         offers, api_total = get_all_offers({param_type: value}, token=token)
 
-        # "Internal" duplicates = same id returned twice WITHIN a category
-        # (an effect of paginating over a live index). Measured, not fixed.
+        # "Internal" duplicates = same id returned twice WITHIN a category.
+        # Before 2026-09-26 they came from a pagination the API ignored
+        # (same page served repeatedly), not from a live index. Correctly
+        # paginated, the expected value is 0; kept in the metadata as a check.
         ids = [o["id"] for o in offers]
         internal_duplicate_count = len(ids) - len(set(ids))
 

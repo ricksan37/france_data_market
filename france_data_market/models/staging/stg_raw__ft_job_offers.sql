@@ -1,7 +1,12 @@
 -- Staging model for the France Travail raw job offers dump.
 -- Deduplication: qualify row_number() over (partition by job_offer_id order
--- by job_offer_last_updated_date desc) = 1 -- 1094 raw rows -> 552 unique
--- offers (measured, see spec). No other business logic here.
+-- by job_offer_last_updated_date desc) = 1. It absorbs two things: the same
+-- offer matched by several categories (a ROME code and a keyword), and the
+-- same offer seen in several dumps. On the July dump, 1094 raw rows -> 552
+-- unique offers, but 449 of those 542 duplicates were a pagination bug (the
+-- API ignored the Range header and served the first page repeatedly, fixed
+-- 2026-09-26), not live-index noise; only 93 were cross-category overlap.
+-- No other business logic here.
 
 with source as (
 

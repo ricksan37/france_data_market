@@ -6,6 +6,13 @@ models:
       Weekly market flow: active, appeared and disappeared offers, measured
       on actual presence in each France Travail pull rather than on
       fct_job_offer's accumulated corpus. Grain: one recorded week.
+      HISTORY BREAK on 2026-09-26: every week up to and including
+      2026-09-21 was recorded from truncated pulls (M1811 and "data
+      analyst" capped at their first 150 offers by a pagination bug). An
+      offer that slid out of that first page counted as an exit while still
+      online. Flow figures before and after the break are not comparable;
+      the first comparable week is the first pull made with the fixed
+      pagination.
     columns:
       - name: week_start_date
         description: Monday of the week of the dump used for the measurement.
