@@ -50,7 +50,7 @@ def search_offers(params: dict) -> dict:
     return data
 
 
-def get_all_offers(params: dict, token: str | None = None) -> list[dict]:
+def get_all_offers(params: dict, token: str | None = None) -> tuple[list[dict], int | None]:
     """
     Fetches ALL offers for a given search, paginating past the 150-result
     per-call limit.
@@ -64,9 +64,14 @@ def get_all_offers(params: dict, token: str | None = None) -> list[dict]:
     search would need to be narrowed down (e.g. by date), out of scope for
     now.
 
-    Returns the list of offers. Possible duplicates included (live search
+    Returns (offers, api_total). offers: possible duplicates included (live search
     index, see the earlier observation): deduplication is
     stg_raw__ft_job_offers's job on the dbt side, not this function's.
+    api_total: the total announced by the last Content-Range read (None if the
+    API never sent one). Returned rather than only used for the loop, so the
+    caller can check that what was fetched matches what exists: without it, a
+    pagination that silently returns the same page is indistinguishable from
+    a small market.
     """
     if token is None:
         token, _ = get_access_token()
@@ -115,13 +120,13 @@ def get_all_offers(params: dict, token: str | None = None) -> list[dict]:
         print(f"⚠ {duplicate_count} duplicate(s) detected out of {len(ids)} offers "
               f"(pagination on a live index, expected; dedup downstream via dbt)")
 
-    return all_results
+    return all_results, total
 
 
 if __name__ == "__main__":
     # Example of the two filtering modes chosen for the data scope
-    ds_offers = get_all_offers({"codeROME": "M1405"})
+    ds_offers, _ = get_all_offers({"codeROME": "M1405"})
     print(f"\nTotal M1405 (Data scientist): {len(ds_offers)}")
 
-    da_offers = get_all_offers({"motsCles": "data analyst"})
+    da_offers, _ = get_all_offers({"motsCles": "data analyst"})
     print(f"Total 'data analyst' (motsCles): {len(da_offers)}")
