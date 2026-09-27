@@ -10,11 +10,12 @@ A dbt + DuckDB pipeline that collects French data-job postings from the France T
 
 ## What the market says
 
-Measured on 981 distinct listings (1,132 offers) collected between July and September 2026, data analyst, data scientist and data engineer roles (ROME codes M1405 and M1811).
+Measured on the first complete pull, on 26 September 2026: 822 distinct listings (854 offers) returned by six France Travail searches — ROME codes M1405 (data scientist) and M1811 (data engineer), plus the keywords "data analyst", "data architect", "décisionnel" and "business intelligence". Earlier pulls were truncated (see finding 1), so they aren't used here.
 
 1. ~~**Offers are short-lived.** Of the 552 offers live in mid-July, 463 (84%) had disappeared from France Travail six weeks later.~~ **Invalid, withdrawn on 2026-09-26.** Every pull up to then was truncated by a pagination bug: the API ignored the range the code sent and served the same first page, so the two largest categories (ROME M1811 and "data analyst", 427 and 221 offers on 2026-09-26) were capped at their first 150 offers. An offer that slid out of that first page counted as "disappeared" while still online, so the 84% mixes real exits with truncation and can't be separated after the fact. It will be re-measured on pulls made with the fixed pagination.
-2. **Salaries are rarely shown, and almost never when the employer is hidden.** 31% of listings disclose a salary: 55% for recruitment intermediaries, 38% for direct employers, 9% when the employer's name is masked (about 3 offers in 10).
-3. **Where a salary is shown, it sits in a narrow band.** The median annual salary is €42.5k–45k whatever the employer type. Required experience is what moves it: €45k when experience is required (n=208) vs €38.5k when beginners are accepted (n=50).
+2. **Salaries are rarely shown, and almost never when the employer is hidden.** 27.6% of listings disclose a salary: 44% for recruitment agencies and IT consultancies, 40.5% for direct employers, 10% when the employer's name is masked (about 1 listing in 4).
+3. **Where a salary is shown, it sits in a narrow band.** The median annual salary (lower bound) is €45k for direct employers (n=89) and masked employers (n=19), €42k for agencies and consultancies (n=58), €50k for Collective.work missions (n=33). Required experience is what moves it: €45k when experience is required (n=156) vs €40k when beginners are accepted (n=43).
+4. **A quarter of the market is freelance missions from a single platform.** Collective.work, which relays missions for unnamed clients, posted 216 of the 822 listings (26%), all created from 11 September. They rarely fill the salary field (16%) and state a daily rate in the text instead (74 listings), so they're counted as intermediaries and left out of the agency figure above.
 
 Built as a hands-on Analytics Engineering project on a real, messy public dataset. The rest of this page is for technical readers.
 
@@ -22,7 +23,7 @@ Built as a hands-on Analytics Engineering project on a real, messy public datase
 
 ## A few decisions that show the approach
 
-**Company matching went from 19.2% to 80.3%.** The first attempt (name + postal code) matched one offer in five. Eleven diagnostic rounds later — each triggered by a measurement on real data — the rate reached 80.3% on the 213 eligible offers. Two rules that *worked* were later removed because they produced false positives: the rate gained more in reliability than in volume.
+**Company matching went from 19.2% to 80.3%.** The first attempt (name + postal code) matched one offer in five. Eleven diagnostic rounds later — each triggered by a measurement on real data — the rate reached 80.3% on the 213 eligible offers. Two rules that *worked* were later removed because they produced false positives: the rate gained more in reliability than in volume. Re-run in September on the full corpus with the same rules: 86.8% (614 of 707), and unchanged on the July offers (171 of 213).
 
 **The geographic key wasn't what I assumed, and I only half-fixed it.** The original plan used postal code to join company data. Measured: postal code covers 166 of 213 target offers, INSEE commune code covers 198 — a strict superset. I fixed the company enrichment, but not the geography dimension, which stayed indexed on postal code alone. Paris, Lyon and Marseille are the three French communes with arrondissements: they have no single postal code, so the source returns their overall INSEE code instead, with an empty postal code. Measured: 95 offers affected, 77 of them in Paris — the report was showing 74 Parisian offers instead of 151. A unified key (`coalesce(postal_code, commune_code)`) took coverage from 79% to 89%. The lesson wasn't "fix this one join," it was "this source's geographic key isn't the postal code" — and I'd only applied it locally the first time.
 
@@ -135,8 +136,8 @@ Each run produces a distinct timestamped file: nothing is overwritten.
 - **"EY" left unmatched** (28 offers): a commercial acronym absent from the SIRENE registry, with 5+ legal entities and no reliable tiebreaker.
 - **Group consolidation on homonyms** (27 cases): subsidiaries sharing a name with their parent are attached to the largest entity — a deliberate choice aligned with the analytical goal, flagged with a distinct status.
 - **LLM extraction under-extracts the `domains` field** on consulting listings, in exchange for much higher reliability on `technologies`, the field prioritized for this project.
-- **Salary plausibility bounds, annual only**: too few hourly/monthly offers (4 and 34) to set a defensible threshold.
-- **Salary shown on under a third of offers** (32.6%): any salary analysis covers a non-random subset, since disclosing a salary is itself an employer behavior.
+- **Salary plausibility bounds, annual only**: too few hourly/monthly listings (5 and 21 in the 26 September pull) to set a defensible threshold.
+- **Salary shown on under a third of listings** (27.6% in the 26 September pull): any salary analysis covers a non-random subset, since disclosing a salary is itself an employer behavior.
 - **Residual near-duplicate listings**: detection relies on strict text identity; listings differing by a few words are counted separately.
 - **ROME tag isn't fully reliable**: a small number of offers (~4%) carry an unrelated ROME label, entered via keyword match. Left visible rather than filtered by an under-supported rule.
 - **Accumulated corpus vs. live market are two different things** — `fct_job_offer`/`fct_weekly_market` count everything ever collected, `fct_weekly_market_flow` is the only one measuring the live market.
