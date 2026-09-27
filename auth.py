@@ -1,58 +1,76 @@
 # auth.py
 """
-Authentification OAuth2 à l'API France Travail (flux client_credentials).
+OAuth2 authentication for the France Travail API (client_credentials flow).
 
-L'API Offres d'emploi v2 exige un jeton Bearer sur chaque appel. Ce module
-isole l'obtention du jeton pour que le reste du code (search, pull) n'ait
-jamais à manipuler client_id / client_secret directement.
+The Job Offers API v2 requires a Bearer token on every call. This module
+isolates token retrieval so that the rest of the code (search, pull) never
+has to handle client_id / client_secret directly.
 
-Les identifiants sont lus depuis un fichier .env (jamais commité, cf.
-.gitignore) via python-dotenv ; aucun secret n'est écrit en dur dans le code.
+Credentials are read from environment variables. Locally, python-dotenv
+loads them from the .env file (never committed, see .gitignore). In CI,
+GitHub Actions injects them from the repository secrets; load_dotenv() then
+finds no .env file and overrides nothing. No secret is hardcoded.
 """
 
 import os
 import requests
 from dotenv import load_dotenv
 
-load_dotenv()  # charge FT_CLIENT_ID / FT_CLIENT_SECRET depuis le .env local
+load_dotenv()  # loads FT_CLIENT_ID / FT_CLIENT_SECRET from the local .env
 
-# Endpoint OAuth2 de l'espace partenaire. Le realm est passé en query string
-# et fait partie intégrante de l'URL attendue par France Travail.
+# OAuth2 endpoint of the partner space. The realm is passed as a query string
+# and is part of the URL expected by France Travail.
 TOKEN_URL = "https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=/partenaire"
+# Without a timeout, requests waits forever if the server never answers.
+REQUEST_TIMEOUT_SECONDS = 30
 
 
 def get_access_token() -> tuple[str, int]:
     """
-    Obtient un jeton d'accès via le flux OAuth2 client_credentials.
+    Obtains an access token via the OAuth2 client_credentials flow.
 
-    Retourne un tuple (access_token, expires_in) :
-    - access_token : str, à placer dans le header Authorization: Bearer ...
-    - expires_in   : int, durée de validité en secondes (permet à l'appelant
-                     de décider s'il doit ré-authentifier avant un pull long).
+    Returns a tuple (access_token, expires_in):
+    - access_token: str, to be placed in the header Authorization: Bearer ...
+    - expires_in:   int, validity period in seconds (1499 s measured,
+                    about 25 minutes).
 
-    Lève requests.HTTPError si l'authentification échoue (identifiants
-    invalides, scope refusé, etc.) via raise_for_status().
+    Known limitation: no caller renews the token. A full pull makes at most
+    48 calls (6 categories x 8 pages), well within the token lifetime.
+    To revisit if the number of calls per pull grows.
+
+    Raises:
+    - KeyError if FT_CLIENT_ID or FT_CLIENT_SECRET is missing from the
+      environment (fails here with the variable name, rather than with a
+      misleading HTTP error further down);
+    - requests.HTTPError if the server refuses authentication, with the
+      server's error message included;
+    - requests.Timeout if the server does not respond within
+      REQUEST_TIMEOUT_SECONDS.
     """
-    client_id = os.getenv("FT_CLIENT_ID")
-    client_secret = os.getenv("FT_CLIENT_SECRET")
+    client_id = os.environ["FT_CLIENT_ID"]
+    client_secret = os.environ["FT_CLIENT_SECRET"]
 
     payload = {
         "grant_type": "client_credentials",
         "client_id": client_id,
         "client_secret": client_secret,
-        # Scopes requis : accès à l'API v2 + au détail des offres (o2dsoffre).
+        # Required scopes: API v2 access + offer details (o2dsoffre).
         "scope": "api_offresdemploiv2 o2dsoffre",
     }
 
-    response = requests.post(TOKEN_URL, data=payload)
-    response.raise_for_status()  # stoppe net si l'auth échoue (fail fast)
+    response = requests.post(TOKEN_URL, data=payload, timeout=REQUEST_TIMEOUT_SECONDS)
+    # Not raise_for_status(): it drops the server's error message, the only clue to diagnose.
+    if not response.ok:
+        raise requests.HTTPError(
+            f"Authentication refused ({response.status_code}): {response.text}", response=response
+        )
 
     token_data = response.json()
     return token_data["access_token"], token_data["expires_in"]
 
 
 if __name__ == "__main__":
-    # Test manuel : vérifie que les identifiants du .env sont valides.
+    # Manual test: checks that the credentials in .env are valid.
     token, expires_in = get_access_token()
-    print(f"Token obtenu : {token[:20]}...")  # tronqué : on ne logue jamais le jeton entier
-    print(f"Valide {expires_in} secondes")
+    print(f"Token obtained: {token[:20]}...")  # truncated: never log the full token
+    print(f"Valid for {expires_in} seconds")
