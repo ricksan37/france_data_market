@@ -16,8 +16,8 @@ never modified" principle. Only the count per category is kept, in the
 metadata.
 """
 
+import argparse
 import json
-import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -91,6 +91,11 @@ def check_completeness(category_stats: list[dict]) -> None:
                 verdict = "ok"
         print(f"  {stat['value']:<24} api_total={str(total):>5}  "
               f"unique_fetched={unique:>5}  {verdict}")
+        # Warning only, never a failure: 0 offers is a legitimate API answer
+        # (204 + "*/0"), but a category dropping to 0 more likely means the
+        # API or the keyword stopped matching than that the market vanished.
+        if total == 0:
+            print(f"  ⚠ {stat['value']}: 0 offers announced, check the search criteria")
         if verdict != "ok":
             failures.append(f"{stat['value']}: {verdict}")
 
@@ -183,4 +188,15 @@ def full_pull(dry_run: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    full_pull(dry_run="--dry-run" in sys.argv)
+    # argparse rather than `"--dry-run" in sys.argv`: an unknown or mistyped
+    # argument (--dryrun) must stop the script, not be silently ignored while
+    # a real dump gets written and picked up by dbt.
+    # allow_abbrev=False: "--dry" must not be accepted as "--dry-run".
+    parser = argparse.ArgumentParser(description="Full pull of the data scope.", allow_abbrev=False)
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="collect and run the completeness check, but write no dump",
+    )
+    args = parser.parse_args()
+    full_pull(dry_run=args.dry_run)
