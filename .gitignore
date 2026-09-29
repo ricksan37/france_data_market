@@ -9,4 +9,5 @@ docs/
 logs/
 .ipynb_checkpoints/
 dashboard/report.html
-CLAUDE.md
+CLAUDE.local.md
+.claude/settings.local.json
