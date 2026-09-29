@@ -17,6 +17,8 @@ from auth import get_access_token
 import requests
 
 SEARCH_URL = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
+# Without a timeout, requests waits forever if the server never answers.
+REQUEST_TIMEOUT_SECONDS = 30
 
 
 def search_offers(params: dict) -> dict:
@@ -35,7 +37,7 @@ def search_offers(params: dict) -> dict:
     token, _ = get_access_token()
     headers = {"Authorization": f"Bearer {token}"}
 
-    response = requests.get(SEARCH_URL, headers=headers, params=params)
+    response = requests.get(SEARCH_URL, headers=headers, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
 
     print(f"HTTP status: {response.status_code}")
 
@@ -99,10 +101,29 @@ def get_all_offers(params: dict, token: str | None = None) -> tuple[list[dict], 
         # full_pull.py for the guard that now catches it.
         page_params = {**params, "range": f"{start}-{end}"}
 
-        response = requests.get(SEARCH_URL, headers=headers, params=page_params)
-        response.raise_for_status()
+        response = requests.get(
+            SEARCH_URL, headers=headers, params=page_params, timeout=REQUEST_TIMEOUT_SECONDS
+        )
+
+        # Not raise_for_status(): it drops the server's explanation. On a 401/403
+        # the body is empty and the only clue is the WWW-Authenticate header
+        # (e.g. error="insufficient_scope"), measured on 2026-09-29.
+        if not response.ok:
+            raise requests.HTTPError(
+                f"Search refused ({response.status_code}): body={response.text!r}, "
+                f"WWW-Authenticate={response.headers.get('WWW-Authenticate')!r}",
+                response=response,
+            )
+
+        # No match: the API answers 204 with an empty body and
+        # Content-Range "*/0" (measured 2026-09-29). response.json() would
+        # crash on the empty body, so stop here with a total of 0.
+        if response.status_code == 204:
+            total = 0
+            break
 
         data = response.json()
+        
         all_results.extend(data.get("resultats", []))
 
         # Read the total after each call: "offres 0-149/1234" -> 1234.

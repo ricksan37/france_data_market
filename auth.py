@@ -54,7 +54,9 @@ def get_access_token() -> tuple[str, int]:
         "grant_type": "client_credentials",
         "client_id": client_id,
         "client_secret": client_secret,
-        # Required scopes: API v2 access + offer details (o2dsoffre).
+        # Both scopes are required, including for search: a token without
+        # o2dsoffre gets a 403 insufficient_scope on /offres/search
+        # (measured 2026-09-28).
         "scope": "api_offresdemploiv2 o2dsoffre",
     }
 
