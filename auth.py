@@ -34,9 +34,9 @@ def get_access_token() -> tuple[str, int]:
     - expires_in:   int, validity period in seconds (1499 s measured,
                     about 25 minutes).
 
-    Known limitation: no caller renews the token. A full pull makes at most
-    48 calls (6 categories x 8 pages), well within the token lifetime.
-    To revisit if the number of calls per pull grows.
+    Known limitation: no caller renews the token. A full pull makes about
+    12 calls (8 ROME codes, 1 to 3 pages each; 64 in the worst case), well
+    within the token lifetime.
 
     Raises:
     - KeyError if FT_CLIENT_ID or FT_CLIENT_SECRET is missing from the

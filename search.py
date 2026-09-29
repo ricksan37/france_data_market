@@ -2,11 +2,9 @@
 """
 Search functions for the France Travail Job Offers API v2.
 
-The search parameter is a generic dict rather than a fixed keyword, to
-support the hybrid strategy chosen for the "data" scope:
-- full codeROME for dedicated occupations (e.g. M1405 Data scientist, M1811 Data engineer)
-- targeted motsCles for titles scattered across catch-all occupations
-  (e.g. "data analyst", "data architect", "decisional")
+The search parameter is a generic dict ({"codeROME": ...} or
+{"motsCles": ...}), passed as-is to the API. The collection scope itself
+lives in full_pull.py.
 
 Two functions:
 - search_offers    : a single call (useful for exploration / debugging)
@@ -96,9 +94,9 @@ def get_all_offers(params: dict, token: str | None = None) -> tuple[list[dict], 
         headers = {"Authorization": f"Bearer {token}"}
         # Pagination goes through the `range` QUERY parameter. An HTTP
         # `Range: offres=...` header is silently ignored by this API: it
-        # answers 206 with the first page (offres 0-149/total) whatever the
-        # header asks for. Measured on 2026-09-26; see check_completeness in
-        # full_pull.py for the guard that now catches it.
+        # answers 206 with the first page whatever the header asks for.
+        # check_completeness in full_pull.py catches a pagination that stops
+        # advancing.
         page_params = {**params, "range": f"{start}-{end}"}
 
         response = requests.get(
@@ -137,11 +135,9 @@ def get_all_offers(params: dict, token: str | None = None) -> tuple[list[dict], 
 
         start += page_size
 
-    # Internal duplicates were long read as live-index noise. They weren't:
-    # they were the same first page returned over and over by a pagination
-    # the API ignored (449 of the 542 July duplicates). Correctly paginated,
-    # a category has none, so any that show up now are worth a look. Still
-    # informational: completeness is enforced by check_completeness.
+    # Correctly paginated, a category has no internal duplicate, so any that
+    # show up point to a page served twice. Informational only: completeness
+    # is enforced by check_completeness in full_pull.py.
     ids = [offer["id"] for offer in all_results]
     duplicate_count = len(ids) - len(set(ids))
     if duplicate_count > 0:

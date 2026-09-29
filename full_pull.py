@@ -2,18 +2,13 @@
 """
 Full pull of the data scope.
 
-Hybrid strategy chosen after exploring the ROME reference table:
-- full codeROME for occupations dedicated to data (M1405, M1811, validated
-  by direct inspection of the returned titles, see exploration/)
-- targeted motsCles for titles scattered across catch-all ROME occupations
-  (M1403, M1805, M1806, M1868 mix data with dozens of unrelated occupations)
+The scope is a list of ROME codes (CATEGORIES). ROME codes are declared by
+recruiters, so none is 100 % clean (the BI codes also catch business
+developers): collection aims at recall here, and each offer is qualified
+as data or not downstream in dbt, which handles precision.
 
-Known and accepted limit: offers surfaced via motsCles carry no trace, in
-the raw JSON, of the keyword that matched them (unlike codeROME offers,
-where romeCode is already a native field of the offer). Offers aren't
-modified to add this info after the fact: that would violate the "raw is
-never modified" principle. Only the count per category is kept, in the
-metadata.
+An offer carries a single romeCode, so categories never overlap and every
+offer records natively the code that brought it in.
 """
 
 import argparse
@@ -24,15 +19,21 @@ from pathlib import Path
 from auth import get_access_token
 from search import get_all_offers
 
-# Collection scope: one row = one category to query.
-# Tuple (readable name, API parameter type, parameter value).
+# Collection scope: one row = one ROME code to query.
+# Tuple (readable name, API parameter type, parameter value). The parameter
+# type stays explicit so a keyword search (motsCles) remains possible.
+# Left out on purpose: M1889 (AI / ML engineer, outside the data market as
+# defined here), M1894 (database administration, mostly IT ops and data
+# entry), M1414 (statistician, few offers, half of them lab technicians).
 CATEGORIES = [
     ("Data scientist (M1405)", "codeROME", "M1405"),
     ("Data engineer (M1811)", "codeROME", "M1811"),
-    ("Data analyst", "motsCles", "data analyst"),
-    ("Data architect", "motsCles", "data architect"),
-    ("Decisional", "motsCles", "décisionnel"),
-    ("Business Intelligence", "motsCles", "business intelligence"),
+    ("Data analyst (M1419)", "codeROME", "M1419"),
+    ("Data architect / database architect (M1868)", "codeROME", "M1868"),
+    ("BI analyst (M1851)", "codeROME", "M1851"),
+    ("BI developer (M1824)", "codeROME", "M1824"),
+    ("BI consultant (M1872)", "codeROME", "M1872"),
+    ("Chief Data Officer (M1423)", "codeROME", "M1423"),
 ]
 
 OUTPUT_DIR = Path("data/raw")  # "raw" layer: raw drop, never transformed here
@@ -45,16 +46,12 @@ OUTPUT_DIR = Path("data/raw")  # "raw" layer: raw drop, never transformed here
 # place to remove them is here, before the file exists.
 PERSONAL_DATA_FIELDS = ("contact", "agence")
 
-# Completeness guard. Until 2026-09-26 the pagination sent its range in a
-# header the API ignores: every page returned the same first 150 offers, and
-# M1811 / "data analyst" were silently capped at 150 unique offers for two
-# months (427 and 221 existed). Nothing failed, because nothing compared what
-# was fetched with what the API said exists. The Content-Range total is that
-# reference. Tolerance: the index is live, so the total drifts during a pull
-# (the July M1811 pull came back with 151 uniques, one more than the page).
-# A few offers of slack absorbs that drift; a capped page (150 vs 427) is
-# nowhere near it.
-COMPLETENESS_MIN_SLACK = 5         # offers
+# Completeness guard: the Content-Range total is the reference for what
+# exists. Without it, a pagination that keeps serving the same page would
+# look like a small market. Tolerance: the index is live, so the total
+# drifts during a pull; a few offers of slack absorb that drift, while a
+# capped page (150 fetched out of several hundred) stays far beyond it.
+COMPLETENESS_MIN_SLACK = 5          # offers
 COMPLETENESS_RELATIVE_SLACK = 0.02  # share of the announced total
 # Pagination limit of the API (range 0-1149). Past it, offers are unreachable
 # whatever the code does: the search must be narrowed, so fail rather than
@@ -134,9 +131,8 @@ def full_pull(dry_run: bool = False) -> None:
         offers, api_total = get_all_offers({param_type: value}, token=token)
 
         # "Internal" duplicates = same id returned twice WITHIN a category.
-        # Before 2026-09-26 they came from a pagination the API ignored
-        # (same page served repeatedly), not from a live index. Correctly
-        # paginated, the expected value is 0; kept in the metadata as a check.
+        # With a correct pagination the expected value is 0: a non-zero count
+        # points to a page served twice. Kept in the metadata as a check.
         ids = [o["id"] for o in offers]
         internal_duplicate_count = len(ids) - len(set(ids))
 
@@ -155,8 +151,9 @@ def full_pull(dry_run: bool = False) -> None:
                 offer.pop(field, None)
         all_offers.extend(offers)
 
-    # Global count of unique ids (informational): cross-category duplicates
-    # are expected, since the same offer can match several keywords/ROME codes.
+    # Global count of unique ids (informational). An offer has a single
+    # romeCode, so this should equal len(all_offers); a gap would mean the
+    # live index moved an offer between codes during the pull.
     global_ids = [o["id"] for o in all_offers]
 
     check_completeness(category_stats)
