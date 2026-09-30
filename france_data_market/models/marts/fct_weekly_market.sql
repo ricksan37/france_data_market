@@ -1,3 +1,5 @@
+{{ config(materialized='table') }}
+
 -- Weekly fact: state of the offer corpus, week by week.
 -- Grain: 1 row = 1 ISO week (Monday). Uniqueness is guaranteed at the
 -- source by weekly_snapshot.py's upsert, and verified here by a test rather

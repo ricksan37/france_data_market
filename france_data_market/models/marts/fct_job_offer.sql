@@ -1,3 +1,5 @@
+{{ config(materialized='table') }}
+
 -- fct_job_offer: fine-grained fact table.
 -- Grain: one row per job offer. Key: job_offer_id.
 -- Assembles stg_raw__ft_job_offers (raw facts) with the int_ layer's

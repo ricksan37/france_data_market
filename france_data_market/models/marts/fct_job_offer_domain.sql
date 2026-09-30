@@ -1,3 +1,5 @@
+{{ config(materialized='table') }}
+
 -- Fine-grained fact table: 1 row = 1 (job offer, domain) pair.
 -- A model distinct from fct_job_offer_technology rather than a single table
 -- with a skill_type column: an explicit decision. Cost assumed: a question

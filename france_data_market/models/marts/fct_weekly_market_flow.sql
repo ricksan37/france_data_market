@@ -1,3 +1,5 @@
+{{ config(materialized='table') }}
+
 -- Weekly market flow: what appears, what disappears.
 -- Grain: 1 row = 1 actually recorded week.
 --

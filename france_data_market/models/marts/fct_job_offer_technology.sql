@@ -1,3 +1,5 @@
+{{ config(materialized='table') }}
+
 -- Fine-grained fact table: 1 row = 1 (job offer, technology) pair.
 -- This grain is what lets you count how many offers ask for Python: a
 -- simple group by technology, impossible on a LIST column.

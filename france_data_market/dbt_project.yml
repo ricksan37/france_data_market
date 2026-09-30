@@ -1,6 +1,7 @@
 name: 'france_data_market'
 version: '1.0.0'
 config-version: 2
+require-dbt-version: [">=1.11.0", "<1.12.0"]
 
 profile: 'france_data_market'
 
@@ -19,6 +20,8 @@ clean-targets:
 models:
   france_data_market:
     staging:
+      +materialized: view
+    intermediate:
       +materialized: view
     marts:
       +materialized: table
