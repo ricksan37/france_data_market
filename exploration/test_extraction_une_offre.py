@@ -19,7 +19,7 @@ import time
 import duckdb
 from ollama import chat
 
-sys.path.insert(0, "../exploration")
+sys.path.insert(0, "..")
 from schema_extraction import ExtractionOffre
 
 MODELE = "mistral-nemo"

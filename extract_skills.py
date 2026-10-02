@@ -1,48 +1,51 @@
 """
-Skill extraction from job offer text.
+Skill extraction from job offer text, with a local LLM.
 
-Replicates the ingestion pattern established in Phase 1 and Phase 3: Python
-script -> timestamped JSON dump in data/raw/ -> dbt source -> stg_ model. dbt
-makes no LLM calls, just as it makes no HTTP calls.
+Same pattern as the API enrichments: Python script -> timestamped JSON dump
+in data/raw/ -> dbt source -> stg_ model. dbt makes no LLM calls, just as it
+makes no HTTP calls. Runs locally only (Ollama), never in CI.
 
-MODEL CHOSEN: mistral-nemo (12B), after a measured comparison on a 20-offer
-sample against mistral 7B and qwen3 8B. Decisive criterion: only Nemo
-correctly distinguishes a named product (Azure, Databricks) from a technical
-concept (RAG, CI/CD, Data Lake): an irreducible defect via prompting on both
-7-8B models, tested across three successive phrasings.
+MODEL: mistral-nemo (12B), chosen on a 20-offer sample against mistral 7B
+and qwen3 8B: only Nemo told a named product (Azure, Databricks) from a
+technical concept (RAG, CI/CD, Data Lake), a defect the 7-8B models kept
+across three prompt phrasings. Its residual list errors are corrected
+downstream by int_job_offer_skills_placed.
 
 KNOWN AND ACCEPTED LIMIT: Nemo under-extracts the 'domaines' field on
-consulting listings. Measured: 4 concepts found out of ~8 present in the
-text (offer 0388930). Not fixed: a further prompt iteration produced a
-marginal gain on 'domaines' at the cost of a hallucination on
-annees_experience_min. The gain/risk ratio flips: 'technologies' is the
-project's priority field and it's reliable.
+consulting listings (4 concepts found out of ~8 present in offer 0388930).
+A further prompt iteration gained little on 'domaines' and introduced a
+hallucination on annees_experience_min; 'technologies', the priority
+field, is reliable.
 
-Usage: from the repo ROOT -> python3 extract_skills.py
-Incremental resume: only offers absent from previous dumps are processed.
-Measured duration: 34.5 s/offer (317 min for 552 offers).
+The prompt stays in French: it is a measured configuration (model choice +
+exact wording), and translating it could shift the extraction without a
+new measurement.
 
-The extraction prompt below stays in French: it's a measured, validated
-configuration (model choice + exact wording, three iterations tested), not
-just code -- translating it could shift the LLM's actual extraction
-behavior without a new measurement.
+Usage: from the repo ROOT -> python3 extract_skills.py (no argument).
+Incremental: only offers absent from every previous dump are processed.
+Measured duration: 34.5 s/offer (552 offers, July run).
 """
 
+import argparse
 import json
-import sys
 import time
 from datetime import datetime
 from pathlib import Path
 
 import duckdb
-from ollama import chat
+from ollama import Client
 
-sys.path.insert(0, "exploration")
 from schema_extraction import ExtractionOffre
 
 MODEL = "mistral-nemo"
 DB_PATH = "data/warehouse.duckdb"
 OUTPUT_DIR = Path("data/raw")
+
+# About 9 times the measured average per offer: long enough for a slow
+# offer, short enough that a hung Ollama server becomes a failed row instead
+# of blocking the run forever.
+LLM_TIMEOUT_SECONDS = 300
+OLLAMA = Client(timeout=LLM_TIMEOUT_SECONDS)
 
 PROMPT = """Tu extrais des informations factuelles d'une offre d'emploi française.
 
@@ -141,10 +144,12 @@ Texte de l'offre :
 def load_already_extracted_ids() -> set[str]:
     """Union of job_offer_id across every previous extraction dump.
 
-    Reads a pattern rather than a frozen filename: that coupling is exactly
-    what would have made the 552 July offers rebuild endlessly on the `raw`
-    source side (Phase 5 bug). One more dump should enrich the resume,
-    never break it.
+    Reads a pattern rather than a frozen filename, so one more dump
+    (including a partial checkpoint) enriches the resume instead of being
+    ignored.
+
+    Returns:
+        The set of job_offer_id already extracted, possibly empty.
     """
     ids: set[str] = set()
     for path in sorted(OUTPUT_DIR.glob("extract_skills_*.json")):
@@ -166,6 +171,9 @@ def write_dump(path: Path, results: list, failures: list, duration: float) -> No
     4h run shouldn't cost 4 hours. The partial file is read back on the next
     launch by load_already_extracted_ids() -- checkpoint and resume are the
     same mechanism, written once.
+
+    Returns:
+        None.
     """
     dump = {
         "metadata": {
@@ -189,8 +197,12 @@ def load_offers() -> list[tuple[str, str, str]]:
 
     fct_job_offer is materialized as a table: it can be queried from any
     directory. stg_raw__ft_job_offers is a view, whose relative path to the
-    source JSON only resolves from france_data_market/ (known pitfall).
+    source JSON only resolves from france_data_market/.
     read_only=True to avoid taking DuckDB's single-writer lock.
+
+    Returns:
+        (job_offer_id, job_title, job_description) of the offers of
+        fct_job_offer not extracted yet, ordered by job_offer_id.
     """
     con = duckdb.connect(DB_PATH, read_only=True)
     offers = con.execute("""
@@ -200,9 +212,8 @@ def load_offers() -> list[tuple[str, str, str]]:
     """).fetchall()
     con.close()
 
-    # Filtered IN PYTHON, never via a SQL `not in`: an IN() with several
-    # hundred values crashes the DuckDB optimizer (known bug,
-    # version-independent). A set comparison sidesteps the issue.
+    # Filtered in Python: the already-extracted ids come from JSON files,
+    # not from the warehouse, so a set lookup is the direct comparison.
     already_extracted = load_already_extracted_ids()
     new_offers = [offer for offer in offers if offer[0] not in already_extracted]
 
@@ -214,8 +225,18 @@ def load_offers() -> list[tuple[str, str, str]]:
 
 
 def extract_one_offer(description: str) -> ExtractionOffre:
-    """A single LLM call constrained by the schema. temperature=0: no creativity."""
-    response = chat(
+    """A single LLM call constrained by the schema. temperature=0: no creativity.
+
+    Returns:
+        The validated extraction.
+
+    Raises:
+        httpx.TimeoutException: Ollama did not answer within
+            LLM_TIMEOUT_SECONDS.
+        ollama.ResponseError, pydantic.ValidationError: Ollama refused the
+            request, or its answer doesn't match the schema.
+    """
+    response = OLLAMA.chat(
         model=MODEL,
         messages=[{"role": "user", "content": PROMPT.format(description=description)}],
         format=ExtractionOffre.model_json_schema(),
@@ -225,6 +246,13 @@ def extract_one_offer(description: str) -> ExtractionOffre:
 
 
 def main() -> None:
+    """Extracts every offer of fct_job_offer not extracted yet and writes one
+    timestamped dump, checkpointed every 25 offers. A failed extraction is
+    recorded with extraction_status "failed" rather than stopping the run.
+
+    Returns:
+        None.
+    """
     offers = load_offers()
     total = len(offers)
 
@@ -253,7 +281,7 @@ def main() -> None:
                 "extraction_status": "ok",
                 "error": None,  # always present: heterogeneous keys would
                                 # make read_json_auto infer an incomplete
-                                # schema (pitfall identified at gate 0)
+                                # schema
                 **extraction.model_dump(),
             })
         except Exception as err:
@@ -264,7 +292,7 @@ def main() -> None:
             failures.append(offer_id)
             results.append({
                 "job_offer_id": offer_id,
-                "extraction_status": "echec",
+                "extraction_status": "failed",
                 "error": str(err)[:200],
                 "technologies": [],
                 "domaines": [],
@@ -300,4 +328,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    # No option today, but argparse still rejects an unknown or mistyped
+    # argument instead of silently starting a multi-hour run.
+    parser = argparse.ArgumentParser(
+        description="Extract skills from job offers with a local LLM (Ollama).",
+        allow_abbrev=False,
+    )
+    parser.parse_args()
     main()

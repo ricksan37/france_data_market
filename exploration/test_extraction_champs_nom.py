@@ -16,7 +16,7 @@ import sys
 import duckdb
 from ollama import chat
 
-sys.path.insert(0, "../exploration")
+sys.path.insert(0, "..")
 from schema_extraction import ExtractionOffre
 from test_extraction_une_offre import PROMPT, MODELE, CHEMIN_DB
 
