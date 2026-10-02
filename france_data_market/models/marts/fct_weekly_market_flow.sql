@@ -3,28 +3,26 @@
 -- Weekly market flow: what appears, what disappears.
 -- Grain: 1 row = 1 actually recorded week.
 --
--- WHY THIS TABLE EXISTS ALONGSIDE fct_weekly_market. That one measures the
--- ACCUMULATED CORPUS, which never shrinks: an offer seen once stays in it
--- forever. Measured 2026-08-31: of the 552 July offers, 463 had disappeared
--- from France Travail, and fct_job_offer still counted them. The flow is
--- therefore measured on actual presence in each pull, never on the
--- cumulative total.
+-- WHY THIS TABLE EXISTS ALONGSIDE fct_weekly_market. That one counts each
+-- week's pull; it can't say which offers appeared or left. The flow is
+-- measured at the offer's grain, on the presence of each offer in each pull
+-- (offer_presence.csv, built from the raw dumps).
 --
--- READ THE RATES WITH weeks_since_previous. The first two recorded weeks
--- are six weeks apart, not one: an exit rate of 83.9% there covers a
--- six-week period. Exposing the gap rather than normalizing it away by
--- default leaves the choice to the analysis, and makes it impossible to
--- misread this figure as a weekly pace by mistake.
+-- READ THE RATES WITH weeks_since_previous. Recorded weeks are not always
+-- consecutive (the first two are six weeks apart): an exit rate then covers
+-- the whole gap. Exposing the gap rather than normalizing it away leaves
+-- the choice to the analysis and prevents reading it as a weekly pace.
+--
+-- READ THE CHANGES WITH is_series_break. On the first week of a new method
+-- or scope (seeds/series_breaks.csv), exits and new offers measure the
+-- change of pipeline, not the market.
 --
 -- REAPPEARANCES. new_offer_count counts offers never seen before
--- (min(week_start_date) = t). An offer present in July, absent in August,
--- then reposted is therefore neither new nor a survivor: it enters the
--- active count without appearing in the reconciliation. The defect wasn't
--- observable over two weeks, where any offer absent from the first is
--- necessarily new; it surfaced at the third data point, in CI, and
--- assert_flow_conservation caught it. reappearance_count closes the
--- reconciliation without distorting new_offer_count, which keeps its market
--- meaning: a genuinely new offer.
+-- (min(week_start_date) = t). An offer present, then absent, then reposted
+-- is neither new nor a survivor: without reappearance_count it would enter
+-- the active count without appearing in the reconciliation that
+-- assert_flow_conservation checks. A separate term keeps new_offer_count's
+-- market meaning: a genuinely new offer.
 --
 -- exit_count, reappearance_count and exit_rate_pct are NULL on the first
 -- week: no earlier week to compare against. An absence of comparison isn't
@@ -84,9 +82,10 @@ new_offers as (
 
 ),
 
--- Exits: present the previous recorded week, absent this one. Anti-join via
--- left join + is null rather than NOT IN: a NOT IN with several hundred
--- values crashes the DuckDB optimizer (known bug, version-independent).
+-- Exits: present the previous recorded week, absent this one. An explicit
+-- anti-join (left join + is null): it reads as "no matching row", and it
+-- avoids NOT IN's trap, where a single NULL in the subquery makes every
+-- comparison unknown and returns no row.
 exits as (
 
     select
@@ -122,6 +121,12 @@ reappearances as (
       and fs.first_seen_week < o.week_start_date
     group by o.week_start_date
 
+),
+
+series_breaks as (
+
+    select * from {{ ref('series_breaks') }}
+
 )
 
 select
@@ -155,10 +160,13 @@ select
     case when o.previous_week_start_date is null then null
          else round(100.0 * coalesce(e.exit_count, 0)
                     / nullif(lag(a.active_offer_count) over (order by o.week_start_date), 0), 1)
-    end as exit_rate_pct
+    end as exit_rate_pct,
+
+    b.week_start_date is not null as is_series_break
 
 from ordered as o
 inner join active_offers as a on a.week_start_date = o.week_start_date
 left join new_offers as n on n.week_start_date = o.week_start_date
 left join exits as e on e.week_start_date = o.week_start_date
 left join reappearances as r on r.week_start_date = o.week_start_date
+left join series_breaks as b on b.week_start_date = o.week_start_date

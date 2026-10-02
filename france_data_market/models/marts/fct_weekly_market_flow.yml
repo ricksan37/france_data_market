@@ -4,15 +4,13 @@ models:
   - name: fct_weekly_market_flow
     description: >
       Weekly market flow: active, appeared and disappeared offers, measured
-      on actual presence in each France Travail pull rather than on
-      fct_job_offer's accumulated corpus. Grain: one recorded week.
-      HISTORY BREAK on 2026-09-26: every week up to and including
-      2026-09-21 was recorded from truncated pulls (M1811 and "data
-      analyst" capped at their first 150 offers by a pagination bug). An
-      offer that slid out of that first page counted as an exit while still
-      online. Flow figures before and after the break are not comparable;
-      the first comparable week is the first pull made with the fixed
-      pagination.
+      at the offer's grain on the presence of each offer in each France
+      Travail pull (offer_presence.csv). Grain: one recorded week. Check
+      is_series_break before reading a week's exits or new offers: on the
+      first week of a new method or scope (seeds/series_breaks.csv), they
+      measure the change of pipeline. In particular, every week up to
+      2026-09-21 was recorded from truncated pulls, where an offer that slid
+      out of the first page counted as an exit while still online.
     columns:
       - name: week_start_date
         description: Monday of the week of the dump used for the measurement.
@@ -47,3 +45,10 @@ models:
           exit_count as a percentage of the PREVIOUS week's
           active_offer_count -- an exit is measured against the population
           that could exit. NULL on the first week.
+      - name: is_series_break
+        description: >
+          True on the first week measured with a new method or scope
+          (listed with its reason in seeds/series_breaks.csv): that week's
+          exits and new offers reflect the pipeline, not the market.
+        data_tests:
+          - not_null

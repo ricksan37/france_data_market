@@ -1,0 +1,3 @@
+week_start_date,reason
+2026-09-28,"First untruncated pull: pagination fixed on 2026-09-26, earlier pulls capped M1811 and the ""data analyst"" keyword at their first 150 offers."
+2026-10-05,"First pull on the eight-ROME-code scope (keywords dropped on 2026-09-29), and first total_offer_count measured on the latest dump only (earlier points also counted the versioned 2026-07-17 dump)."

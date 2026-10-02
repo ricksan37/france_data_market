@@ -3,27 +3,73 @@ version: 2
 models:
   - name: fct_weekly_market
     description: >
-      Weekly state of the offer corpus. Grain: one row per ISO week,
-      identified by its Monday. Measures the accumulated corpus size, NOT
-      the number of offers active on the market at that date (see the
-      model's header comment).
+      Weekly state of the market. Grain: one row per ISO week, identified by
+      its Monday. Each row is computed by weekly_snapshot.py on fct_job_offer
+      right after that week's pull, so it describes that pull. Check
+      is_series_break before reading a change between two weeks.
     columns:
       - name: week_start_date
         description: Monday of the ISO week. Grain key.
         data_tests:
           - unique
           - not_null
+
       - name: total_offer_count
-        description: Offers in fct_job_offer at run time, accumulated corpus.
+        description: >
+          Offers in fct_job_offer when the snapshot ran, i.e. in that week's
+          pull. Points before 2026-10-05 also counted the versioned
+          2026-07-17 dump (see is_series_break).
         data_tests:
           - not_null
+
+      - name: anonymous_offer_count
+        description: Offers classified ANONYMOUS (see int_employers_classified).
+
+      - name: intermediary_offer_count
+        description: Offers classified INTERMEDIARY.
+
       - name: reclassified_intermediary_offer_count
         description: >
           Offers reclassified from ANONYMOUS to INTERMEDIARY via
           end_client_masked. NULL (not 0) on weeks produced in CI, where the
           LLM extraction didn't run: the measurement is unavailable, not zero.
+
+      - name: direct_employer_offer_count
+        description: Offers classified DIRECT_EMPLOYER.
+
+      - name: median_annual_salary
+        description: >
+          Median of salary_min over the week's offers with an annual salary
+          period. Computed by weekly_snapshot.py without the
+          annual_salary_plausible filter.
+
+      - name: top_technology
+        description: >
+          Technology mentioned by the most offers that week; "not available
+          (CI)" on weeks produced in CI, where the LLM extraction didn't run.
+
       - name: llm_extraction_available
         description: >
           True if the run that produced this row had the LLM extraction
           fields available. Lets you tell an absent measurement apart from a
           zero measurement on any column that depends on it.
+
+      - name: offer_count_change
+        description: >
+          total_offer_count minus the previous recorded week's. NULL on the
+          first week. On a week where is_series_break is true, it measures
+          the change of method, not the market.
+
+      - name: anonymous_rate_pct
+        description: anonymous_offer_count as a percentage of total_offer_count.
+
+      - name: direct_employer_rate_pct
+        description: direct_employer_offer_count as a percentage of total_offer_count.
+
+      - name: is_series_break
+        description: >
+          True on the first week measured with a new method or scope
+          (listed with its reason in seeds/series_breaks.csv): the change
+          from the previous week reflects the pipeline, not the market.
+        data_tests:
+          - not_null

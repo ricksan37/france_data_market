@@ -1,6 +1,27 @@
 version: 2
 
 seeds:
+  - name: series_breaks
+    description: >
+      Weeks where a weekly series changes method or scope, maintained by
+      hand: the change from the previous week reflects the pipeline, not
+      the market. Joined by fct_weekly_market and fct_weekly_market_flow
+      into is_series_break. Add a row whenever the collection scope or a
+      counting method changes.
+    config:
+      column_types:
+        week_start_date: date
+    columns:
+      - name: week_start_date
+        description: Monday of the first week measured with the new method or scope.
+        data_tests:
+          - unique
+          - not_null
+      - name: reason
+        description: What changed that week, and why the change from the previous week isn't comparable.
+        data_tests:
+          - not_null
+
   - name: mapping_domaines
     description: >
       Normalization mapping for LLM-extracted domain values (see

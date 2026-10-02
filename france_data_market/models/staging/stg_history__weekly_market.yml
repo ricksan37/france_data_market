@@ -15,9 +15,9 @@ models:
 
       - name: total_offer_count
         description: >
-          Count of the accumulated corpus (deduplicated union of every dump
-          present on disk) as of this week -- not the offers active on
-          France Travail that week. See fct_weekly_market for the full caveat.
+          Offers in fct_job_offer when the snapshot ran, i.e. in that week's
+          pull. See fct_weekly_market.is_series_break for the weeks where
+          the method or scope changed.
 
       - name: anonymous_offer_count
         description: Count of offers classified ANONYMOUS (see int_employers_classified) as of this week.
