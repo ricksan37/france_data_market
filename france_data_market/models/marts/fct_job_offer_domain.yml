@@ -3,19 +3,32 @@ version: 2
 models:
   - name: fct_job_offer_domain
     description: >
-      Fine-grained fact table: 1 row = 1 (job offer, domain) pair. A model
-      distinct from fct_job_offer_technology rather than a single table with
-      a skill_type column (explicit decision). Known limit: the extraction
-      model (mistral-nemo) under-extracts this field on consulting
-      listings, so domain counts are floors, not exact measurements.
+      Fine-grained fact table: 1 row = 1 (job offer, raw domain) pair, for
+      the offers of fct_job_offer. A model distinct from
+      fct_job_offer_technology rather than a single table with a skill_type
+      column (explicit decision). Known limit: the extraction model
+      (mistral-nemo) under-extracts this field on consulting listings, so
+      domain counts are floors, not exact measurements. Empty in CI, where
+      the LLM extraction doesn't run.
+    data_tests:
+      - unique:
+          column_name: "job_offer_id || '|' || raw_domain"
     columns:
       - name: job_offer_id
         description: Identifier of the job offer this domain mention belongs to.
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('fct_job_offer')
+                field: job_offer_id
 
       - name: raw_domain
         description: >
           Domain exactly as extracted by the LLM, before normalization.
           Kept as the audit source alongside normalized_domain.
+        data_tests:
+          - not_null
 
       - name: normalized_domain
         description: >
@@ -23,4 +36,6 @@ models:
           for the 12 most frequent clusters (>60 cumulative occurrences
           each). Equals raw_domain unchanged when no match exists in the
           mapping -- the long tail (1-10 occurrences) is deliberately not
-          mapped.
+          mapped. Two variants of one domain in the same offer give two rows
+          with the same normalized_domain: count offers per domain with
+          count(distinct job_offer_id), not count(*).

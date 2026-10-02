@@ -9,8 +9,8 @@
 -- field on consulting listings. Domain counts are therefore floors, not
 -- exact measurements. See extract_skills.py.
 --
--- NORMALIZATION: across the 552 real offers, 1473 distinct domain values
--- for 3489 mentions: lexical fragmentation (case, language, acronyms:
+-- NORMALIZATION: 2310 distinct domain values for 5828 mentions on the
+-- 2026-09-26 dump: lexical fragmentation (case, language, acronyms:
 -- "BI"/"Business Intelligence", "Data Governance"/"gouvernance des
 -- données") that makes the raw field unusable for a group by. A mapping
 -- (seeds/mapping_domaines.csv) normalizes the 12 most frequent clusters
@@ -21,7 +21,13 @@
 -- unchanged when no match exists in the mapping.
 -- Restricted to offers in fct_job_offer: the extraction dumps cover every
 -- offer ever extracted, fct_job_offer only the latest pull.
-select
+--
+-- COUNTING. The grain is (offer, raw_domain), deduplicated with distinct
+-- because the LLM sometimes lists a value twice. Two variants of the same
+-- domain in one offer ("Gouvernance des données" and "Data Governance")
+-- stay two rows with the same normalized_domain (4 offers on the 2026-09-26
+-- dump): count offers per domain with count(distinct job_offer_id).
+select distinct
     d.job_offer_id,
     d.domain as raw_domain,
     coalesce(m.canonical_domain, d.domain) as normalized_domain
