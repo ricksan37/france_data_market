@@ -9,6 +9,9 @@ models:
     columns:
       - name: job_offer_id
         description: Unique identifier of the job offer. Grain of this model.
+        data_tests:
+          - unique
+          - not_null
 
       - name: salary_period
         description: >
@@ -42,10 +45,11 @@ models:
           reclassifying the borderline monthly/hourly values instead.
 
 unit_tests:
-  - name: test_parsing_salaire
+  - name: test_salary_parsing
     description: >
-      Verifies the salary regex parsing and the monthly -> annual
-      reclassification.
+      Verifies the salary regex parsing, the monthly -> annual
+      reclassification, the three-state annual plausibility flag, and that
+      an unparsable label yields NULL rather than an empty string.
     model: int_job_offer_salary
     given:
       - input: ref('stg_raw__ft_job_offers')
@@ -57,12 +61,16 @@ unit_tests:
           - {job_offer_id: "5", salary_label: "Mensuel de 50000.0 Euros à 59000 Euros sur 12 mois"}
           - {job_offer_id: "6", salary_label: "Mensuel de 1900.0 Euros à 2500.0 Euros"}
           - {job_offer_id: "7", salary_label: null}
+          - {job_offer_id: "8", salary_label: "Annuel de 7.5E+7 Euros à 7.5E+7 Euros"}
+          - {job_offer_id: "9", salary_label: "Annuel de 9500.0 Euros"}
     expect:
       rows:
-        - {job_offer_id: "1", salary_period: "annual", salary_min: 45000, salary_max: 60000, salary_mentioned: true}
-        - {job_offer_id: "2", salary_period: "annual", salary_min: 60000, salary_max: 60000, salary_mentioned: true}
-        - {job_offer_id: "3", salary_period: "annual", salary_min: 37000, salary_max: 37000, salary_mentioned: true}
-        - {job_offer_id: "4", salary_period: "hourly", salary_min: 25, salary_max: 25, salary_mentioned: true}
-        - {job_offer_id: "5", salary_period: "annual", salary_min: 50000, salary_max: 59000, salary_mentioned: true}
-        - {job_offer_id: "6", salary_period: "monthly", salary_min: 1900, salary_max: 2500, salary_mentioned: true}
-        - {job_offer_id: "7", salary_period: null, salary_min: null, salary_max: null, salary_mentioned: false}
+        - {job_offer_id: "1", raw_salary_period: "Annuel", salary_period: "annual", salary_min: 45000, salary_max: 60000, salary_mentioned: true, annual_salary_plausible: true}
+        - {job_offer_id: "2", raw_salary_period: "Annuel", salary_period: "annual", salary_min: 60000, salary_max: 60000, salary_mentioned: true, annual_salary_plausible: true}
+        - {job_offer_id: "3", raw_salary_period: "Annuel", salary_period: "annual", salary_min: 37000, salary_max: 37000, salary_mentioned: true, annual_salary_plausible: true}
+        - {job_offer_id: "4", raw_salary_period: "Horaire", salary_period: "hourly", salary_min: 25, salary_max: 25, salary_mentioned: true, annual_salary_plausible: null}
+        - {job_offer_id: "5", raw_salary_period: "Mensuel", salary_period: "annual", salary_min: 50000, salary_max: 59000, salary_mentioned: true, annual_salary_plausible: true}
+        - {job_offer_id: "6", raw_salary_period: "Mensuel", salary_period: "monthly", salary_min: 1900, salary_max: 2500, salary_mentioned: true, annual_salary_plausible: null}
+        - {job_offer_id: "7", raw_salary_period: null, salary_period: null, salary_min: null, salary_max: null, salary_mentioned: false, annual_salary_plausible: null}
+        - {job_offer_id: "8", raw_salary_period: null, salary_period: null, salary_min: null, salary_max: null, salary_mentioned: true, annual_salary_plausible: null}
+        - {job_offer_id: "9", raw_salary_period: "Annuel", salary_period: "annual", salary_min: 9500, salary_max: 9500, salary_mentioned: true, annual_salary_plausible: false}
