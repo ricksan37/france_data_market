@@ -1,10 +1,14 @@
 models:
   - name: stg_dinum__companies
     description: >
-      Staging model for the DINUM company-enrichment dump. No business logic
-      here — flattening, renaming and casting only. Grain is 1 row = 1
-      enriched job offer, not yet 1 row = 1 SIREN (a company can post several
-      offers).
+      Staging model for the DINUM company-enrichment dumps, restricted to the
+      most recent dump. No business logic here — flattening, renaming and
+      casting only. Grain is 1 row = 1 enriched job offer, not yet 1 row = 1
+      SIREN (a company can post several offers). The dump covers the
+      direct-employer offers of the corpus it was run on, which can include
+      offers no longer in fct_job_offer. Its quality is enforced by the
+      singular tests assert_match_status_valid and
+      assert_dinum_matching_rate_floor (both errors).
     columns:
       - name: job_offer_id
         description: Unique identifier of the job offer. Grain of this model.
@@ -32,53 +36,8 @@ models:
           group, word-inclusion, or NAF-assisted — `non_matchable_known_acronym`
           when a known acronym was recognized but couldn't be resolved to a
           specific company, or `unresolved` (`_no_geo` variant) when no
-          match was attempted successfully at all.
-        # Every status resolve_company() can emit, not only those observed:
-        # the July list held the 20 seen on 213 offers, and the first
-        # 929-offer run produced 5 legitimate ones it lacked. Derivation:
-        # 6 base outcomes x 4 levels ("", _dept, _national,
-        # _national_no_geo), plus 3 _then_naf outcomes on the two levels
-        # where NAF tie-breaking is allowed (commune, _dept), plus 3
-        # no-match statuses = 33.
-        data_tests:
-          - accepted_values:
-              arguments:
-                values:
-                  - match_name
-                  - match_name_dept
-                  - match_name_national
-                  - match_name_national_no_geo
-                  - match_name_then_naf
-                  - match_name_then_naf_dept
-                  - match_name_prefix
-                  - match_name_prefix_dept
-                  - match_name_prefix_national
-                  - match_name_prefix_national_no_geo
-                  - match_name_prefix_then_naf
-                  - match_name_prefix_then_naf_dept
-                  - match_word_inclusion
-                  - match_word_inclusion_dept
-                  - match_word_inclusion_national
-                  - match_word_inclusion_national_no_geo
-                  - match_word_inclusion_then_naf
-                  - match_word_inclusion_then_naf_dept
-                  - match_consolidated_group
-                  - match_consolidated_group_dept
-                  - match_consolidated_group_national
-                  - match_consolidated_group_national_no_geo
-                  - match_consolidated_group_prefix
-                  - match_consolidated_group_prefix_dept
-                  - match_consolidated_group_prefix_national
-                  - match_consolidated_group_prefix_national_no_geo
-                  - match_consolidated_group_inclusion
-                  - match_consolidated_group_inclusion_dept
-                  - match_consolidated_group_inclusion_national
-                  - match_consolidated_group_inclusion_national_no_geo
-                  - non_matchable_known_acronym
-                  - unresolved
-                  - unresolved_no_geo
-              config:
-                severity: warn
+          match was attempted successfully at all. Values checked by the
+          singular test assert_match_status_valid.
       - name: siren
         description: >
           SIREN of the company that posted the offer (French national

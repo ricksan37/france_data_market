@@ -48,7 +48,7 @@ CI: `.github/workflows/ci.yml` runs on every push (compile scripts, `dbt build` 
 - `dim_company.age_years` is a raw column; no `is_startup` flag (age / NAF / headcount do not discriminate).
 - Skill extraction model: mistral-nemo 12B. The extraction prompt and its JSON field names stay in French: per-field instructions are anchored to those names.
 - The `domains` field is under-extracted on consulting offers: accepted, documented limit.
-- The `dinum` dbt source reads every DINUM dump and `stg_dinum__companies` keeps the most recent one (each run supersedes the earlier ones). A run with any `technical_error` fails `dbt build` through the `match_status` test.
+- The `dinum` dbt source reads every DINUM dump and `stg_dinum__companies` keeps the most recent one (each run supersedes the earlier ones). A run with any `technical_error` fails `dbt build` (`assert_match_status_valid`), and so does a matching rate under 75 % (`assert_dinum_matching_rate_floor`).
 - `stg_raw__ft_job_offers` keeps only the most recent job offers dump: `fct_job_offer` describes the market as of the latest pull. Offer history lives in `offer_presence.csv`, built from the raw dumps directly.
 - Our own vocabulary (`employer_category`, `salary_period`, `geographic_zone`, `match_status`) is in English; values copied from source text stay in their source language.
 
@@ -69,4 +69,3 @@ Language-specific rules live in `.claude/rules/` (Python, dbt).
 - No dbt model yet qualifies an offer as data / not data.
 - README and `dim_rome.yml` still describe the former scope.
 - `fct_job_offer.sql` and five singular tests (`assert_contract_type_valid`, `assert_contract_type_valid_fct_job_offer`, `assert_employer_category_valid`, `assert_geographic_zone_valid`, `assert_week_is_a_monday`) still avoid multi-value `IN()` because of a DuckDB optimizer bug that does not reproduce on DuckDB 1.5.4 (tested on real views). `IN()` is fine; the README and `requirements.txt` (whose comments are still in French) still mention the bug.
-- `stg_dinum__companies.match_status` is tested with `accepted_values`, against `.claude/rules/dbt.md` (singular tests); the `dinum` settled decision relies on that test.
