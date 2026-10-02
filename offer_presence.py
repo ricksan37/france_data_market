@@ -18,7 +18,9 @@ ONE PULL PER WEEK: writing a dump REPLACES its week's offers. A rerun
 within the same week (after a failure, or a manual trigger) makes the
 latest pull win, the same rule as weekly_snapshot.py's upsert. Adding to
 the week instead would merge two pulls into a set of offers the API never
-returned. Replaying the same dump changes nothing.
+returned. Replaying the same dump changes nothing. A local run records a
+local pull: run weekly_snapshot.py on the same dump too (after dbt build)
+and commit both files together, so both histories describe the same pull.
 
 Usage: from the repo ROOT
     python3 offer_presence.py                 -> most recent dump

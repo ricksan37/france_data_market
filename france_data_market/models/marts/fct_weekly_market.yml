@@ -40,8 +40,9 @@ models:
       - name: median_annual_salary
         description: >
           Median of salary_min over the week's offers with an annual salary
-          period. Computed by weekly_snapshot.py without the
-          annual_salary_plausible filter.
+          period and a plausible amount (annual_salary_plausible). Rows
+          written before 2026-10-05 were computed without that filter; it
+          made no difference on the 2026-09-26 dump (45000 EUR either way).
 
       - name: top_technology
         description: >

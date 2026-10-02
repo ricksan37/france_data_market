@@ -1,22 +1,40 @@
 """
 weekly_snapshot.py
 
-Goal: compute a weekly market snapshot and append it to
-data/snapshots/weekly_market.csv, the only artifact persisted between two CI
-runs (warehouse.duckdb and the JSON dumps stay ephemeral/gitignored).
+Computes the weekly market snapshot on fct_job_offer and writes it to
+data/snapshots/weekly_market.csv, one row per week, read back by
+fct_weekly_market. Committed every week with offer_presence.csv: the two
+files are the only history persisted between runs (runner dumps and the
+warehouse are not kept), so a wrong row can't be rebuilt.
 
-In CI_WITHOUT_EXTRACTION mode (GitHub Actions workflow), fct_job_offer_technology
-is empty -- top_technology is then "not available (CI)" rather than crashing
-on an empty fetchone().
+WEEK KEY: the Monday of the week of the dump the warehouse describes (the
+most recent job_offers_*.json, the one stg_raw__ft_job_offers keeps), with
+offer_presence.py's own function: both histories file a pull under the same
+week. Not the run date: a local run on another day would otherwise file a
+pull under a week it doesn't belong to.
 
-Usage: from the repo root -> python3 weekly_snapshot.py
+ONE ROW PER WEEK, the latest write wins. A local run (LLM fields populated)
+thus replaces the CI row of its own dump's week; llm_extraction_available
+traces which kind of run produced the row. A local dump is a different pull
+from the runner's: record that same dump in both histories, in this order
+(offer_presence.py, dbt build, weekly_snapshot.py), and commit both files
+together. Otherwise the two histories describe different pulls for the
+same week.
+
+In CI_WITHOUT_EXTRACTION mode, fct_job_offer_technology is empty:
+top_technology is then "not available (CI)" and the reclassified
+intermediary count is left empty, not 0.
+
+Usage: from the repo root, after dbt build -> python3 weekly_snapshot.py
 """
 
+import argparse
 import csv
-from datetime import date, timedelta
 from pathlib import Path
 
 import duckdb
+
+from offer_presence import DUMPS_DIR, week_of_dump
 
 DB_PATH = "data/warehouse.duckdb"
 SNAPSHOT_PATH = Path("data/snapshots/weekly_market.csv")
@@ -34,20 +52,31 @@ COLUMNS = [
 ]
 
 
-def monday_of_the_week() -> str:
-    """Snapshot key: the Monday of the ISO week, not the run date.
+def week_of_latest_dump() -> str:
+    """Monday of the week of the most recent job offers dump.
 
-    date.today() used to be the key: three manual triggers on 2026-08-09
-    produced three distinct rows for the same week, a grain
-    fct_weekly_market would have inherited broken. The Monday stays a date
-    axis directly usable in a chart, unlike a "2026-W32" notation.
+    Returns:
+        The Monday as an ISO date string (YYYY-MM-DD).
+
+    Raises:
+        SystemExit: no job offers dump in data/raw/.
+        ValueError: the latest dump's filename doesn't carry a date.
     """
-    today = date.today()
-    return (today - timedelta(days=today.weekday())).isoformat()
+    dumps = sorted(DUMPS_DIR.glob("job_offers_*.json"))
+    if not dumps:
+        raise SystemExit("No job_offers_*.json dump in data/raw/: nothing to snapshot.")
+    return week_of_dump(dumps[-1])
 
 
-def compute_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
-    """Computes today's metrics on the current state of fct_job_offer."""
+def compute_snapshot(con: duckdb.DuckDBPyConnection, week: str) -> dict:
+    """Computes the week's metrics on the current state of fct_job_offer.
+
+    Returns:
+        A dict keyed by COLUMNS.
+
+    Raises:
+        duckdb.Error: a query fails (e.g. dbt build has not run).
+    """
 
     total_count = con.execute("select count(*) from fct_job_offer").fetchone()[0]
 
@@ -57,10 +86,13 @@ def compute_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
         group by employer_category
     """).fetchall())
 
+    # annual_salary_plausible: an implausible amount (a monthly salary typed
+    # in the annual field) must not enter an annual aggregate.
     median_salary = con.execute("""
         select median(salary_min)
         from fct_job_offer
         where salary_period = 'annual'
+          and annual_salary_plausible
     """).fetchone()[0]
 
     top_technology_result = con.execute("""
@@ -75,7 +107,7 @@ def compute_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
     top_technology = top_technology_result[0] if top_technology_result else "not available (CI)"
 
     return {
-        "week_start_date": monday_of_the_week(),
+        "week_start_date": week,
         "total_offer_count": total_count,
         "anonymous_offer_count": count_by_category.get("ANONYMOUS", 0),
         "intermediary_offer_count": count_by_category.get("INTERMEDIARY", 0),
@@ -90,9 +122,8 @@ def compute_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
         "median_annual_salary": median_salary,
         "top_technology": top_technology,
         # Derived from the query result, not from an environment variable
-        # re-read downstream (same choice as top_technology, more robust).
-        # Without this column, a week with no LLM fields would be
-        # indistinguishable from a week where the LLM found nothing.
+        # re-read downstream. Without this column, a week with no LLM fields
+        # would be indistinguishable from a week where the LLM found nothing.
         "llm_extraction_available": bool(top_technology_result),
     }
 
@@ -100,16 +131,14 @@ def compute_snapshot(con: duckdb.DuckDBPyConnection) -> dict:
 def write_row(snapshot: dict) -> None:
     """Upsert by week: one week = one row, the latest write wins.
 
-    The old append-only mode left three rows for 2026-08-09 (two
-    workflow_dispatch tests plus the real run). Rewriting the whole file
-    costs a few kilobytes and guarantees grain uniqueness at the source,
-    rather than catching it downstream with a qualify in every consuming
-    model.
+    Rewriting the whole file costs a few kilobytes and guarantees the grain
+    at the source, rather than deduplicating in every consuming model.
 
-    A mid-week rerun therefore overwrites that week's row: this is
-    intentional, the most recent measurement is the right one. A local run
-    (LLM fields populated) thus takes precedence over Monday's CI run, and
-    llm_extraction_available traces which of the two produced the row.
+    Returns:
+        None.
+
+    Raises:
+        OSError: the snapshot file can't be read or written.
     """
     SNAPSHOT_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -128,16 +157,35 @@ def write_row(snapshot: dict) -> None:
 
 
 def main() -> None:
+    """Computes the snapshot of the latest dump's week and writes it.
+
+    Returns:
+        None.
+
+    Raises:
+        SystemExit, ValueError: propagated from week_of_latest_dump().
+        duckdb.Error, OSError: propagated from compute_snapshot() and
+            write_row().
+    """
+    week = week_of_latest_dump()
+
     con = duckdb.connect(DB_PATH, read_only=True)
-    snapshot = compute_snapshot(con)
+    snapshot = compute_snapshot(con, week)
     con.close()
 
     write_row(snapshot)
 
-    print("--- Snapshot added ---")
+    print("--- Snapshot written ---")
     for key, value in snapshot.items():
         print(f"  {key}: {value}")
 
 
 if __name__ == "__main__":
+    # No option today, but argparse still rejects an unknown or mistyped
+    # argument instead of silently writing a row to the committed history.
+    parser = argparse.ArgumentParser(
+        description="Write the weekly market snapshot of the latest dump's week.",
+        allow_abbrev=False,
+    )
+    parser.parse_args()
     main()
