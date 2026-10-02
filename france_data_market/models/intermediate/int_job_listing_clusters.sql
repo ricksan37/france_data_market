@@ -1,28 +1,26 @@
 -- Grouping of job offers that are actually the same listing.
 -- Grain: one row per job offer. Key: job_offer_id.
 --
--- THE PROBLEM. stg_raw__ft_job_offers' deduplication works on job_offer_id:
--- it discards the API's index duplicates, not campaigns. Yet the same
--- position published in several cities gets one identifier per city, and so
--- counts that many times in every aggregate. Measured 2026-09-04: 152 offers
--- out of 960 share their text with at least one other, i.e. 15.8% of the
--- corpus. The largest cluster is one employer publishing the same listing in
--- 24 communes.
+-- THE PROBLEM. stg_raw__ft_job_offers deduplicates on job_offer_id, but a
+-- recruiter who publishes the same listing several times, in several
+-- communes or again in the same one, gets one identifier per publication:
+-- every copy counts in every aggregate. 2026-09-26 dump: 53 offers out of
+-- 854 (6.2%) share their text with at least one other, in 21 clusters. The
+-- largest is one employer publishing the same listing in 12 communes; 13
+-- clusters stay within a single commune (reposts).
 --
--- MEASURED CONSEQUENCES. SQL goes from 282 to 235 offers (-16.7%), Python
--- from 283 to 262, and Python moves clearly ahead of SQL when the two
--- seemed neck and neck. The salary median goes from 45,000 to 43,000 €.
--- These are not cosmetic adjustments.
+-- MEASURED CONSEQUENCES (same dump). Counting listings instead of offers
+-- takes SQL from 256 to 238 offers (-7%) and Python from 261 to 255. The
+-- median annual salary stays at 45000 EUR.
 --
 -- NORMALIZED SIGNATURE, NOT A SIMILARITY THRESHOLD. Lowercase and collapsed
--- whitespace: seven more clusters than on raw text, and above all no
--- threshold to justify. Two texts are identical or they aren't. A similarity
--- measure would catch more -- across the eleven listings of an overseas
--- campaign, nine share exactly the same text and two have a slightly
--- different one -- but at the cost of an arbitrary threshold, which this
--- project doesn't introduce without a measurement to defend it.
--- False-cluster risk ruled out by measurement: the shortest description in
--- the corpus is 296 characters, only 17 fall under 500.
+-- whitespace, then md5: two texts are identical or they aren't, so there is
+-- no threshold to justify. Normalization finds 21 clusters where the raw
+-- text finds 20. A similarity measure would also catch near-identical
+-- texts, at the cost of an arbitrary threshold this project doesn't
+-- introduce without a measurement to defend it.
+-- False-cluster risk checked on the same dump: no cluster mixes two named
+-- employers; the shortest description is 191 characters, 10 are under 500.
 --
 -- WE FLAG, WE DON'T DROP. No offer is discarded: every analysis chooses to
 -- count offers or listings. Both questions are legitimate and don't share
