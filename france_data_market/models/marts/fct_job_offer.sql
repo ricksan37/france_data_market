@@ -79,8 +79,13 @@ left join {{ ref('int_job_offer_salary_parsed') }} as s
     on f.job_offer_id = s.job_offer_id
 left join {{ ref('int_employers_classified') }} as c
     on f.job_offer_id = c.job_offer_id
+-- Restricted to DIRECT_EMPLOYER: the DINUM dump keeps the category an offer
+-- had when it was enriched, so an offer reclassified since (e.g. ALTECA,
+-- matched to its own SIREN while still DIRECT_EMPLOYER) would otherwise keep
+-- an intermediary's SIREN as its employer.
 left join {{ ref('stg_dinum__companies') }} as d
     on f.job_offer_id = d.job_offer_id
+    and c.employer_category = 'DIRECT_EMPLOYER'
 left join {{ ref('stg_extraction__skills') }} as k
     on f.job_offer_id = k.job_offer_id
 left join {{ ref('int_job_offers_clustered') }} as g

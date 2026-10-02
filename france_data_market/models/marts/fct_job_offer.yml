@@ -65,10 +65,11 @@ models:
 
       - name: siren
         description: >
-          SIREN of the employing company, from the DINUM enrichment. NULL
-          for offers outside the DIRECT_EMPLOYER scope (339) and for the 42
-          in-scope offers unresolved by matching (80.3% matching rate on the
-          213 eligible offers).
+          SIREN of the employing company, from the DINUM enrichment, for
+          DIRECT_EMPLOYER offers only. NULL for every other category, and for
+          direct-employer offers the matching left unresolved or that the
+          latest DINUM dump doesn't cover (2026-09-26 dumps: 243 of the 267
+          direct-employer offers carry a SIREN).
         data_tests:
           - relationships:
               to: ref('dim_company')
