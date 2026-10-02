@@ -9,18 +9,19 @@ models:
     columns:
       - name: job_offer_id
         description: Unique identifier of the job offer. Grain of this model.
+        data_tests:
+          - unique
+          - not_null
 
       - name: employer_category
         description: >
           One of DIRECT_EMPLOYER (structurally identifiable employer),
           INTERMEDIARY (known staffing/recruitment firm, matched on NAF code
-          or employer name), ANONYMOUS (neither NAF nor employer name
-          usable), or INTERMEDIARY_RECLASSIFIED (structurally ANONYMOUS, but
+          or employer name), ANONYMOUS (no employer name and no intermediary
+          NAF code), or INTERMEDIARY_RECLASSIFIED (structurally ANONYMOUS, but
           the offer's text reveals a masked end client -- see
-          end_client_masked in stg_extraction__skills). Validated by the
-          dedicated assert_employer_category_valid test rather than
-          accepted_values, to avoid the DuckDB 1.5.4 multi-value IN()
-          optimizer bug.
+          end_client_masked in stg_extraction__skills). Accepted values are
+          checked by the singular test assert_employer_category_valid.
 
 unit_tests:
   - name: test_parsing_employeur

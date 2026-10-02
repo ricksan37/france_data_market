@@ -14,40 +14,34 @@ classified as (
 
     select
         s.job_offer_id,
-        -- Note: no IN(...) here. This DuckDB engine (1.5.4) crashes with an
-        -- INTERNAL Error ("index 4 within vector of size 4") as soon as a
-        -- view containing a multi-value IN() is queried (GROUP BY, JOIN,
-        -- WHERE...) -- same optimizer bug as point 0 (accepted_values,
-        -- NOT IN). General workaround: chained = / OR.
         case
-            when s.naf_code_on_offer = '62.02A'
-                or s.naf_code_on_offer = '78.20Z'
-                or s.naf_code_on_offer = '78.10Z'
-                or s.naf_code_on_offer = '70.22Z'
-                or s.employer_name_raw = 'Michael Page'
-                or s.employer_name_raw = 'Fed Group'
-                or s.employer_name_raw = 'NEXTGEN RH'
-                or s.employer_name_raw = 'STEP UP'
-                or s.employer_name_raw = 'Mercato de l''emploi'
-                or s.employer_name_raw = 'Externatic'
-                or s.employer_name_raw = 'Capgemini'
-                or s.employer_name_raw = 'Accenture'
-                or s.employer_name_raw = 'CGI'
-                or s.employer_name_raw = 'Sopra Steria'
-                or s.employer_name_raw = 'Astek'
-                or s.employer_name_raw = 'Akkodis'
-                or s.employer_name_raw = 'Amaris'
-                or s.employer_name_raw = 'Alteca'
-                or s.employer_name_raw = 'Randstad professional'
-                or s.employer_name_raw = 'ADECCO'
-                or s.employer_name_raw = 'CRIT INTERIM'
-                -- Freelance mission platform, not an employer: "notre client
-                -- recherche...", daily rate (TJM) caps, "- Freelance" titles.
-                -- Measured 2026-09-26: 222 offers (all created from
-                -- 2026-09-11), 206 of them mentioning freelance/mission/TJM/
-                -- portage. Left as DIRECT_EMPLOYER, it made up 24% of that
-                -- category and 222 of the 275 unresolved DINUM matches.
-                or s.employer_name_raw = 'Collective.work'
+            when s.naf_code_on_offer in ('62.02A', '78.20Z', '78.10Z', '70.22Z')
+                or s.employer_name_raw in (
+                    'Michael Page',
+                    'Fed Group',
+                    'NEXTGEN RH',
+                    'STEP UP',
+                    'Mercato de l''emploi',
+                    'Externatic',
+                    'Capgemini',
+                    'Accenture',
+                    'CGI',
+                    'Sopra Steria',
+                    'Astek',
+                    'Akkodis',
+                    'Amaris',
+                    'Alteca',
+                    'Randstad professional',
+                    'ADECCO',
+                    'CRIT INTERIM',
+                    -- Freelance mission platform, not an employer: "notre client
+                    -- recherche...", daily rate (TJM) caps, "- Freelance" titles.
+                    -- Measured 2026-09-26: 222 offers (all created from
+                    -- 2026-09-11), 206 of them mentioning freelance/mission/TJM/
+                    -- portage. Left as DIRECT_EMPLOYER, it made up 24% of that
+                    -- category and 222 of the 275 unresolved DINUM matches.
+                    'Collective.work'
+                )
                 then 'INTERMEDIARY'
             when s.employer_name_raw is not null then 'DIRECT_EMPLOYER'
             -- Reclassification: offers with no usable NAF/name (hence
