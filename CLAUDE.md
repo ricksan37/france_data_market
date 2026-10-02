@@ -7,7 +7,8 @@ Analytics engineering pipeline on French data job offers: France Travail API ing
 - Always activate the venv before any `python3` or `dbt` command: `source .venv/bin/activate`. If `dbt debug` shows an unexpected python path despite a correct `which`, run `hash -r`.
 - `python3`, never `python`.
 - Python scripts run from the repo root. All dbt commands run from `france_data_market/`.
-- Stack: Python 3.13, dbt-core 1.11.7, dbt-duckdb 1.10.1, DuckDB 1.5.4 (pinned), Ollama + mistral-nemo.
+- Stack: Python 3.13, dbt v2 (`dbt` 2.0.6, Rust engine with a built-in DuckDB 1.5.5 driver), Python `duckdb` 1.5.5 (pinned to the same version: both read and write `data/warehouse.duckdb`), Ollama + mistral-nemo. dbt v2 doesn't enforce `require-dbt-version` on the project: the pin in `requirements.txt` is the version guard.
+- dbt v2 is stricter than v1: deprecated syntax and unexpected YAML keys are parse errors, and a model can be declared in one YAML file only. Source `external_location` lives under `config: meta:`.
 - DuckDB is single-writer. On `Could not set lock`: `lsof | grep warehouse.duckdb`, close the other process.
 - dbt never drops the relation of a renamed or deleted model: after a rename, delete `data/warehouse.duckdb` and rerun `dbt build` (the warehouse is fully rebuilt from `data/` and the seeds).
 

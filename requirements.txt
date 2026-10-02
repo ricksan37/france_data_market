@@ -1,16 +1,18 @@
 # Dependencies: France Data Market
 # Install: python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
 #
-# Exact versions, for a reproducible environment locally and in CI. duckdb
-# is pinned explicitly because data/warehouse.duckdb is written by dbt
-# (through dbt-duckdb) and read by the Python scripts: both must use the
-# same engine version and file format.
+# Exact versions, for a reproducible environment locally and in CI.
+# dbt is dbt v2 (the Rust engine, distributed as the `dbt` package). It
+# embeds its own DuckDB driver (1.5.5 in dbt 2.0.6), which writes
+# data/warehouse.duckdb; the Python scripts read that file with the duckdb
+# package, pinned to the same version so both sides share one file format.
+# dbt v2 doesn't enforce require-dbt-version on the project: this pin is the
+# version guard.
 
 requests==2.33.0          # HTTP calls to the France Travail and DINUM APIs
 python-dotenv==1.0.1       # loads credentials from .env
-dbt-core==1.11.7
-dbt-duckdb==1.10.1
-duckdb==1.5.4               # pinned: see the header
+dbt==2.0.6
+duckdb==1.5.5               # pinned: see the header
 pydantic==2.12.5            # LLM extraction schemas
 ollama==0.6.2                # local client for the skill extraction
 plotly==6.9.0

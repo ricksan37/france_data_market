@@ -50,17 +50,10 @@ jobs:
         # Monday, in the middle of the weekly run.
         run: python3 -m compileall -q *.py dashboard/*.py exploration/*.py
 
-      - name: dbt parse, deprecations as errors
-        # The project has no deprecation warning, a prerequisite for dbt v2:
-        # this step keeps it that way. --no-partial-parse because some
-        # deprecations only show on a full parse.
-        working-directory: france_data_market
-        env:
-          CI_WITHOUT_EXTRACTION: "true"
-        run: |
-          dbt parse --no-partial-parse --warn-error-options '{"error": ["Deprecations"]}'
-
       - name: dbt build on versioned data
+        # dbt v2 rejects deprecated syntax at parse time (e.g. generic test
+        # arguments outside `arguments:` is error dbt1159), so this build
+        # also fails on any deprecated construct.
         working-directory: france_data_market
         env:
           CI_WITHOUT_EXTRACTION: "true"  # the LLM extraction dump isn't versioned

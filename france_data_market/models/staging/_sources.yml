@@ -8,8 +8,9 @@ sources:
       the most recent one, so downstream models describe the market as of
       the latest pull. The offer history lives in offer_presence.py, which
       reads the dumps directly.
-    meta:
-      external_location: "read_json_auto('../data/raw/job_offers_*.json', filename=true)"
+    config:
+      meta:
+        external_location: "read_json_auto('../data/raw/job_offers_*.json', filename=true)"
     tables:
       - name: ft_job_offers
         description: >
@@ -25,8 +26,9 @@ sources:
       Company enrichment written by enrich_dinum.py: each direct-employer
       offer matched to a SIRENE company through the DINUM API. Every dump on
       disk is read; stg_dinum__companies keeps only the most recent one.
-    meta:
-      external_location: "read_json_auto('../data/raw/enrich_dinum_*.json', filename=true)"
+    config:
+      meta:
+        external_location: "read_json_auto('../data/raw/enrich_dinum_*.json', filename=true)"
     tables:
       - name: companies
         description: >
@@ -42,8 +44,9 @@ sources:
     description: >
       Weekly market metrics written by weekly_snapshot.py and committed by
       the weekly workflow.
-    meta:
-      external_location: "read_csv_auto('../data/snapshots/weekly_market.csv')"
+    config:
+      meta:
+        external_location: "read_csv_auto('../data/snapshots/weekly_market.csv')"
     tables:
       - name: weekly_market
         description: One row per ISO week (its Monday); a rerun within the same week overwrites that week's row.
@@ -55,8 +58,9 @@ sources:
     description: >
       Offer presence history written by offer_presence.py from the raw
       dumps, committed by the weekly workflow.
-    meta:
-      external_location: "read_csv_auto('../data/snapshots/offer_presence.csv')"
+    config:
+      meta:
+        external_location: "read_csv_auto('../data/snapshots/offer_presence.csv')"
     tables:
       - name: job_offer_presence
         description: One row per (week, job_offer_id) pair, the week being the Monday of the dump's week.
@@ -67,8 +71,9 @@ sources:
       Ollama, local only, never in CI). Every dump is read: each run only
       processes offers absent from earlier dumps, so dumps don't overlap
       (tested by unique on stg_extraction__skills.job_offer_id).
-    meta:
-      external_location: "read_json_auto('../data/raw/extract_skills_*.json')"
+    config:
+      meta:
+        external_location: "read_json_auto('../data/raw/extract_skills_*.json')"
     tables:
       - name: skills
         description: >

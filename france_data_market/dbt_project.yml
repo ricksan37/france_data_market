@@ -1,7 +1,9 @@
 name: 'france_data_market'
 version: '1.0.0'
 config-version: 2
-require-dbt-version: [">=1.11.0", "<1.12.0"]
+# dbt v2 does not enforce this on the root project (measured on 2.0.6): the
+# exact version is pinned in requirements.txt. Kept as the declared range.
+require-dbt-version: [">=2.0.0", "<3.0.0"]
 
 profile: 'france_data_market'
 
