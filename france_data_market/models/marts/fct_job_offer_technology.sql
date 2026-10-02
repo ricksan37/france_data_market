@@ -10,8 +10,9 @@
 -- reference table for counting offers. This model is for counting term
 -- occurrences, not offers.
 --
--- Restricted to offers in fct_job_offer: the extraction dumps cover every
--- offer ever extracted, fct_job_offer only the latest pull.
+-- Reads int_job_offer_skills_placed: mentions of the offers in
+-- fct_job_offer, placed in the technology list when the corpus agrees
+-- (SQL moves here from domains, CI/CD leaves for domains).
 --
 -- CASE. The LLM writes the same technology in several casings ("Power BI" /
 -- "Power Bi", "dbt" / "DBT" / "Dbt"): 43 technologies on the 2026-09-26
@@ -19,26 +20,16 @@
 -- grouped case-insensitively and shown under the corpus's most frequent
 -- spelling (alphabetical on a tie). Spacing variants ("PowerBI",
 -- "Datalake") are not merged: no rule checked yet. The raw spelling stays
--- in stg_extraction__skills.
+-- in int_job_offer_skills_placed.
 
-with mentions as (
-
-    select
-        job_offer_id,
-        unnest(technologies) as raw_technology
-    from {{ ref('stg_extraction__skills') }}
-    where extraction_status = 'ok'
-        and job_offer_id in (select job_offer_id from {{ ref('fct_job_offer') }})
-
-),
-
-keyed as (
+with keyed as (
 
     select
         job_offer_id,
-        raw_technology,
-        lower(trim(raw_technology)) as technology_key
-    from mentions
+        raw_term as raw_technology,
+        term_key as technology_key
+    from {{ ref('int_job_offer_skills_placed') }}
+    where skill_list = 'technology'
 
 ),
 

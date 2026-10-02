@@ -1,0 +1,86 @@
+version: 2
+
+models:
+  - name: int_job_offer_skills_placed
+    description: >
+      Every LLM-extracted skill mention (technologies and domains) of the
+      offers in fct_job_offer, with the list the corpus places the term in.
+      Grain: one row per mention. A term with at least 10 mentions, two
+      thirds or more of them in one list, moves all its mentions to that
+      list; other terms stay where the LLM put them. Source of
+      fct_job_offer_technology and fct_job_offer_domain. Empty in CI.
+    columns:
+      - name: job_offer_id
+        description: Identifier of the job offer the mention belongs to.
+        data_tests:
+          - not_null
+
+      - name: raw_term
+        description: The term exactly as extracted by the LLM.
+        data_tests:
+          - not_null
+
+      - name: term_key
+        description: lower(trim(raw_term)), the key placement is decided on.
+
+      - name: extracted_list
+        description: The list the LLM put the mention in (technology or domain).
+
+      - name: skill_list
+        description: >
+          The list the mention is counted in (technology or domain): the
+          corpus majority for frequent terms, extracted_list otherwise.
+        data_tests:
+          - not_null
+
+unit_tests:
+  - name: test_skills_placement
+    description: >
+      A frequent term mostly placed in one list moves there; a frequent term
+      without a two-to-one majority and a rare term stay where extracted.
+    model: int_job_offer_skills_placed
+    given:
+      - input: ref('fct_job_offer')
+        rows:
+          - {job_offer_id: "1"}
+          - {job_offer_id: "2"}
+      - input: ref('stg_extraction__skills')
+        format: sql
+        # sql format: the only one that can express LIST columns; it needs
+        # every column of the input, hence the typed NULLs.
+        rows: |
+          select '1' as job_offer_id, 'ok' as extraction_status, cast(null as json) as error,
+                 ['SQL', 'SQL', 'SQL', 'SQL', 'SQL', 'SQL', 'SQL', 'SQL', 'Orchestration', 'Orchestration', 'Orchestration', 'Orchestration', 'Orchestration', 'Ingestion'] as technologies,
+                 ['Orchestration', 'Orchestration', 'Orchestration', 'Orchestration', 'Orchestration', 'Orchestration'] as domains,
+                 cast(null as varchar) as education_level, cast(null as integer) as min_years_experience,
+                 cast(null as varchar) as remote_work, cast(null as boolean) as english_required,
+                 cast(null as varchar) as salary_text, cast(null as varchar) as employer_name_text,
+                 cast(null as boolean) as end_client_masked
+          union all
+          select '2', 'ok', null, cast([] as varchar[]), ['sql', 'sql', 'Ingestion'],
+                 null, null, null, null, null, null, null
+    expect:
+      rows:
+        - {job_offer_id: "2", raw_term: "sql", extracted_list: "domain", skill_list: "technology"}
+        - {job_offer_id: "2", raw_term: "sql", extracted_list: "domain", skill_list: "technology"}
+        - {job_offer_id: "2", raw_term: "Ingestion", extracted_list: "domain", skill_list: "domain"}
+        - {job_offer_id: "1", raw_term: "SQL", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "SQL", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "SQL", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "SQL", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "SQL", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "SQL", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "SQL", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "SQL", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "Orchestration", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "Orchestration", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "Orchestration", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "Orchestration", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "Orchestration", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "Ingestion", extracted_list: "technology", skill_list: "technology"}
+        - {job_offer_id: "1", raw_term: "Orchestration", extracted_list: "domain", skill_list: "domain"}
+        - {job_offer_id: "1", raw_term: "Orchestration", extracted_list: "domain", skill_list: "domain"}
+        - {job_offer_id: "1", raw_term: "Orchestration", extracted_list: "domain", skill_list: "domain"}
+        - {job_offer_id: "1", raw_term: "Orchestration", extracted_list: "domain", skill_list: "domain"}
+        - {job_offer_id: "1", raw_term: "Orchestration", extracted_list: "domain", skill_list: "domain"}
+        - {job_offer_id: "1", raw_term: "Orchestration", extracted_list: "domain", skill_list: "domain"}

@@ -19,8 +19,9 @@
 -- too thin to defend (project principle, cf. assert_annual_salary_bounds).
 -- raw_domain stays the audit source; normalized_domain equals raw_domain
 -- unchanged when no match exists in the mapping.
--- Restricted to offers in fct_job_offer: the extraction dumps cover every
--- offer ever extracted, fct_job_offer only the latest pull.
+-- Reads int_job_offer_skills_placed: mentions of the offers in
+-- fct_job_offer, placed in the domain list when the corpus agrees (CI/CD
+-- moves here from technologies, SQL leaves for technologies).
 --
 -- COUNTING. The grain is (offer, raw_domain), deduplicated with distinct
 -- because the LLM sometimes lists a value twice. Two variants of the same
@@ -29,15 +30,9 @@
 -- dump): count offers per domain with count(distinct job_offer_id).
 select distinct
     d.job_offer_id,
-    d.domain as raw_domain,
-    coalesce(m.canonical_domain, d.domain) as normalized_domain
-from (
-    select
-        job_offer_id,
-        unnest(domains) as domain
-    from {{ ref('stg_extraction__skills') }}
-    where extraction_status = 'ok'
-        and job_offer_id in (select job_offer_id from {{ ref('fct_job_offer') }})
-) as d
+    d.raw_term as raw_domain,
+    coalesce(m.canonical_domain, d.raw_term) as normalized_domain
+from {{ ref('int_job_offer_skills_placed') }} as d
 left join {{ ref('mapping_domaines') }} as m
-    on d.domain = m.variant
+    on d.raw_term = m.variant
+where d.skill_list = 'domain'

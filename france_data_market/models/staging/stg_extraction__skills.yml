@@ -19,9 +19,9 @@ models:
 
       - name: extraction_status
         description: >
-          Outcome of the LLM extraction for this offer (e.g. "ok"). Only rows
-          with status "ok" carry usable technologies/domains -- see
-          fct_job_offer_technology and fct_job_offer_domain.
+          Outcome of the LLM extraction for this offer: "ok" or "failed".
+          Only rows with status "ok" carry usable fields -- see
+          int_job_offer_skills_placed.
 
       - name: error
         description: Raw error payload when extraction failed, NULL otherwise.
@@ -49,7 +49,13 @@ models:
         description: Remote-work arrangement mentioned in the offer, as extracted by the LLM.
 
       - name: english_required
-        description: Whether the offer explicitly requires English, as extracted by the LLM.
+        description: >
+          Whether the offer requires English, as extracted by the LLM. Only
+          true is reliable (212 of the 214 true offers mention English on the
+          2026-09-26 dump). The prompt defines true or NULL only, yet the LLM
+          also returns false, and false almost always means "not mentioned"
+          (9 of 175 false offers mention English): treat false and NULL alike,
+          and compute a rate over all offers, not over true + false.
 
       - name: salary_text
         description: >

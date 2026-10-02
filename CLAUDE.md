@@ -47,6 +47,8 @@ CI: `.github/workflows/ci.yml` runs on every push (compile scripts, `dbt build` 
 - `dim_company.age_years` is a raw column; no `is_startup` flag (age / NAF / headcount do not discriminate).
 - Skill extraction model: mistral-nemo 12B. The extraction prompt and its JSON field names stay in French: per-field instructions are anchored to those names.
 - The `domains` field is under-extracted on consulting offers: accepted, documented limit.
+- The LLM sometimes puts a product in `domaines` or a concept in `technologies`. `int_job_offer_skills_placed` corrects it in dbt rather than by re-extraction: a term with at least 10 mentions and a 2:1 majority in one list moves all its mentions there; rarer terms stay as extracted (low-count majorities gave false positives).
+- `anglais_requis` / `english_required`: only `true` is reliable; the LLM's `false` means "not mentioned", like NULL.
 - The `dinum` dbt source reads every DINUM dump and `stg_dinum__companies` keeps the most recent one (each run supersedes the earlier ones). A run with any `technical_error` fails `dbt build` (`assert_match_status_valid`), and so does a matching rate under 75 % (`assert_dinum_matching_rate_floor`).
 - `stg_raw__ft_job_offers` keeps only the most recent job offers dump: `fct_job_offer` describes the market as of the latest pull. Offer history lives in `offer_presence.csv`, built from the raw dumps directly.
 - Our own vocabulary (`employer_category`, `salary_period`, `geographic_zone`, `match_status`) is in English; values copied from source text stay in their source language.
