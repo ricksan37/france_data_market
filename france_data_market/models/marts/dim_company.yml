@@ -3,8 +3,9 @@ version: 2
 models:
   - name: dim_company
     description: >
-      Company dimension, deduplicated from the DINUM enrichment dump. Grain
-      is 1 row = 1 SIREN. No is_startup flag: age + NAF + headcount don't
+      Company dimension, deduplicated from the latest DINUM enrichment dump
+      and restricted to the companies of current DIRECT_EMPLOYER offers.
+      Grain is 1 row = 1 SIREN. No is_startup flag: age + NAF + headcount don't
       reliably distinguish a startup from any other SME -- that threshold
       is made visible at analysis time rather than hidden in this mart.
     columns:
