@@ -59,6 +59,14 @@ models:
           INSEE commune code of the job offer's location. Always populated
           for Paris, Lyon and Marseille, where postal_code is empty.
 
+      - name: location_label
+        description: >
+          France Travail's label of the work location. "<department> -
+          <commune name>" when the offer has a commune_code (e.g. "44 -
+          CARQUEFOU"); otherwise a department, a region or a country (e.g.
+          "92 - Hauts-de-Seine", "Île-de-France", "Luxembourg"). Source of
+          dim_commune.commune_name.
+
       - name: employer_name_raw
         description: >
           Employer name as it appears on the job offer (free text, not

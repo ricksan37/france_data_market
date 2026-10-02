@@ -17,7 +17,6 @@ Analytics engineering pipeline on French data job offers: France Travail API ing
 |---|---|---|
 | Ingestion | `full_pull.py` (uses `auth.py`, `search.py`) | `data/raw/job_offers_*.json` |
 | Company enrichment | `enrich_dinum.py` | `data/raw/enrich_dinum_*.json` |
-| Commune names | `enrich_communes.py` | `france_data_market/seeds/mapping_communes.csv` |
 | Skill extraction | `extract_skills.py` (local, never in CI) | `data/raw/extract_skills_*.json` |
 | Weekly history | `weekly_snapshot.py`, `offer_presence.py` | `data/snapshots/*.csv` |
 | Transformation | dbt project in `france_data_market/` | `data/warehouse.duckdb` |

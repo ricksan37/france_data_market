@@ -35,9 +35,9 @@ sources:
           filename identifies the dump.
 
   # Output of weekly_snapshot.py, hence a SOURCE just like the JSON dumps --
-  # not a seed. The project's two seeds (mapping_domaines, mapping_communes)
-  # are lookup tables maintained by hand; this file is written by a script on
-  # every run. The criterion is who authors the file, not its extension.
+  # not a seed. The project's seed (mapping_domaines) is a lookup table
+  # maintained by hand; this file is written by a script on every run. The
+  # criterion is who authors the file, not its extension.
   - name: history
     description: >
       Weekly market metrics written by weekly_snapshot.py and committed by

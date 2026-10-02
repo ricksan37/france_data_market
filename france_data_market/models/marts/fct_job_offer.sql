@@ -7,8 +7,8 @@
 -- classification (int_employers_classified). Left join from
 -- stg_raw__ft_job_offers: the fact table must never lose rows because an
 -- enrichment is missing or late.
--- rome_code and postal_code stay as raw foreign keys toward dim_rome /
--- dim_commune (no join here, see the relationships tests, point 6).
+-- rome_code and commune_key are foreign keys toward dim_rome / dim_commune
+-- (no join here; the relationships tests enforce them).
 --
 -- employer_name: defaults to France Travail's structured value (100%
 -- reliable). Scoped only to employer_category = 'INTERMEDIARY_RECLASSIFIED'
@@ -29,10 +29,9 @@ select
     f.postal_code,
     f.commune_code,
 
-    -- Unified geographic key: postal code when it exists, INSEE code
-    -- otherwise. See dim_commune for why (Paris, Lyon and Marseille have no
-    -- single postal code and arrive without one).
-    coalesce(f.postal_code, f.commune_code) as commune_key,
+    -- Geographic key toward dim_commune: the INSEE code. See dim_commune for
+    -- why it is not the postal code.
+    f.commune_code as commune_key,
 
     -- Zone rather than a restriction of scope. The question "what if we
     -- limited to mainland France?" was measured on 2026-09-04: overseas

@@ -44,9 +44,10 @@ models:
 
       - name: commune_key
         description: >
-          Unified geographic key: postal code when it exists, INSEE code
-          otherwise. Covers 89.5% of the corpus versus 79.6% for the postal
-          code alone. This is the join key toward dim_commune.
+          INSEE code of the offer's commune, the join key toward
+          dim_commune. NULL when France Travail locates the offer only at
+          department, region or country level (63 of 854 offers on the
+          2026-09-26 dump).
         data_tests:
           - relationships:
               to: ref('dim_commune')

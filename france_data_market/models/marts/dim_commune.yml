@@ -3,26 +3,29 @@ version: 2
 models:
   - name: dim_commune
     description: >
-      Geographic reference table for the scope. Grain: one row per
-      geographic key, postal code when it exists, INSEE code otherwise.
+      Geographic reference table for the scope. Grain: one row per commune
+      of the latest job offers dump, keyed on its INSEE code. Names come from
+      France Travail's own location label, so no commune is ever left
+      unnamed.
     columns:
       - name: commune_key
         description: >
-          Grain key. The unique test was missing until 2026-09-04, and its
-          absence cost something: the dimension then carried two duplicate
-          keys (49000 and 95000, two postal codes each covering two INSEE
-          communes), 292 rows for 290 codes. The defect had appeared on its
-          own when the corpus grew from 552 to 960 offers, without breaking
-          anything visible. It's a classic trap: a distinct on several
-          columns never deduplicates a single column -- it came back through
-          the data rather than through the code.
+          INSEE code of the commune (5 characters, "2A"/"2B" for Corsica;
+          an arrondissement of Paris, Lyon or Marseille has its own code,
+          e.g. 75109, distinct from the overall commune 75056). Grain key.
         data_tests:
           - unique
           - not_null
       - name: commune_name
         description: >
-          Name resolved via geo.api.gouv.fr (enrich_communes.py). NULL as
-          long as a newly appeared key hasn't been resolved yet,
-          'UNRESOLVED' when the API returns nothing (99999, France Travail's
-          sentinel for an unspecified location). No row is ever lost in
-          either case.
+          Commune name taken from location_label ("44 - CARQUEFOU" ->
+          "CARQUEFOU"). When the same commune arrives in two spellings, the
+          mixed-case one (with accents and hyphens) is kept. For an
+          arrondissement of Paris, Lyon or Marseille, the city's name
+          ("Paris"), so that grouping by name counts the city once.
+        data_tests:
+          - not_null
+      - name: arrondissement_name
+        description: >
+          Full arrondissement label ("Paris 9e Arrondissement") when
+          commune_key is an arrondissement's INSEE code; NULL otherwise.

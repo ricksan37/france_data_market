@@ -1,50 +1,55 @@
 {{ config(materialized='table') }}
 
 -- dim_commune: geographic reference table for the scope.
--- Grain: one row per geographic key. Key: commune_key.
+-- Grain: one row per commune. Key: commune_key, the commune's INSEE code.
 --
--- WHY THE KEY IS NO LONGER THE POSTAL CODE. Paris, Lyon and Marseille are
--- the three French communes with arrondissements: they have no single
--- postal code, so France Travail returns their overall commune's INSEE code
--- (75056, 69123, 13055) with an EMPTY postal code. Indexed on postal code
--- alone, this dimension therefore systematically missed the country's three
--- largest cities. Measured 2026-09-04: 95 offers affected, 77 of them in
--- Paris: the report showed 71 Parisian offers where there are actually 148.
--- Geographic coverage goes from 79.6% to 89.5% of the corpus.
+-- WHY THE INSEE CODE. It is populated on more offers than the postal code
+-- (791 vs 584 of 854 on the 2026-09-26 dump), maps 1:1 to a commune, and
+-- is the only key Paris, Lyon and Marseille carry (their overall commune,
+-- 75056 / 69123 / 13055, has no single postal code). A postal code can
+-- cover several communes.
 --
--- It's a lesson already learned that repeats itself: what was assumed
--- (postal code) didn't match reality (INSEE code). The same fix had
--- already been applied to the company enrichment and never carried over to
--- the geographic dimension.
+-- WHY THE NAME COMES FROM location_label. France Travail already gives
+-- "<department> - <commune name>" for every offer with a commune code, so
+-- the dimension is complete for any dump, locally and in CI, with no
+-- external lookup. The same commune can arrive spelled two ways
+-- ("NEUILLY SUR SEINE" / "Neuilly-sur-Seine", 21 of 207 communes): the
+-- mixed-case spelling is kept, as it carries accents and hyphens; ties are
+-- broken alphabetically so the result doesn't depend on read order.
 --
--- postal_code and commune_code stay exposed alongside the key: they let you
--- audit which of the two sources supplied the value.
+-- ARRONDISSEMENTS. Some Paris, Lyon and Marseille offers carry their
+-- arrondissement's INSEE code (75109, "Paris 9e Arrondissement"), others
+-- only the overall commune's (75056, "Paris"): 92 vs 208 offers on the
+-- 2026-09-26 dump. commune_name is the city in both cases, so grouping by
+-- name counts Paris once; the arrondissement stays in arrondissement_name.
 
-with keys as (
+with labels as (
 
     select
-        coalesce(postal_code, commune_code) as commune_key,
-        postal_code,
-        commune_code
+        commune_code as commune_key,
+        regexp_replace(location_label, '^\S+ - ', '') as full_name
     from {{ ref('stg_raw__ft_job_offers') }}
-    where coalesce(postal_code, commune_code) is not null
+    where commune_code is not null
 
-    -- A postal code can cover several INSEE communes: a select distinct on
-    -- the pair would then produce two rows for the same key and break the
-    -- grain. That's exactly the trap already hit (196 rows instead of 193).
-    -- qualify decides on the key itself, never on the pair.
+),
+
+best_spelling as (
+
+    select
+        commune_key,
+        full_name
+    from labels
     qualify row_number() over (
-        partition by coalesce(postal_code, commune_code)
-        order by postal_code nulls last, commune_code
+        partition by commune_key
+        order by regexp_matches(full_name, '[a-z]') desc, full_name
     ) = 1
 
 )
 
 select
-    k.commune_key,
-    k.postal_code,
-    k.commune_code,
-    m.commune_name
-from keys as k
-left join {{ ref('mapping_communes') }} as m
-    on m.commune_key = k.commune_key
+    commune_key,
+    regexp_replace(full_name, ' [0-9]+(er|e) Arrondissement$', '') as commune_name,
+    case
+        when regexp_matches(full_name, ' [0-9]+(er|e) Arrondissement$') then full_name
+    end as arrondissement_name
+from best_spelling

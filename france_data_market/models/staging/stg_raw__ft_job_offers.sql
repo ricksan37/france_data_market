@@ -44,6 +44,7 @@ renamed as (
         offre.experienceExige as required_experience,
         offre.lieuTravail.codePostal as postal_code,
         offre.lieuTravail.commune as commune_code,
+        offre.lieuTravail.libelle as location_label,
         offre.entreprise.nom as employer_name_raw,
         offre.codeNaf as naf_code_on_offer,
         offre.salaire.libelle as salary_label,

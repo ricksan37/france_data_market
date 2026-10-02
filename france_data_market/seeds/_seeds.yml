@@ -1,36 +1,15 @@
 version: 2
 
 seeds:
-  - name: mapping_communes
-    description: >
-      Commune names resolved from geo.api.gouv.fr (enrich_communes.py).
-      Key: postal code when the source provides one, overall commune's
-      INSEE code otherwise (Paris, Lyon, Marseille).
-    config:
-      # varchar FORCED, not left to inference. With every value numeric, dbt
-      # was typing the column as INTEGER: 01200 became 1200, and the join
-      # with stg_raw__ft_job_offers, where the code is text, only held
-      # together through DuckDB's implicit conversion. It worked, but by
-      # accident. A postal or INSEE code is an identifier, not a quantity:
-      # you don't add it, you don't compare it on an order, and its leading
-      # zero carries information.
-      column_types:
-        commune_key: varchar
-    columns:
-      - name: commune_key
-        data_tests:
-          - unique
-          - not_null
-
   - name: mapping_domaines
     description: >
       Normalization mapping for LLM-extracted domain values (see
-      fct_job_offer_domain). Covers the 12 most frequent clusters (>60
-      cumulative occurrences each, measured 2026-08-02 on the 552 real
-      offers), roughly ~20% of mentions -- coverage tracked over time by
-      assert_domain_mapping_coverage rather than extended blindly. The
-      long tail (1-10 occurrences per value) is deliberately not mapped: no
-      rule built on a sample too thin to defend.
+      fct_job_offer_domain). Covers 12 clusters chosen for having more than
+      60 cumulative occurrences each; they cover 19.6% of mentions (1144 of
+      5828 on the 2026-09-26 dump). assert_domain_mapping_coverage warns if
+      coverage falls under 15%, the signal to rework the mapping rather than
+      extend it blindly. The long tail (1-10 occurrences per value) is
+      deliberately not mapped: no rule built on a sample too thin to defend.
     columns:
       - name: variant
         description: >
