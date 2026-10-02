@@ -1,23 +1,20 @@
 -- Flow conservation: a week's actives must be exactly the previous week's
 -- actives, minus exits, plus new offers, plus reappearances.
 --
---   552 - 463 + 408 + 0 = 497   (the first two measured weeks)
+--   552 - 463 + 408 + 0 = 497   (weeks of 2026-07-13 and 2026-08-24)
 --
 -- This is the flow model's strongest test: it ties together four
 -- independently computed measurements (an aggregation, a first occurrence,
--- two symmetric anti-joins). If one drifts, the equality breaks.
+-- two symmetric anti-joins). If one drifts, the equality breaks. The
+-- reappearance term is what makes it close: an offer reposted after an
+-- absence is neither new nor a survivor.
 --
--- It's already proven useful. The reappearance_count term was missing from
--- the first version: an offer reposted after an absence was neither new
--- nor a survivor and entered the actives without appearing in the
--- reconciliation. The defect was invisible over two weeks and the test
--- caught it at the third data point, in CI.
---
--- coalesce on the three terms: without it, a single NULL makes the
--- comparison unknown and the test passes SILENTLY instead of failing. That
--- happened in the same session on a week with no new offer. The first week
--- stays excluded by the clause on previous_active_offer_count: with no
--- predecessor, the equality is meaningless.
+-- coalesce on the three terms: without it, a single NULL (a CTE with no
+-- row for that week) makes the comparison unknown and the test passes
+-- SILENTLY instead of failing. The first week stays excluded by the clause
+-- on previous_active_offer_count: with no predecessor, the equality is
+-- meaningless.
+-- dbt contract: 0 rows = pass, >= 1 row = fail.
 
 with flux as (
 

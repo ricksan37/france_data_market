@@ -53,7 +53,8 @@ models:
           France Travail contract type code: CDI (permanent), CDD (fixed
           term), MIS (temporary agency assignment), LIB (profession
           libérale, self-employed), CCE (profession commerciale, commercial
-          agent). Checked by assert_contract_type_valid_fct_job_offer.
+          agent). Copied unchanged from stg_raw__ft_job_offers, where
+          assert_contract_type_valid checks it.
 
       - name: required_experience
         description: >

@@ -1,17 +1,16 @@
-# Dépendances — Observatoire du Marché Data France
-# Installation :  python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+# Dependencies: France Data Market
+# Install: python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
 #
-# Versions figées (pip freeze) sur l'environnement de travail au 02/08/2026,
-# pour reproductibilité (spec, NFR reproductibilité). duckdb est épinglé
-# explicitement : un bug connu de l'optimiseur 1.5.4 impose un contournement
-# SQL systématique (IN() -> =/!= chaînés) ; une version différente changerait
-# ce comportement sans prévenir.
+# Exact versions, for a reproducible environment locally and in CI. duckdb
+# is pinned explicitly because data/warehouse.duckdb is written by dbt
+# (through dbt-duckdb) and read by the Python scripts: both must use the
+# same engine version and file format.
 
-requests==2.33.0          # appels HTTP à l'API France Travail et DINUM
-python-dotenv==1.0.1       # chargement des identifiants depuis le .env
+requests==2.33.0          # HTTP calls to the France Travail and DINUM APIs
+python-dotenv==1.0.1       # loads credentials from .env
 dbt-core==1.11.7
 dbt-duckdb==1.10.1
-duckdb==1.5.4               # épinglé : bug optimiseur connu, voir commentaire ci-dessus
-pydantic==2.12.5            # schémas d'extraction LLM (Phase 4)
-ollama==0.6.2                # client local pour l'extraction skills (Phase 4)
+duckdb==1.5.4               # pinned: see the header
+pydantic==2.12.5            # LLM extraction schemas
+ollama==0.6.2                # local client for the skill extraction
 plotly==6.9.0

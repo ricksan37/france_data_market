@@ -8,24 +8,14 @@
 -- Limited to salary_period = 'annual': the hourly/monthly bounds aren't
 -- measured, decision deferred.
 --
--- SEVERITY: WARN, and this test deliberately stays a COUNTER. It measures
--- how many outlier values exist; it was never meant to exclude them from
--- an aggregation.
---
--- The condition set previously is met. It said: "if a 2nd case shows up
--- one day with new data, that changes things." As of 2026-09-03, out of
--- 960 offers, there are 15, spread across four distinct sources and two
--- consistent mechanisms: a monthly salary labeled annual (11 listings from
--- the same advertiser, all at 1800 €) and an hourly rate labeled annual (4
--- listings, 15 to 40 €). The rule was therefore written, but elsewhere:
--- annual_salary_plausible in int_job_offer_salary_parsed, protected by
--- assert_plausible_salary_flag at severity error.
---
--- Why this test doesn't move to error regardless: the 15 rows exist and
--- will keep existing, since we chose to flag them rather than fix them.
--- Failing it would block the pipeline on a known, accepted state. Its WARN
--- keeps the count visible on every run, which stays useful: if the number
--- spikes, the source has changed.
+-- SEVERITY: WARN, a COUNTER. Outlier amounts are recruiter entry errors
+-- (a monthly salary or an hourly rate typed in the annual field; 1 offer at
+-- 9500 EUR on the 2026-09-26 dump). They are flagged, not fixed: the rule
+-- lives in annual_salary_plausible (int_job_offer_salary_parsed), protected
+-- by assert_plausible_salary_flag at severity error, and aggregations
+-- filter on that flag. Failing here would block the pipeline on a known,
+-- accepted state; the warning keeps the count visible, and a spike means
+-- the source has changed.
 --
 -- dbt contract: 0 rows = pass, >= 1 row = warn (not fail).
 
