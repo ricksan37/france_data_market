@@ -3,19 +3,22 @@ version: 2
 models:
   - name: dim_rome
     description: >
-      Reference table of ROME occupations present in the scope. Grain: one
-      row per ROME code. Fed from the offers themselves, not from the
-      exported ROME reference table (export and live API can diverge in
-      version, measured).
+      ROME occupations of the latest job offers dump. Grain: one row per ROME
+      code. Fed from the offers themselves, not from the exported ROME
+      reference table (export and live API can diverge in version), so the
+      label is the one the API serves. Holds the collection-scope codes
+      (CATEGORIES in full_pull.py) that have at least one offer in the dump:
+      a scope code with no offer has no row. Start from fct_job_offer, not
+      from this table, to count offers per occupation.
     columns:
       - name: rome_code
         description: >
-          ROME occupation code. Grain of this model. The scope is hybrid
-          (codeROME + motsCles), so codes go beyond the two explicitly
-          targeted (M1405, M1811).
+          ROME occupation code. Grain of this model; the unique test also
+          guards against a code arriving with two labels, which the select
+          distinct on (code, label) would turn into two rows.
         data_tests:
           - unique
           - not_null
 
       - name: rome_label
-        description: Human-readable label of the ROME occupation code.
+        description: France Travail's label of the ROME occupation code.
