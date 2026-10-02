@@ -3,16 +3,15 @@ Company enrichment via the Company Search API (DINUM).
 
 Enriches DIRECT_EMPLOYER offers with SIREN, NAF, headcount and creation
 date, by resolving the employer name entered by the employer to a legal
-entity in the SIRENE registry.
+entity in the SIRENE registry. The API is public and needs no credentials.
+Figures below: 2026-09-26 run, 707 offers, 86.8% matched.
 
-MATCHING STRATEGY: built through measured stages (19.2% -> 80.3% matching
-rate):
+MATCHING STRATEGY:
 
-  Geographic key: INSEE commune code, NOT the postal code.
-    The initial plan called for the postal code. Reopened and justified by
-    measurement on the 213 target offers: postal code populated 166/213,
-    INSEE code 198/213 (strict superset). The INSEE code also has a 1:1
-    relationship with the commune, unlike the postal code.
+  Geographic key: INSEE commune code, not the postal code. It is populated
+    more often (250 vs 236 of the 267 direct-employer offers of the
+    2026-09-26 job offers dump) and maps 1:1 to a commune, which a postal
+    code does not.
 
   Geographic cascade: commune -> department -> national.
     The registered head office is often outside the offer's commune
@@ -26,8 +25,8 @@ rate):
     3. word inclusion (a word inserted in the middle of the legal name)
 
   NAF is used ONLY as a tiebreaker among candidates already retained by
-  name. The "NAF alone" path was removed after audit: 2 matches out of 172,
-  2 of them doubtful. Rule kept: the name must always corroborate.
+  name: the name must always corroborate. A NAF-only match was measured at
+  2 matches out of 172, both doubtful.
 
   Group consolidation on homonyms: the entity with the largest number of
   establishments is kept. Aligned with the project's analytical goal
@@ -35,25 +34,25 @@ rate):
   LORRAINE offer does belong to a large transport group.
 
 KNOWN AND ACCEPTED LIMITS:
-  - "EY" (28 offers, 13%): a commercial acronym absent from SIRENE, and 5+
+  - "EY" (40 offers, 5.7%): a commercial acronym absent from SIRENE, and 5+
     legal entities in the group with no tiebreaking criterion. Deliberately
     not matched.
   - Internal department labels ("FONCTIONS SUPPORTS", "751163-DIR STRATEGIE
     INNOVATION ET TRANSFO", "BNP Paribas Mission Handicap"): these aren't
     company names, no rule can attach them correctly. Any rule loose enough
     to find them a candidate will find a WRONG candidate (a works council, a
-    satellite association). 2 residual false positives measured out of 171
-    matches. Not filtered upstream: the criterion would have relied on a
-    keyword list built from 5 examples.
-  - Group consolidation (27 matches, 16%): wrongly attaches homonyms with no
-    capital link. Distinct status to filter downstream.
-  - 14 offers (6.6%) unresolved: trade name or internal label absent from
+    satellite association). Not filtered upstream: the criterion would rely
+    on a keyword list built from a handful of examples.
+  - Group consolidation (73 matches, 11.9% of matches): wrongly attaches
+    homonyms with no capital link. Distinct status to filter downstream.
+  - 53 offers (7.5%) unresolved: trade name or internal label absent from
     the SIRENE registry.
 
-USAGE: run from the project ROOT.
+USAGE: run from the project ROOT; takes no argument.
     python3 enrich_dinum.py
 """
 
+import argparse
 import duckdb
 import requests
 import time
@@ -107,6 +106,9 @@ def normalize_name(name):
     Safeguard: stop words and legal forms are only stripped if at least one
     word remains. Some companies are literally named "LTd"; stripping them
     would empty the name and make any comparison impossible.
+
+    Returns:
+        The normalized name, words separated by single spaces.
     """
     name = name.strip().upper()
 
@@ -129,8 +131,9 @@ def name_variants(full_name):
     DE DEVELOPPEMENT (AFD)". Comparing the whole string therefore fails on
     otherwise perfect matches.
 
-    Returns every comparable normalized form: the whole string, the legal
-    name alone, and each parenthesized content in isolation.
+    Returns:
+        The set of every comparable normalized form: the whole string, the
+        legal name alone, and each parenthesized content in isolation.
     """
     forms = {normalize_name(full_name)}
     forms.add(normalize_name(re.sub(r"\([^)]*\)", " ", full_name)))
@@ -149,8 +152,11 @@ def is_prefix_on_word_boundary(short_name, long_name):
     "STEP UP" is a prefix of "STEP UP LILLE" (followed by a space).
     "FED" is NOT a prefix of "FEDERATION SPORTIVE" (cuts mid-word).
 
-    Replaces an arbitrary length safeguard: safer, since it becomes
-    impossible to match on a truncated word.
+    A word boundary rather than a minimum length: it is impossible to match
+    on a truncated word.
+
+    Returns:
+        True or False.
     """
     if not short_name or not long_name:
         return False
@@ -172,9 +178,12 @@ def words_included(short_name, long_name):
       of candidates;
     - the candidate must not have more than double the word count. Without
       this bound, an internal department label like "FONCTIONS SUPPORTS"
-      used to attach to "AIDE AUX FONCTIONS SUPPORTS DES ENTREPRISES":
-      strictly true inclusion, but an unrelated entity. A gap this large
-      signals a satellite entity was caught, not the employer.
+      attaches to "AIDE AUX FONCTIONS SUPPORTS DES ENTREPRISES": strictly
+      true inclusion, but an unrelated entity. A gap this large signals a
+      satellite entity was caught, not the employer.
+
+    Returns:
+        True or False.
     """
     short_words = set(short_name.split())
     if len(short_words) < 2:
@@ -195,6 +204,9 @@ def department_from_commune(commune_code):
     """
     Department code from the INSEE commune code.
     Overseas territory case: codes in 97x / 98x -> 3-digit department.
+
+    Returns:
+        The department code, or None when commune_code is empty.
     """
     if not commune_code:
         return None
@@ -204,7 +216,21 @@ def department_from_commune(commune_code):
 
 
 def search(name, geo_params):
-    """A single API call with a given set of geographic parameters."""
+    """
+    A single API search with a given set of geographic parameters, retried
+    on transient failures.
+
+    Returns:
+        The list of candidate companies (the response's "results"), possibly
+        empty.
+
+    Raises:
+        requests.HTTPError: non-retryable HTTP error, or a 429 / 5xx still
+            failing after MAX_ATTEMPTS; the message carries the status code
+            and the response body.
+        requests.ConnectionError, requests.Timeout: network failure still
+            present after MAX_ATTEMPTS.
+    """
     params = {"q": name, **geo_params}
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
@@ -212,7 +238,14 @@ def search(name, geo_params):
                                 timeout=REQUEST_TIMEOUT_SECONDS)
             retryable = resp.status_code == 429 or resp.status_code >= 500
             if not retryable or attempt == MAX_ATTEMPTS:
-                resp.raise_for_status()
+                # Not raise_for_status(): it drops the body, where the API
+                # explains a refusal.
+                if not resp.ok:
+                    raise requests.HTTPError(
+                        f"DINUM search refused ({resp.status_code}) for "
+                        f"{name!r}: body={resp.text!r}",
+                        response=resp,
+                    )
                 break
             reason = f"HTTP {resp.status_code}"
         except (requests.exceptions.ConnectionError,
@@ -242,6 +275,10 @@ def consolidate_group(candidates):
 
     Accepted blind spot: homonyms with NO capital link get wrongly attached
     -> distinct status to measure and filter downstream.
+
+    Returns:
+        The candidate with the most establishments, or None when no
+        candidate reports an establishment count.
     """
     with_establishments = [r for r in candidates if r.get("nombre_etablissements") is not None]
     if not with_establishments:
@@ -257,6 +294,10 @@ def _break_tie(candidates, offer_naf_code, naf_status, group_status, allow_naf):
     `allow_naf` is False at the national level: with no geographic anchor,
     a NAF match would bring together same-sector companies located
     anywhere.
+
+    Returns:
+        A (match_status, candidate) tuple, or None when no candidate can be
+        chosen.
     """
     if len(candidates) == 1:
         return (naf_status.replace("_then_naf", ""), candidates[0])
@@ -283,11 +324,15 @@ def select_exact_name(offer_name, offer_naf_code, active_candidates, allow_naf=T
     name found nationally is more reliable than an approximate match in the
     offer's own commune.
 
-    Counter-example that motivated this separation: "UNIVERSITE
-    PARIS-SACLAY" used to match by word inclusion with "ASSOCIATION DES
-    ETUDIANTS ... DE L'UNIVERSITE PARIS-SACLAY" in the right commune, which
-    short-circuited discovering the university itself at the department
+    Counter-example this separation handles: "UNIVERSITE PARIS-SACLAY"
+    matches by word inclusion with "ASSOCIATION DES ETUDIANTS ... DE
+    L'UNIVERSITE PARIS-SACLAY" in the right commune; a single pass would
+    stop there instead of finding the university itself at the department
     level.
+
+    Returns:
+        A (match_status, candidate) tuple, or None when no candidate has
+        the exact name.
     """
     if not active_candidates:
         return None
@@ -310,6 +355,10 @@ def select_fuzzy(offer_name, offer_naf_code, active_candidates, allow_naf=True):
     a word boundary, then word inclusion.
 
     Only attempted after the exact pass fails at EVERY geographic level.
+
+    Returns:
+        A (match_status, candidate) tuple, or None when no loosened rule
+        finds a candidate.
     """
     if not active_candidates:
         return None
@@ -354,8 +403,17 @@ def resolve_company(name, commune_code, naf_code):
     geographic PROXIMITY. An exact name found nationally is more reliable
     than an approximate match in the offer's own commune.
 
-    Cost: up to 6 API calls per offer instead of 3, but each level's
-    results are cached locally to avoid any duplicate call.
+    Cost: up to 3 API calls per offer (one per geographic level); both
+    passes reuse each level's candidates.
+
+    Returns:
+        A (match_status, candidate) tuple; candidate is None for the
+        non_matchable_known_acronym, unresolved and unresolved_no_geo
+        statuses.
+
+    Raises:
+        requests.HTTPError, requests.ConnectionError, requests.Timeout:
+            propagated from search().
     """
     if name.strip().upper() in NON_MATCHABLE_ACRONYMS:
         return ("non_matchable_known_acronym", None)
@@ -404,6 +462,9 @@ def extract_fields(candidate):
     Keeps only the API response fields useful to dim_company.
     The rest (executives, financials, list of establishments...) is out of
     scope and would needlessly bloat the dump.
+
+    Returns:
+        A dict of the 12 kept fields (None where the API has no value).
     """
     headquarters = candidate.get("siege", {})
     return {
@@ -426,7 +487,97 @@ def extract_fields(candidate):
 # Main program
 # ─────────────────────────────────────────────────────────────
 
+def print_quality_audit(results, total_matches):
+    """
+    Prints the breakdown of matches by confidence level and the matches
+    whose names diverge most, for a human review of the dump just written.
+
+    Two complementary signals, learned from the Paris-Saclay false
+    positive:
+      1. offer words absent from the candidate (too loose a match)
+      2. candidate words absent from the offer (too broad a candidate:
+         "ASSOCIATION DES ETUDIANTS ... DE L'UNIVERSITE PARIS-SACLAY"
+         contains every word of "UNIVERSITE PARIS-SACLAY", but adds eight
+         more, a sign a satellite entity was caught)
+
+    Returns:
+        None.
+    """
+    print("\n--- Quality audit ---")
+
+    families = {}
+    suspects = []
+
+    for r in results:
+        if not r["company"]:
+            continue
+
+        path = r["match_status"]
+        if "consolidated_group" in path:
+            family = "group consolidation (arbitration)"
+        elif "word_inclusion" in path:
+            family = "word inclusion"
+        elif "prefix" in path:
+            family = "prefix"
+        else:
+            family = "exact name (safest)"
+        families[family] = families.get(family, 0) + 1
+
+        offer_words = set(normalize_name(r["employer_name_on_offer"]).split())
+        if not offer_words:
+            continue
+
+        # The gap is measured against the CLOSEST variant, not the whole
+        # string: DINUM stacks every trade name into nom_complet ("ADECCO
+        # FRANCE (ADECCO FRANCE, LHH RECRUITMENT SOLUTIONS, AKKODIS TALENT,
+        # QAPA)"), which would inflate the "extra words" signal on perfect
+        # matches. The audit thus aligns with the matching logic, which
+        # already compares variant by variant.
+        best = None
+        for v in name_variants(r["company"]["full_name"]):
+            variant_words = set(v.split())
+            if not variant_words:
+                continue
+            missing = len(offer_words - variant_words) / len(offer_words)
+            extra = len(variant_words - offer_words) / len(variant_words)
+            score = max(missing, extra)
+            if best is None or score < best[0]:
+                best = (score, missing, extra)
+
+        if best is None:
+            continue
+
+        score, missing, extra = best
+        if missing > 0.5 or extra > 0.6:
+            suspects.append((score, r, missing, extra))
+
+    print("\nBreakdown by confidence level:")
+    for family, n in sorted(families.items(), key=lambda x: -x[1]):
+        print(f"  {family}: {n} ({100 * n / total_matches:.1f}% of matches)")
+
+    print("\nMatches to review:")
+    for score, r, missing, extra in sorted(suspects, key=lambda x: -x[0])[:15]:
+        print(f"  [{missing:.0%} missing, {extra:.0%} extra] {r['employer_name_on_offer']}")
+        print(f"      -> {r['company']['full_name']}  ({r['match_status']})")
+
+    print(f"\nTotal matches to review: {len(suspects)} / {total_matches}")
+
+
 def main():
+    """
+    Enriches every DIRECT_EMPLOYER offer of fct_job_offer and writes one
+    timestamped dump to data/raw/. An HTTP error on one offer is recorded
+    as technical_error (which then fails dbt build) rather than stopping the
+    run; a network failure that outlasts the retries stops it with nothing
+    written.
+
+    Returns:
+        None.
+
+    Raises:
+        SystemExit: the target population is empty (no dump written).
+        requests.ConnectionError, requests.Timeout: propagated from search().
+    """
     print("Reading the target population from DuckDB...")
 
     # Read-only: no risk of a concurrent lock with dbt
@@ -439,6 +590,10 @@ def main():
     con.close()
 
     print(f"Target population: {len(offers)} DIRECT_EMPLOYER offers")
+
+    # An empty dump would become the latest one and empty stg_dinum__companies.
+    if not offers:
+        raise SystemExit("No DIRECT_EMPLOYER offer in fct_job_offer: run dbt build first. No dump written.")
 
     # Call deduplication: the same (name, commune) pair often recurs (an
     # employer posts several offers at the same location). The cache avoids
@@ -499,72 +654,7 @@ def main():
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(output, f, ensure_ascii=False, indent=2)
 
-# --- Quality audit ---
-    # Two complementary signals, learned from the Paris-Saclay false
-    # positive:
-    #   1. offer words absent from the candidate (too loose a match)
-    #   2. candidate words absent from the offer (too broad a candidate:
-    #      "ASSOCIATION DES ETUDIANTS ... DE L'UNIVERSITE PARIS-SACLAY"
-    #      contains every word of "UNIVERSITE PARIS-SACLAY", but adds eight
-    #      more, a sign a satellite entity was caught)
-    print("\n--- Quality audit ---")
-
-    families = {}
-    suspects = []
-
-    for r in results:
-        if not r["company"]:
-            continue
-
-        path = r["match_status"]
-        if "consolidated_group" in path:
-            family = "group consolidation (arbitration)"
-        elif "word_inclusion" in path:
-            family = "word inclusion"
-        elif "prefix" in path:
-            family = "prefix"
-        else:
-            family = "exact name (safest)"
-        families[family] = families.get(family, 0) + 1
-
-        offer_words = set(normalize_name(r["employer_name_on_offer"]).split())
-        if not offer_words:
-            continue
-
-        # The gap is measured against the CLOSEST variant, not the whole
-        # string: DINUM stacks every trade name into nom_complet ("ADECCO
-        # FRANCE (ADECCO FRANCE, LHH RECRUITMENT SOLUTIONS, AKKODIS TALENT,
-        # QAPA)"), which artificially inflated the "extra words" signal on
-        # perfect matches. The audit thus aligns with the matching logic,
-        # which already compares variant by variant.
-        best = None
-        for v in name_variants(r["company"]["full_name"]):
-            variant_words = set(v.split())
-            if not variant_words:
-                continue
-            missing = len(offer_words - variant_words) / len(offer_words)
-            extra = len(variant_words - offer_words) / len(variant_words)
-            score = max(missing, extra)
-            if best is None or score < best[0]:
-                best = (score, missing, extra)
-
-        if best is None:
-            continue
-
-        score, missing, extra = best
-        if missing > 0.5 or extra > 0.6:
-            suspects.append((score, r, missing, extra))
-
-    print("\nBreakdown by confidence level:")
-    for family, n in sorted(families.items(), key=lambda x: -x[1]):
-        print(f"  {family}: {n} ({100 * n / total_matches:.1f}% of matches)")
-
-    print("\nMatches to review:")
-    for score, r, missing, extra in sorted(suspects, key=lambda x: -x[0])[:15]:
-        print(f"  [{missing:.0%} missing, {extra:.0%} extra] {r['employer_name_on_offer']}")
-        print(f"      -> {r['company']['full_name']}  ({r['match_status']})")
-
-    print(f"\nTotal matches to review: {len(suspects)} / {total_matches}")
+    print_quality_audit(results, total_matches)
 
     print("\n--- Status breakdown ---")
     for status, n in sorted(counters.items(), key=lambda x: -x[1]):
@@ -576,4 +666,12 @@ def main():
 
 
 if __name__ == "__main__":
+    # No option today, but argparse still rejects an unknown or mistyped
+    # argument instead of silently ignoring it while a real dump gets
+    # written and picked up by dbt.
+    parser = argparse.ArgumentParser(
+        description="Enrich DIRECT_EMPLOYER offers with SIRENE data (DINUM API).",
+        allow_abbrev=False,
+    )
+    parser.parse_args()
     main()
