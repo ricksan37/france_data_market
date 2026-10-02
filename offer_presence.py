@@ -1,30 +1,34 @@
 """
 offer_presence.py
 
-Presence history of offers, at the (offer, week) grain.
+Presence history of offers, at the (week, offer) grain: which offers each
+weekly pull returned. fct_weekly_market_flow derives appearances and exits
+from it. The file is committed every week and is the only trace of past
+pulls (runner dumps are not kept): it can't be rebuilt, so a wrong write
+stays.
 
-WHY THIS SCRIPT DOESN'T READ fct_job_offer. The `raw` source unions every
-dump present on disk and deduplicates: an offer seen once stays in it
-forever. Measured 2026-08-31: fct_job_offer counts 960 offers, 463 of which
-had already disappeared from France Travail. A flow -- appearances,
-disappearances -- therefore can't be derived from it. This script reads the
-most recent RAW DUMP, i.e. exactly what the API returned that day.
+WHY IT READS THE RAW DUMP, NOT fct_job_offer. The weekly workflow runs it
+right after the pull and before dbt build, and its time key comes from the
+dump's filename, which the warehouse doesn't carry.
 
 TIME KEY: the Monday of the DUMP's week, read from its filename, not the run
-date. The script becomes idempotent (rerunning it on the same dump adds
-nothing) and the history can be rebuilt from any dump kept on disk -- that's
-what lets it restart from the two existing dumps rather than starting from
-scratch.
+date: replaying an old dump files it under its own week.
+
+ONE PULL PER WEEK: writing a dump REPLACES its week's offers. A rerun
+within the same week (after a failure, or a manual trigger) makes the
+latest pull win, the same rule as weekly_snapshot.py's upsert. Adding to
+the week instead would merge two pulls into a set of offers the API never
+returned. Replaying the same dump changes nothing.
 
 Usage: from the repo ROOT
     python3 offer_presence.py                 -> most recent dump
     python3 offer_presence.py data/raw/job_offers_2026-07-17_1403.json
 """
 
+import argparse
 import csv
 import json
 import re
-import sys
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -39,8 +43,13 @@ def week_of_dump(path: Path) -> str:
     """Monday of the dump's ISO week, read from its filename.
 
     The filename carries the ingestion date: the date the API responded, so
-    the only date that honestly qualifies an offer's presence. The script's
-    run date would diverge from it as soon as an old dump is replayed.
+    the only date that honestly qualifies an offer's presence.
+
+    Returns:
+        The Monday as an ISO date string (YYYY-MM-DD).
+
+    Raises:
+        ValueError: the filename doesn't match job_offers_YYYY-MM-DD_HHMM.json.
     """
     match = DATE_PATTERN.search(path.name)
     if not match:
@@ -50,25 +59,32 @@ def week_of_dump(path: Path) -> str:
 
 
 def ids_from_dump(path: Path) -> set[str]:
-    """Distinct job offer ids from a raw France Travail dump.
+    """Distinct job offer ids of a raw France Travail dump.
 
-    The dump contains structural duplicates (the API's unstable index,
-    observed from the first pull on: 1094 rows for 552 offers). The set
-    absorbs them, like the qualify row_number() of stg_raw__ft_job_offers on
-    the dbt side.
+    A set: an offer returned twice in one pull counts once, like the
+    deduplication of stg_raw__ft_job_offers on the dbt side.
+
+    Returns:
+        The set of job offer ids, possibly empty.
+
+    Raises:
+        OSError, json.JSONDecodeError, KeyError: unreadable file, invalid
+            JSON, or a dump without the resultats key.
     """
     with open(path, encoding="utf-8") as fh:
         content = json.load(fh)
-    offers = content["resultats"] if isinstance(content, dict) else content
-    return {o["id"] for o in offers}
+    return {offer["id"] for offer in content["resultats"]}
 
 
-def write_presence(week: str, ids: set[str]) -> tuple[int, int]:
-    """Adds the missing (week, job_offer_id) pairs, rewriting the file.
+def write_presence(week: str, ids: set[str]) -> tuple[int, int, int]:
+    """Replaces the week's (week, job_offer_id) pairs with the dump's,
+    rewriting the file.
 
-    The pair is the key: replaying an already-processed dump adds nothing.
-    Same discipline as weekly_snapshot.py's upsert -- pure append-only writing
-    had produced three rows for the single week of 2026-08-09.
+    Returns:
+        (pairs before, pairs of that week before, pairs after).
+
+    Raises:
+        OSError: the presence file can't be read or written.
     """
     PRESENCE_PATH.parent.mkdir(parents=True, exist_ok=True)
 
@@ -78,6 +94,8 @@ def write_presence(week: str, ids: set[str]) -> tuple[int, int]:
             pairs = {(r["week_start_date"], r["job_offer_id"]) for r in csv.DictReader(fh)}
 
     before = len(pairs)
+    week_before = sum(1 for pair_week, _ in pairs if pair_week == week)
+    pairs = {pair for pair in pairs if pair[0] != week}
     pairs |= {(week, job_offer_id) for job_offer_id in ids}
 
     with open(PRESENCE_PATH, "w", newline="", encoding="utf-8") as fh:
@@ -85,28 +103,49 @@ def write_presence(week: str, ids: set[str]) -> tuple[int, int]:
         writer.writerow(COLUMNS)
         writer.writerows(sorted(pairs))
 
-    return before, len(pairs)
+    return before, week_before, len(pairs)
 
 
-def main() -> None:
-    if len(sys.argv) > 1:
-        path = Path(sys.argv[1])
-    else:
+def main(dump_path: Path | None) -> None:
+    """Writes the presence of one dump: the given one, or the most recent.
+
+    Returns:
+        None.
+
+    Raises:
+        ValueError, OSError, json.JSONDecodeError, KeyError: propagated from
+            week_of_dump(), ids_from_dump() and write_presence().
+    """
+    if dump_path is None:
         dumps = sorted(DUMPS_DIR.glob("job_offers_*.json"))
         if not dumps:
             print("No job_offers_*.json dump in data/raw/.")
             return
-        path = dumps[-1]  # timestamped names: the last one is the most recent
+        dump_path = dumps[-1]  # timestamped names: the last one is the most recent
 
-    week = week_of_dump(path)
-    ids = ids_from_dump(path)
-    before, after = write_presence(week, ids)
+    week = week_of_dump(dump_path)
+    ids = ids_from_dump(dump_path)
+    before, week_before, after = write_presence(week, ids)
 
-    print(f"Dump     : {path.name}")
+    print(f"Dump     : {dump_path.name}")
     print(f"Week     : {week}")
     print(f"Offers   : {len(ids)} distinct")
-    print(f"Presence : {before} -> {after} pairs (+{after - before})")
+    print(f"Week     : {week_before} -> {len(ids)} pairs (replaced)")
+    print(f"Presence : {before} -> {after} pairs")
 
 
 if __name__ == "__main__":
-    main()
+    # argparse rather than sys.argv: an unknown option must stop the script
+    # instead of being read as a dump path.
+    parser = argparse.ArgumentParser(
+        description="Record which offers a pull returned, under the dump's week.",
+        allow_abbrev=False,
+    )
+    parser.add_argument(
+        "dump",
+        nargs="?",
+        type=Path,
+        help="dump to record (default: the most recent data/raw/job_offers_*.json)",
+    )
+    args = parser.parse_args()
+    main(args.dump)
