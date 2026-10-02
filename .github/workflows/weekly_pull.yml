@@ -1,6 +1,7 @@
 # .github/workflows/weekly_pull.yml
 #
-# Phase 5 (spec §13.1): ingest -> dbt build -> snapshot, automated.
+# Weekly pipeline: ingest -> presence -> dbt build -> snapshot -> company
+# enrichment -> report, then commit the two history files.
 #
 # The GitHub Actions runner is disposable: nothing persists from one run to
 # the next except what's explicitly committed. data/warehouse.duckdb and the
@@ -20,6 +21,12 @@ on:
 
 permissions:
   contents: write  # needed for the snapshot's git push at the end of the job
+
+# A manual trigger during the Monday run waits for it instead of running in
+# parallel: two jobs would write the same history files and race on the push.
+concurrency:
+  group: weekly-pull
+  cancel-in-progress: false
 
 jobs:
   pull-and-snapshot:
@@ -46,8 +53,8 @@ jobs:
       - name: Job offer presence history
         # Must run AFTER ingestion (it reads the freshly written dump) and
         # BEFORE dbt build (fct_weekly_market_flow consumes the CSV as a
-        # source). Idempotent: the key is the (week, job_offer_id) pair, so a
-        # manual re-trigger within the same week adds no row.
+        # source). A rerun within the same week replaces that week's offers:
+        # the latest pull wins, as in weekly_snapshot.py.
         run: python3 offer_presence.py
 
       - name: dbt build
@@ -71,7 +78,27 @@ jobs:
           CI_WITHOUT_EXTRACTION: "true"
         run: dbt build --select stg_history__weekly_market+
 
-      - name: Generate the HTML report (Phase 6a)
+      - name: Company enrichment (DINUM)
+        # After the snapshot on purpose: presence and snapshot don't depend
+        # on DINUM, so an API outage can't cost the week's history. The API
+        # is public, no secret needed. continue-on-error: on a failure the
+        # report goes out with the SIRENs of the versioned DINUM dump
+        # instead of not going out.
+        continue-on-error: true
+        run: python3 enrich_dinum.py
+
+      - name: Adopt the fresh DINUM dump
+        # stg_dinum__companies keeps the most recent dump, and its tests
+        # (assert_match_status_valid, assert_dinum_matching_rate_floor) gate
+        # the adoption: if they fail, dbt skips dim_company and
+        # fct_job_offer, whose tables from the first build stay in place.
+        continue-on-error: true
+        working-directory: france_data_market
+        env:
+          CI_WITHOUT_EXTRACTION: "true"
+        run: dbt build --select stg_dinum__companies+
+
+      - name: Generate the HTML report
         # dashboard/report.html is gitignored (a regenerable artifact, like
         # warehouse.duckdb) -- never committed. Exported as a GitHub Actions
         # artifact to stay reviewable from the run's Actions tab, without
