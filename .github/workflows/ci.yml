@@ -1,26 +1,18 @@
 # .github/workflows/ci.yml
 #
-# Pipeline validation on every push.
+# Pipeline validation on every push: without it, a model that fails to
+# compile would only surface in the middle of the next Monday run.
 #
-# WHY NOT A SLIM CI. The spec (§13, Phase 6) planned an incremental build
-# `dbt build --select state:modified+ --defer`. Measured 2026-09-04: the FULL
-# build takes 1.79 seconds -- 15 models, 39 tests, 2 unit tests. There's
-# nothing to save. And `--defer` assumes a persistent production environment
-# to defer non-rebuilt models to, whereas warehouse.duckdb is ephemeral on a
-# disposable runner. Slim CI's premise doesn't hold on this architecture: it
-# optimizes a cost that doesn't exist, with a mechanism the infrastructure
-# doesn't allow.
+# NO SLIM CI. An incremental `dbt build --select state:modified+ --defer`
+# would save nothing: the FULL build takes under 3 seconds (99 nodes on
+# 2026-10-02). And --defer needs a persistent production environment to
+# defer to, whereas warehouse.duckdb is ephemeral on a disposable runner.
 #
-# WHAT WAS ACTUALLY MISSING was CI at all. The repo's only workflow triggered
-# on Mondays or manually: a model that failed to compile would land on main
-# and only be discovered at the next weekly run.
-#
-# NO SECRET IS NEEDED. The 2026-07-17 France Travail dump, the DINUM dump and
-# the two snapshot CSVs are versioned: the entire graph rebuilds from the
-# repo's data alone. This workflow therefore checks, on every commit, a claim
-# the README has made since Phase 2 -- "no API key is required to reproduce
-# the dbt layer" -- instead of leaving it to trust. A third party who clones
-# the repo gets what CI gets.
+# NO SECRET IS NEEDED. A reference France Travail dump, the DINUM dumps and
+# the two history CSVs are versioned: the whole graph rebuilds from the
+# repo's data alone. Every commit thus checks the README's claim that no API
+# key is required to reproduce the dbt layer: a third party who clones the
+# repo gets what CI gets.
 
 name: CI
 
@@ -57,6 +49,16 @@ jobs:
         # syntax error in offer_presence.py would only surface the following
         # Monday, in the middle of the weekly run.
         run: python3 -m compileall -q *.py dashboard/*.py exploration/*.py
+
+      - name: dbt parse, deprecations as errors
+        # The project has no deprecation warning, a prerequisite for dbt v2:
+        # this step keeps it that way. --no-partial-parse because some
+        # deprecations only show on a full parse.
+        working-directory: france_data_market
+        env:
+          CI_WITHOUT_EXTRACTION: "true"
+        run: |
+          dbt parse --no-partial-parse --warn-error-options '{"error": ["Deprecations"]}'
 
       - name: dbt build on versioned data
         working-directory: france_data_market
