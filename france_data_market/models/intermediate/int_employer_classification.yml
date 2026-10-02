@@ -24,12 +24,12 @@ models:
           checked by the singular test assert_employer_category_valid.
 
 unit_tests:
-  - name: test_parsing_employeur
+  - name: test_employer_classification
     description: >
-      Verifies the employer classification (DIRECT_EMPLOYER / INTERMEDIARY /
-      ANONYMOUS / INTERMEDIARY_RECLASSIFIED) based on NAF code, employer name
-      and, as a last resort, the end_client_masked text signal from the LLM
-      extraction.
+      Verifies the employer classification on NAF code, employer name
+      (case-insensitive, no prefix match) and, as a last resort, the
+      end_client_masked text signal; a structured employer name takes
+      precedence over that text signal.
     model: int_employer_classification
     given:
       - input: ref('stg_raw__ft_job_offers')
@@ -40,9 +40,13 @@ unit_tests:
           - {job_offer_id: "4", employer_name_raw: null, naf_code_on_offer: null}
           - {job_offer_id: "5", employer_name_raw: null, naf_code_on_offer: "69.20Z"}
           - {job_offer_id: "6", employer_name_raw: null, naf_code_on_offer: null}
+          - {job_offer_id: "7", employer_name_raw: "ALTECA", naf_code_on_offer: null}
+          - {job_offer_id: "8", employer_name_raw: "CGI FINANCE", naf_code_on_offer: null}
+          - {job_offer_id: "9", employer_name_raw: "Banque Exemple", naf_code_on_offer: null}
       - input: ref('stg_extraction__skills')
         rows:
           - {job_offer_id: "6", end_client_masked: true}
+          - {job_offer_id: "9", end_client_masked: true}
     expect:
       rows:
         - {job_offer_id: "1", employer_category: "INTERMEDIARY"}
@@ -51,3 +55,6 @@ unit_tests:
         - {job_offer_id: "4", employer_category: "ANONYMOUS"}
         - {job_offer_id: "5", employer_category: "ANONYMOUS"}
         - {job_offer_id: "6", employer_category: "INTERMEDIARY_RECLASSIFIED"}
+        - {job_offer_id: "7", employer_category: "INTERMEDIARY"}
+        - {job_offer_id: "8", employer_category: "DIRECT_EMPLOYER"}
+        - {job_offer_id: "9", employer_category: "DIRECT_EMPLOYER"}

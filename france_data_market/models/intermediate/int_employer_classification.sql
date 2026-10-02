@@ -16,22 +16,27 @@ classified as (
         s.job_offer_id,
         case
             when s.naf_code_on_offer in ('62.02A', '78.20Z', '78.10Z', '70.22Z')
-                or s.employer_name_raw in (
-                    'Michael Page',
-                    'Fed Group',
+                -- Upper-cased exact match: France Travail carries the same
+                -- employer in several casings (ALTECA / Alteca). Exact rather
+                -- than prefix: a prefix match on 'CGI' would also catch
+                -- CGI FINANCE, a consumer-credit company.
+                or upper(s.employer_name_raw) in (
+                    'MICHAEL PAGE',
+                    'FED GROUP',
                     'NEXTGEN RH',
                     'STEP UP',
-                    'Mercato de l''emploi',
-                    'Externatic',
-                    'Capgemini',
-                    'Accenture',
+                    'MERCATO DE L''EMPLOI',
+                    'LE MERCATO DE L EMPLOI',
+                    'EXTERNATIC',
+                    'CAPGEMINI',
+                    'ACCENTURE',
                     'CGI',
-                    'Sopra Steria',
-                    'Astek',
-                    'Akkodis',
-                    'Amaris',
-                    'Alteca',
-                    'Randstad professional',
+                    'SOPRA STERIA',
+                    'ASTEK',
+                    'AKKODIS',
+                    'AMARIS',
+                    'ALTECA',
+                    'RANDSTAD PROFESSIONAL',
                     'ADECCO',
                     'CRIT INTERIM',
                     -- Freelance mission platform, not an employer: "notre client
@@ -40,7 +45,7 @@ classified as (
                     -- 2026-09-11), 206 of them mentioning freelance/mission/TJM/
                     -- portage. Left as DIRECT_EMPLOYER, it made up 24% of that
                     -- category and 222 of the 275 unresolved DINUM matches.
-                    'Collective.work'
+                    'COLLECTIVE.WORK'
                 )
                 then 'INTERMEDIARY'
             when s.employer_name_raw is not null then 'DIRECT_EMPLOYER'
