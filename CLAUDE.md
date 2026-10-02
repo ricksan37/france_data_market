@@ -67,4 +67,4 @@ Language-specific rules live in `.claude/rules/` (Python, dbt).
 
 - No dbt model yet qualifies an offer as data / not data.
 - README and `dim_rome.yml` still describe the former scope.
-- `fct_job_offer.sql` and five singular tests (`assert_contract_type_valid`, `assert_contract_type_valid_fct_job_offer`, `assert_employer_category_valid`, `assert_geographic_zone_valid`, `assert_week_is_a_monday`) still avoid multi-value `IN()` because of a DuckDB optimizer bug that does not reproduce on DuckDB 1.5.4 (tested on real views). `IN()` is fine; the README and `requirements.txt` (whose comments are still in French) still mention the bug.
+- Five singular tests (`assert_contract_type_valid`, `assert_contract_type_valid_fct_job_offer`, `assert_employer_category_valid`, `assert_geographic_zone_valid`, `assert_week_is_a_monday`) still avoid multi-value `IN()` because of a DuckDB optimizer bug that does not reproduce on DuckDB 1.5.4 (tested on real views). `IN()` is fine; the README and `requirements.txt` (whose comments are still in French) still mention the bug.

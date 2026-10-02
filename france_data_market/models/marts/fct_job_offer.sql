@@ -1,18 +1,20 @@
 {{ config(materialized='table') }}
 
--- fct_job_offer: fine-grained fact table.
--- Grain: one row per job offer. Key: job_offer_id.
--- Assembles stg_raw__ft_job_offers (raw facts) with the int_ layer's
--- enrichments: salary parsing (int_job_offer_salary_parsed) and employer
--- classification (int_employers_classified). Left join from
--- stg_raw__ft_job_offers: the fact table must never lose rows because an
--- enrichment is missing or late.
+-- fct_job_offer: fine-grained fact table, the table to query for analysis.
+-- Grain: one row per job offer of the latest job offers dump. Key:
+-- job_offer_id.
+-- Assembles stg_raw__ft_job_offers (raw facts) with every enrichment: salary
+-- parsing (int_job_offer_salary_parsed), employer classification
+-- (int_employers_classified), listing clusters (int_job_offers_clustered),
+-- the DINUM SIREN (stg_dinum__companies) and the LLM-extracted employer name
+-- (stg_extraction__skills). Left joins from stg_raw__ft_job_offers: the fact
+-- table must never lose rows because an enrichment is missing or late.
 -- rome_code and commune_key are foreign keys toward dim_rome / dim_commune
 -- (no join here; the relationships tests enforce them).
 --
 -- employer_name: defaults to France Travail's structured value (100%
--- reliable). Scoped only to employer_category = 'INTERMEDIARY_RECLASSIFIED'
--- (21 offers), it's replaced by employer_name_text, LLM-extracted from the
+-- reliable). Scoped only to employer_category = 'INTERMEDIARY_RECLASSIFIED',
+-- it's replaced by employer_name_text, LLM-extracted from the
 -- offer's body. The scope is deliberately restricted to that one status:
 -- it's precisely the column that traces that a value comes from text rather
 -- than the structured field, so no silent mixing -- an unstructured name
@@ -33,19 +35,15 @@ select
     -- why it is not the postal code.
     f.commune_code as commune_key,
 
-    -- Zone rather than a restriction of scope. The question "what if we
-    -- limited to mainland France?" was measured on 2026-09-04: overseas
-    -- territories weigh 17 offers out of 960, and excluding them doesn't
-    -- move any metric (masked employer 33.6 -> 33.0%, identical salary
-    -- median). Restricting would cost 5 real, distinct employers for no
-    -- gain. The zone is therefore exposed as a dimension: filtering becomes
-    -- a one-line clause, available on demand, without touching the spec or
-    -- discarding data. Chained comparisons and not IN(): known DuckDB
-    -- optimizer bug.
+    -- A zone rather than a restriction of scope: overseas offers stay in the
+    -- table and leaving them out is a one-line filter. Excluding them moves
+    -- no metric (2026-09-26 dump: 5 overseas offers; non-direct employer
+    -- share 68.7% vs 68.4%, same median salary), so restricting the scope
+    -- would only discard real employers. Overseas postal and INSEE codes
+    -- start with 97 (DOM) or 98 (COM).
     case
         when coalesce(f.postal_code, f.commune_code) is null then 'unknown'
-        when substr(coalesce(f.postal_code, f.commune_code), 1, 2) = '97'
-          or substr(coalesce(f.postal_code, f.commune_code), 1, 2) = '98'
+        when substr(coalesce(f.postal_code, f.commune_code), 1, 2) in ('97', '98')
             then 'overseas'
         else 'mainland'
     end as geographic_zone,
@@ -63,11 +61,11 @@ select
     s.salary_mentioned,
     s.annual_salary_plausible,
 
-    -- Identical listing clusters. See int_job_offers_clustered: the same
-    -- position published in several cities gets one identifier per city and
-    -- so counts that many times in every aggregate. Filtering on
-    -- is_canonical_listing counts listings, not filtering counts offers.
-    -- Both questions are legitimate.
+    -- Identical listing clusters (see int_job_offers_clustered): a listing
+    -- published several times, in several communes or again in the same
+    -- one, gets one identifier per publication and counts that many times in
+    -- every aggregate. Filtering on is_canonical_listing counts listings;
+    -- not filtering counts offers. Both questions are legitimate.
     g.listing_signature,
     g.cluster_size,
     g.is_canonical_listing,

@@ -4,137 +4,191 @@ models:
 
   - name: fct_job_offer
     description: >
-      Fine-grained fact table. One row per job offer. Assembles
-      stg_raw__ft_job_offers with the salary (int_job_offer_salary_parsed) and
-      employer classification (int_employers_classified) enrichments.
+      Fine-grained fact table, one row per job offer of the latest job offers
+      dump: the market as of the latest pull (offer history lives in
+      offer_presence.csv). Assembles stg_raw__ft_job_offers with every
+      enrichment: salary parsing (int_job_offer_salary_parsed), employer
+      classification (int_employers_classified), listing clusters
+      (int_job_offers_clustered), the DINUM SIREN (stg_dinum__companies) and
+      the LLM-extracted employer name (stg_extraction__skills). Left joins
+      only: an enrichment that is missing or late never removes an offer.
       Exposed model: this is the table to query for analysis, not the
       staging/intermediate layers.
     columns:
       - name: job_offer_id
-        description: Unique identifier of the job offer.
+        description: Unique identifier of the job offer (France Travail's own id). Grain of this model.
         data_tests:
           - not_null
           - unique
 
       - name: job_title
-        description: Job title.
+        description: Job title as published on the offer.
         data_tests:
           - not_null
 
       - name: job_offer_creation_date
-        description: Date the offer was created.
+        description: Date the offer was first published by France Travail.
         data_tests:
           - not_null
 
+      - name: job_offer_last_updated_date
+        description: Date the offer was last refreshed by France Travail.
+
       - name: rome_code
-        description: ROME occupation code.
+        description: >
+          ROME occupation code declared by the recruiter; one of the eight
+          codes of the collection scope (see CATEGORIES in full_pull.py).
         data_tests:
           - not_null
           - relationships:
-              to: ref('dim_rome')
-              field: rome_code
+              arguments:
+                to: ref('dim_rome')
+                field: rome_code
+
+      - name: rome_label
+        description: France Travail's label of rome_code.
+
+      - name: contract_type
+        description: >
+          France Travail contract type code: CDI (permanent), CDD (fixed
+          term), MIS (temporary agency assignment), LIB (profession
+          libérale, self-employed), CCE (profession commerciale, commercial
+          agent). Checked by assert_contract_type_valid_fct_job_offer.
+
+      - name: required_experience
+        description: >
+          France Travail experience code: D (beginners accepted), E
+          (experience required), S (experience desired).
 
       - name: postal_code
         description: >
-          Postal code of the commune, as provided by France Travail. Empty
-          for Paris, Lyon and Marseille, which don't have a single one:
-          their arrondissement isn't transmitted, only the overall commune's
-          INSEE code is. Kept for audit; don't use it as a geographic key,
-          use commune_key.
+          Postal code of the work location, as provided by France Travail.
+          Often empty in Paris, Lyon and Marseille, which have no single
+          postal code. Kept for audit; use commune_key as the geographic key.
+
+      - name: commune_code
+        description: INSEE code of the work location, as provided by France Travail.
 
       - name: commune_key
         description: >
-          INSEE code of the offer's commune, the join key toward
-          dim_commune. NULL when France Travail locates the offer only at
-          department, region or country level (63 of 854 offers on the
-          2026-09-26 dump).
+          INSEE code of the offer's commune (same value as commune_code), the
+          join key toward dim_commune. NULL when France Travail locates the
+          offer only at department, region or country level.
         data_tests:
           - relationships:
-              to: ref('dim_commune')
-              field: commune_key
+              arguments:
+                to: ref('dim_commune')
+                field: commune_key
 
       - name: geographic_zone
         description: >
-          mainland, overseas or unknown. A dimension, not a restriction
-          of scope: overseas territories weigh 17 offers out of 960 and
-          excluding them doesn't move any metric, but the zone stays
-          filterable on demand. 'unknown' covers the 101 offers with no
-          location information at all, and remains a value in its own right
-          rather than a default attachment to mainland France.
+          mainland, overseas (postal or INSEE code starting with 97 or 98) or
+          unknown (no location code at all). A dimension, not a restriction
+          of scope: overseas offers stay filterable on demand, and unknown
+          remains a value in its own right rather than a default attachment
+          to mainland France.
         data_tests:
           - not_null
 
-      - name: siren
-        description: >
-          SIREN of the employing company, from the DINUM enrichment, for
-          DIRECT_EMPLOYER offers only. NULL for every other category, and for
-          direct-employer offers the matching left unresolved or that the
-          latest DINUM dump doesn't cover (2026-09-26 dumps: 243 of the 267
-          direct-employer offers carry a SIREN).
-        data_tests:
-          - relationships:
-              to: ref('dim_company')
-              field: siren
-
       - name: employer_name
         description: >
-          Employer name. Structured (France Travail) except for the 21
-          offers with employer_category = 'INTERMEDIARY_RECLASSIFIED', where
-          it comes from employer_name_text, LLM-extracted from the offer's
-          text. NULL on 5/21 of those offers: the masking is detected
-          without the intermediary's name being identifiable in the text --
-          deliberately not forced.
+          Employer name. France Travail's structured value, except for
+          employer_category = 'INTERMEDIARY_RECLASSIFIED', where it comes from
+          employer_name_text, LLM-extracted from the offer's text, and can be
+          NULL: the masking is detected without the intermediary's name being
+          identifiable in the text, deliberately not forced.
 
-      - name: employer_category
+      - name: naf_code
         description: >
-          DIRECT_EMPLOYER / INTERMEDIARY / ANONYMOUS / INTERMEDIARY_RECLASSIFIED.
-          See int_employers_classified for the full logic.
+          NAF code published on the offer by France Travail (often empty).
+          Not the employer's registered NAF code: see dim_company for that.
+
+      - name: salary_label
+        description: >
+          Free-text salary label published by France Travail, NULL when the
+          offer states no salary. Parsed by int_job_offer_salary_parsed.
+
+      - name: position_count
+        description: Number of positions to fill, as declared on the offer.
+
+      - name: job_description
+        description: >
+          Full text of the listing, carried over from stg_raw__ft_job_offers.
+          Source of the LLM extraction. Carried by fct_job_offer rather than
+          read from stg_raw__ft_job_offers because fct_job_offer is
+          materialized as a table: it can be queried from any directory,
+          where a view only resolves its relative path from the dbt
+          project's own root.
+        data_tests:
+          - not_null
+
+      - name: salary_min
+        description: >
+          Lower bound of the parsed salary, in the unit given by
+          salary_period. See int_job_offer_salary_parsed.
+
+      - name: salary_max
+        description: >
+          Upper bound of the parsed salary; equal to salary_min when the
+          label states a single amount.
+
+      - name: salary_period
+        description: >
+          annual, monthly or hourly, after reclassifying monthly amounts
+          above 10000 EUR as annual. NULL when no salary is stated or the
+          label can't be parsed.
+
+      - name: salary_mentioned
+        description: Whether the offer states a salary at all (salary_label not NULL).
 
       - name: annual_salary_plausible
         description: >
           Does the annual amount fall within the plausibility bounds
-          [10,000, 300,000 €]? NULL when the question doesn't
-          apply: non-annual period, or no amount. Three states rather than
-          two, because "not applicable" isn't "implausible". Any annual
-          salary aggregation must filter on it: as of 2026-09-03, 15 offers
-          out of 275 are flagged false, and they're enough to drop Tableau's
-          median to 1,800 € instead of 37,000 €. Invisible on the overall
-          aggregate, which is 45,000 € either way; destructive on a slice.
-          Consistency guaranteed by assert_plausible_salary_flag (severity
-          error), volume tracked by assert_annual_salary_bounds (warn).
+          [10,000, 300,000 €]? NULL when the question doesn't apply:
+          non-annual period, or no amount. Three states rather than two,
+          because "not applicable" isn't "implausible". Any annual salary
+          aggregation must filter on it: a handful of implausible values is
+          invisible on the overall median but can wreck the median of a
+          small slice (a single technology, a single commune). Consistency
+          guaranteed by assert_plausible_salary_flag (severity error), volume
+          tracked by assert_annual_salary_bounds (warn).
 
       - name: listing_signature
         description: >
           Fingerprint of the listing's text, normalized to lowercase with
           collapsed whitespace. Two offers sharing it are the same listing
-          published more than once. 152 offers out of 960 are in this case
-          as of 2026-09-04.
+          published more than once. See int_job_offers_clustered.
 
       - name: cluster_size
         description: >
-          Number of offers sharing this signature. 1 for a listing published
-          only once. Maximum observed: 25, one employer publishing the same
-          position in 24 communes.
+          Number of offers sharing this signature; 1 for a listing published
+          only once.
         data_tests:
           - not_null
 
       - name: is_canonical_listing
         description: >
           True for exactly one offer per cluster, the oldest one. Filtering
-          on it counts LISTINGS (865), not filtering counts OFFERS (960).
-          The gap isn't cosmetic: SQL loses 16.7% of its mentions and the
-          salary median goes from 45,000 to 43,000 €. Uniqueness guaranteed
-          by assert_one_canonical_per_cluster (severity error).
+          on it counts LISTINGS, not filtering counts OFFERS; the two answers
+          differ wherever a listing is republished (SQL mentions drop by 7%
+          on the 2026-09-26 dump). Uniqueness guaranteed by
+          assert_one_canonical_per_cluster (severity error).
         data_tests:
           - not_null
 
-      - name: job_description
+      - name: employer_category
         description: >
-          Full text of the listing, carried over from stg_raw__ft_job_offers.
-          Added as the source for LLM extraction. Carried by fct_job_offer
-          rather than read from stg_raw__ft_job_offers because fct_job_offer
-          is materialized as a table: it can be queried from any directory,
-          where a view only resolves its relative path from the dbt
-          project's own root.
+          DIRECT_EMPLOYER / INTERMEDIARY / ANONYMOUS / INTERMEDIARY_RECLASSIFIED.
+          See int_employers_classified for the full logic.
+
+      - name: siren
+        description: >
+          SIREN of the employing company, from the DINUM enrichment, for
+          DIRECT_EMPLOYER offers only. NULL for every other category, and for
+          direct-employer offers the matching left unresolved or that the
+          latest DINUM dump doesn't cover.
         data_tests:
-          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_company')
+                field: siren
