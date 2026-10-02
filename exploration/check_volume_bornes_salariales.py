@@ -13,10 +13,10 @@ import duckdb
 CHEMIN_DB = "../data/warehouse.duckdb"
 con = duckdb.connect(CHEMIN_DB, read_only=True)
 
-print("--- Répartition salary_period sur int_job_offer_salary ---")
+print("--- Répartition salary_period sur int_job_offer_salary_parsed ---")
 res = con.execute("""
     select salary_period, count(*) as nb
-    from int_job_offer_salary
+    from int_job_offer_salary_parsed
     where salary_period = 'horaire'
         or salary_period = 'mensuel'
         or salary_period = 'annual'

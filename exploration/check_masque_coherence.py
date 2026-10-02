@@ -29,7 +29,7 @@ res = con.execute("""
         s.end_client_masked,
         f.job_description ilike '%notre client%' as pattern_texte,
         count(*) as nb
-    from int_employer_classification c
+    from int_employers_classified c
     join stg_extraction__skills s on c.job_offer_id = s.job_offer_id
     join stg_raw__ft_job_offers f on c.job_offer_id = f.job_offer_id
     where c.employer_category = 'ANONYMOUS'

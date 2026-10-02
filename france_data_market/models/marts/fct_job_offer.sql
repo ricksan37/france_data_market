@@ -3,8 +3,8 @@
 -- fct_job_offer: fine-grained fact table.
 -- Grain: one row per job offer. Key: job_offer_id.
 -- Assembles stg_raw__ft_job_offers (raw facts) with the int_ layer's
--- enrichments: salary parsing (int_job_offer_salary) and employer
--- classification (int_employer_classification). Left join from
+-- enrichments: salary parsing (int_job_offer_salary_parsed) and employer
+-- classification (int_employers_classified). Left join from
 -- stg_raw__ft_job_offers: the fact table must never lose rows because an
 -- enrichment is missing or late.
 -- rome_code and postal_code stay as raw foreign keys toward dim_rome /
@@ -64,7 +64,7 @@ select
     s.salary_mentioned,
     s.annual_salary_plausible,
 
-    -- Identical listing clusters. See int_job_listing_clusters: the same
+    -- Identical listing clusters. See int_job_offers_clustered: the same
     -- position published in several cities gets one identifier per city and
     -- so counts that many times in every aggregate. Filtering on
     -- is_canonical_listing counts listings, not filtering counts offers.
@@ -75,13 +75,13 @@ select
     c.employer_category,
     d.siren
 from {{ ref('stg_raw__ft_job_offers') }} as f
-left join {{ ref('int_job_offer_salary') }} as s
+left join {{ ref('int_job_offer_salary_parsed') }} as s
     on f.job_offer_id = s.job_offer_id
-left join {{ ref('int_employer_classification') }} as c
+left join {{ ref('int_employers_classified') }} as c
     on f.job_offer_id = c.job_offer_id
 left join {{ ref('stg_dinum__companies') }} as d
     on f.job_offer_id = d.job_offer_id
 left join {{ ref('stg_extraction__skills') }} as k
     on f.job_offer_id = k.job_offer_id
-left join {{ ref('int_job_listing_clusters') }} as g
+left join {{ ref('int_job_offers_clustered') }} as g
     on f.job_offer_id = g.job_offer_id

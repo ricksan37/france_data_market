@@ -5,8 +5,8 @@ models:
   - name: fct_job_offer
     description: >
       Fine-grained fact table. One row per job offer. Assembles
-      stg_raw__ft_job_offers with the salary (int_job_offer_salary) and
-      employer classification (int_employer_classification) enrichments.
+      stg_raw__ft_job_offers with the salary (int_job_offer_salary_parsed) and
+      employer classification (int_employers_classified) enrichments.
       Exposed model: this is the table to query for analysis, not the
       staging/intermediate layers.
     columns:
@@ -86,7 +86,7 @@ models:
       - name: employer_category
         description: >
           DIRECT_EMPLOYER / INTERMEDIARY / ANONYMOUS / INTERMEDIARY_RECLASSIFIED.
-          See int_employer_classification for the full logic.
+          See int_employers_classified for the full logic.
 
       - name: annual_salary_plausible
         description: >

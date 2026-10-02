@@ -14,7 +14,7 @@
 -- Conditional branch: in CI (CI_WITHOUT_EXTRACTION=true), the extraction dump
 -- doesn't exist -- Ollama runs for 3h locally, never on a GitHub runner. The
 -- model then returns 0 rows with the same schema rather than failing to read
--- an absent file. int_employer_classification already degrades cleanly on
+-- an absent file. int_employers_classified already degrades cleanly on
 -- an empty table (end_client_masked always NULL -> INTERMEDIARY_RECLASSIFIED
 -- branch never triggers in CI, intended behavior).
 {% if not in_ci_without_extraction() %}

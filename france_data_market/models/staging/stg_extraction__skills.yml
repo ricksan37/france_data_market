@@ -60,12 +60,12 @@ models:
         description: >
           Employer name extracted by the LLM from the offer body, used only
           when the structured employer name is masked by an intermediary
-          (see end_client_masked and int_employer_classification).
+          (see end_client_masked and int_employers_classified).
 
       - name: end_client_masked
         description: >
           True when the offer's text reveals that the advertiser is acting
           for a masked end client, even though no employer name/NAF let the
           structural classification detect it. Drives the
-          INTERMEDIARY_RECLASSIFIED category in int_employer_classification.
+          INTERMEDIARY_RECLASSIFIED category in int_employers_classified.
           Always NULL in CI (see model description).

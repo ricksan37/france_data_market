@@ -20,7 +20,7 @@ models:
           France Travail that week. See fct_weekly_market for the full caveat.
 
       - name: anonymous_offer_count
-        description: Count of offers classified ANONYMOUS (see int_employer_classification) as of this week.
+        description: Count of offers classified ANONYMOUS (see int_employers_classified) as of this week.
 
       - name: intermediary_offer_count
         description: Count of offers classified INTERMEDIARY as of this week.

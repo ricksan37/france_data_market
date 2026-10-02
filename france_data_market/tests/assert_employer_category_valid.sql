@@ -6,7 +6,7 @@
 select
     job_offer_id,
     employer_category
-from {{ ref('int_employer_classification') }}
+from {{ ref('int_employers_classified') }}
 where employer_category != 'DIRECT_EMPLOYER'
   and employer_category != 'INTERMEDIARY'
   and employer_category != 'ANONYMOUS'

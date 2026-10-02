@@ -71,7 +71,7 @@ models:
         description: >
           Salary as a free-text label published by France Travail (e.g.
           "Annuel de 45000.0 Euros à 60000.0 Euros"). Parsed downstream by
-          int_job_offer_salary.
+          int_job_offer_salary_parsed.
 
       - name: position_count
         description: Number of positions to fill for this job offer.

@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: int_job_offer_salary
+  - name: int_job_offer_salary_parsed
     description: >
       Regex parsing of France Travail's free-text salary_label into a
       structured period/min/max, plus the annual_salary_plausible flag.
@@ -50,7 +50,7 @@ unit_tests:
       Verifies the salary regex parsing, the monthly -> annual
       reclassification, the three-state annual plausibility flag, and that
       an unparsable label yields NULL rather than an empty string.
-    model: int_job_offer_salary
+    model: int_job_offer_salary_parsed
     given:
       - input: ref('stg_raw__ft_job_offers')
         rows:

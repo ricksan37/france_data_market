@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: int_job_listing_clusters
+  - name: int_job_offers_clustered
     description: >
       Groups job offers that are actually the same listing published several
       times (in several communes, or again in the same one), via a
@@ -38,7 +38,7 @@ unit_tests:
       Case and whitespace variants of a text share a signature; the oldest
       offer of a cluster is canonical; on equal dates job_offer_id breaks the
       tie, compared as text ("1000" sorts before "200").
-    model: int_job_listing_clusters
+    model: int_job_offers_clustered
     given:
       - input: ref('stg_raw__ft_job_offers')
         rows:

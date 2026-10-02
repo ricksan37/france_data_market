@@ -15,7 +15,7 @@ con = duckdb.connect(CHEMIN_DB, read_only=True)
 
 res = con.execute("""
     select employer_category, count(*) as nb
-    from int_employer_classification
+    from int_employers_classified
     group by employer_category
     order by nb desc
 """).fetchall()

@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: int_employer_classification
+  - name: int_employers_classified
     description: >
       Employer classification for each job offer, based on NAF code and
       employer name and, as a last resort, the end_client_masked text signal
@@ -30,7 +30,7 @@ unit_tests:
       (case-insensitive, no prefix match) and, as a last resort, the
       end_client_masked text signal; a structured employer name takes
       precedence over that text signal.
-    model: int_employer_classification
+    model: int_employers_classified
     given:
       - input: ref('stg_raw__ft_job_offers')
         rows:

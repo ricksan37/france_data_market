@@ -3,7 +3,7 @@ check_anonymes_masques.py
 
 Objectif : mesurer le volume d'offres ANONYME reclassifiables en INTERMEDIAIRE
 via end_client_masked (Phase 4), avant d'écrire la moindre logique de
-reclassification dans int_employer_classification.
+reclassification dans int_employers_classified.
 
 Lancement : depuis france_data_market/ -> python3 ../exploration/check_anonymes_masques.py
 """
@@ -27,7 +27,7 @@ for masque, nb in res:
 print("\n--- 2. ANONYME avec end_client_masked = true ---")
 nb_reclassifiables = con.execute("""
     select count(*)
-    from int_employer_classification c
+    from int_employers_classified c
     join stg_extraction__skills s on c.job_offer_id = s.job_offer_id
     where c.employer_category = 'ANONYMOUS'
     and s.end_client_masked = true
@@ -37,7 +37,7 @@ print(f"  {nb_reclassifiables}")
 print("\n--- 3. Parmi eux, employer_name_text renseigné ---")
 nb_avec_nom = con.execute("""
     select count(*)
-    from int_employer_classification c
+    from int_employers_classified c
     join stg_extraction__skills s on c.job_offer_id = s.job_offer_id
     where c.employer_category = 'ANONYMOUS'
     and s.end_client_masked = true
@@ -49,7 +49,7 @@ print(f"  {nb_avec_nom}")
 print("\n--- 4. Nouveau total ANONYME après reclassification ---")
 total_anonyme = con.execute("""
     select count(*)
-    from int_employer_classification
+    from int_employers_classified
     where employer_category = 'ANONYMOUS'
 """).fetchone()[0]
 nouveau_total = total_anonyme - nb_reclassifiables

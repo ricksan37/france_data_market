@@ -18,7 +18,7 @@
 -- consistent mechanisms: a monthly salary labeled annual (11 listings from
 -- the same advertiser, all at 1800 €) and an hourly rate labeled annual (4
 -- listings, 15 to 40 €). The rule was therefore written, but elsewhere:
--- annual_salary_plausible in int_job_offer_salary, protected by
+-- annual_salary_plausible in int_job_offer_salary_parsed, protected by
 -- assert_plausible_salary_flag at severity error.
 --
 -- Why this test doesn't move to error regardless: the 15 rows exist and
