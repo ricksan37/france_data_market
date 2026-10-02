@@ -2,43 +2,75 @@ version: 2
 
 sources:
   - name: raw
+    description: >
+      France Travail job offer dumps written by full_pull.py, one JSON file
+      per pull. Every dump on disk is read; stg_raw__ft_job_offers keeps only
+      the most recent one, so downstream models describe the market as of
+      the latest pull. The offer history lives in offer_presence.py, which
+      reads the dumps directly.
     meta:
-      external_location: "read_json_auto('../data/raw/job_offers_*.json')"
+      external_location: "read_json_auto('../data/raw/job_offers_*.json', filename=true)"
     tables:
       - name: ft_job_offers
+        description: >
+          One row per dump file (keys metadata and resultats); the offers
+          are nested in the resultats array. filename identifies the dump.
 
-  # One explicitly named file, the most recent, not a glob: each
-  # enrich_dinum.py run re-enriches every DIRECT_EMPLOYER offer in
-  # fct_job_offer, so the latest dump supersedes the earlier ones, and a glob
-  # would duplicate job_offer_id. Cost: the name must be updated by hand after
-  # each run (enrichment isn't in the weekly workflow; known debt, README).
+  # Every DINUM dump is read and stg_dinum__companies keeps the most recent
+  # one: each enrich_dinum.py run re-enriches every DIRECT_EMPLOYER offer in
+  # fct_job_offer, so the latest dump supersedes the earlier ones, and keeping
+  # them all would duplicate job_offer_id.
   - name: dinum
+    description: >
+      Company enrichment written by enrich_dinum.py: each direct-employer
+      offer matched to a SIRENE company through the DINUM API. Every dump on
+      disk is read; stg_dinum__companies keeps only the most recent one.
     meta:
-      external_location: "read_json_auto('../data/raw/enrich_dinum_2026-09-26_2208.json')"
+      external_location: "read_json_auto('../data/raw/enrich_dinum_*.json', filename=true)"
     tables:
       - name: companies
+        description: >
+          One row per dump file (keys metadata and resultats); one result
+          per enriched job offer is nested in the resultats array.
+          filename identifies the dump.
 
   # Output of weekly_snapshot.py, hence a SOURCE just like the JSON dumps --
   # not a seed. The project's two seeds (mapping_domaines, mapping_communes)
   # are lookup tables maintained by hand; this file is written by a script on
   # every run. The criterion is who authors the file, not its extension.
   - name: history
+    description: >
+      Weekly market metrics written by weekly_snapshot.py and committed by
+      the weekly workflow.
     meta:
       external_location: "read_csv_auto('../data/snapshots/weekly_market.csv')"
     tables:
       - name: weekly_market
+        description: One row per ISO week (its Monday); a rerun within the same week overwrites that week's row.
 
   # Output of offer_presence.py. A separate source from `history`: in this
   # project, external_location lives on the source, so two files = two
   # sources.
   - name: presence
+    description: >
+      Offer presence history written by offer_presence.py from the raw
+      dumps, committed by the weekly workflow.
     meta:
       external_location: "read_csv_auto('../data/snapshots/offer_presence.csv')"
     tables:
       - name: job_offer_presence
+        description: One row per (week, job_offer_id) pair, the week being the Monday of the dump's week.
 
   - name: extraction
+    description: >
+      LLM skill extraction written by extract_skills.py (mistral-nemo via
+      Ollama, local only, never in CI). Every dump is read: each run only
+      processes offers absent from earlier dumps, so dumps don't overlap
+      (tested by unique on stg_extraction__skills.job_offer_id).
     meta:
       external_location: "read_json_auto('../data/raw/extract_skills_*.json')"
     tables:
       - name: skills
+        description: >
+          One row per dump file (keys metadata and resultats); one result
+          per job offer is nested in the resultats array.

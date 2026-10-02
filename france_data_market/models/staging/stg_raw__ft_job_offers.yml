@@ -3,14 +3,12 @@ version: 2
 models:
   - name: stg_raw__ft_job_offers
     description: >
-      Staging model for the France Travail raw job offers dump. Grain is 1
-      row = 1 job offer, deduplicated to the most recently updated version
-      per job_offer_id. Duplicates come from cross-category overlap and from
-      overlapping dumps. The July figure (1094 raw rows -> 552 unique) was
-      inflated by a pagination bug fixed on 2026-09-26: 449 of its 542
-      duplicates were the same first page served repeatedly, and the dump
-      itself was truncated (M1811 and "data analyst" capped at 150 offers).
-      No business logic beyond deduplication and renaming.
+      Staging model for the France Travail job offer dumps, restricted to the
+      most recent dump. Grain is 1 row = 1 job offer of the latest pull.
+      Repeated job_offer_id rows (offers matched by several categories in
+      dumps collected before 2026-09-29) are reduced to the most recently
+      updated version. No business logic beyond selecting the latest dump,
+      deduplicating and renaming.
     columns:
       - name: job_offer_id
         description: Unique identifier of the job offer (France Travail's own id). Grain of this model.

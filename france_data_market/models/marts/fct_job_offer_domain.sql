@@ -19,6 +19,8 @@
 -- too thin to defend (project principle, cf. assert_annual_salary_bounds).
 -- raw_domain stays the audit source; normalized_domain equals raw_domain
 -- unchanged when no match exists in the mapping.
+-- Restricted to offers in fct_job_offer: the extraction dumps cover every
+-- offer ever extracted, fct_job_offer only the latest pull.
 select
     d.job_offer_id,
     d.domain as raw_domain,
@@ -29,6 +31,7 @@ from (
         unnest(domains) as domain
     from {{ ref('stg_extraction__skills') }}
     where extraction_status = 'ok'
+        and job_offer_id in (select job_offer_id from {{ ref('fct_job_offer') }})
 ) as d
 left join {{ ref('mapping_domaines') }} as m
     on d.domain = m.variant

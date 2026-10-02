@@ -4,10 +4,11 @@
 #
 # The GitHub Actions runner is disposable: nothing persists from one run to
 # the next except what's explicitly committed. data/warehouse.duckdb and the
-# JSON dumps therefore stay ephemeral (gitignored, as locally); only
-# data/snapshots/weekly_market.csv is committed on every run, a lightweight
-# file that accumulates the history fct_weekly_market needs without ever
-# recommitting the 552+ raw offers (accepted decision, not reopened).
+# fresh JSON dump stay ephemeral (gitignored, as locally). The repo does
+# version one reference job offers dump (used by ci.yml) and the DINUM
+# dumps; stg_raw__ft_job_offers keeps only the most recent job offers dump,
+# so the fresh pull is the one measured. Only data/snapshots/ is committed
+# on every run.
 
 name: Weekly pull
 

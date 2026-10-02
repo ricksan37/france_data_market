@@ -13,6 +13,9 @@ models:
     columns:
       - name: job_offer_id
         description: Unique identifier of the job offer. Grain of this model.
+        data_tests:
+          - unique
+          - not_null
 
       - name: extraction_status
         description: >

@@ -1,4 +1,8 @@
--- Staging model for the DINUM company-enrichment dump.
+-- Staging model for the DINUM company-enrichment dumps.
+-- Only the most recent dump is kept: each enrich_dinum.py run re-enriches
+-- every DIRECT_EMPLOYER offer, so the latest dump supersedes the earlier
+-- ones. Dump filenames end with a YYYY-MM-DD_HHMM timestamp, so the greatest
+-- filename is the latest run.
 -- No business logic here: flattening, renaming, casting only. Grain is
 -- 1 row = 1 enriched job offer, not yet 1 row = 1 SIREN (a company can post
 -- several offers).
@@ -9,10 +13,18 @@ with source as (
 
 ),
 
+latest_dump as (
+
+    select *
+    from source
+    where filename = (select max(filename) from source)
+
+),
+
 unnested as (
 
     select t.r as r
-    from source as s,
+    from latest_dump as s,
         unnest(s.resultats) as t(r)
 
 ),

@@ -1,11 +1,12 @@
--- Staging model for the France Travail raw job offers dump.
--- Deduplication: qualify row_number() over (partition by job_offer_id order
--- by job_offer_last_updated_date desc) = 1. It absorbs two things: the same
--- offer matched by several categories (a ROME code and a keyword), and the
--- same offer seen in several dumps. On the July dump, 1094 raw rows -> 552
--- unique offers, but 449 of those 542 duplicates were a pagination bug (the
--- API ignored the Range header and served the first page repeatedly, fixed
--- 2026-09-26), not live-index noise; only 93 were cross-category overlap.
+-- Staging model for the France Travail job offer dumps.
+-- Only the most recent dump is kept, so downstream models describe the
+-- market as of the latest pull; offer_presence.py keeps the history by
+-- reading every dump directly. Dump filenames end with a YYYY-MM-DD_HHMM
+-- timestamp, so the greatest filename is the latest pull.
+-- Deduplication on job_offer_id is a guard: in a ROME-only dump an offer
+-- appears once, since it has a single ROME code. Dumps collected before
+-- 2026-09-29 (ROME codes plus keywords) repeat offers matched by several
+-- categories: 138 identical copies out of 992 rows in the 2026-09-26 dump.
 -- No other business logic here.
 
 with source as (
@@ -14,10 +15,18 @@ with source as (
 
 ),
 
+latest_dump as (
+
+    select *
+    from source
+    where filename = (select max(filename) from source)
+
+),
+
 unnested as (
 
     select t.offre as offre
-    from source,
+    from latest_dump,
         unnest(resultats) as t(offre)
 
 ),

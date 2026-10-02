@@ -46,7 +46,7 @@ CI: `.github/workflows/ci.yml` runs on every push (compile scripts, `dbt build` 
 - `dim_company.age_years` is a raw column; no `is_startup` flag (age / NAF / headcount do not discriminate).
 - Skill extraction model: mistral-nemo 12B. The extraction prompt and its JSON field names stay in French: per-field instructions are anchored to those names.
 - The `domains` field is under-extracted on consulting offers: accepted, documented limit.
-- The `dinum` dbt source points to the latest DINUM dump by name: update it by hand after each `enrich_dinum.py` run.
+- The `dinum` dbt source reads every DINUM dump and `stg_dinum__companies` keeps the most recent one (each run supersedes the earlier ones). A run with any `technical_error` fails `dbt build` through the `match_status` test.
 - Our own vocabulary (`employer_category`, `salary_period`, `geographic_zone`, `match_status`) is in English; values copied from source text stay in their source language.
 
 ## Conventions
@@ -64,7 +64,6 @@ Language-specific rules live in `.claude/rules/` (Python, dbt).
 ## Known gaps
 
 - No dbt model yet qualifies an offer as data / not data.
-- `fct_job_offer` unions every dump in `data/raw/`, whatever the scope it was collected with.
-- README, `dim_rome.yml` and a comment in `stg_raw__ft_job_offers.sql` still describe the former scope.
+- README and `dim_rome.yml` still describe the former scope.
 - Several SQL files avoid multi-value `IN()` because of a DuckDB optimizer bug that does not reproduce on DuckDB 1.5.4 (tested on real views). `IN()` is fine; the README still mentions the bug.
-- `data/warehouse.duckdb` holds relations of models that no longer exist (former French names such as `fct_offre`, `stg_ft_offres`): dbt never drops a renamed model's old relation.
+- dbt never drops the relation of a renamed or deleted model: after a rename, delete data/warehouse.duckdb and rerun dbt build (the warehouse is fully rebuilt from data/ and the seeds).
