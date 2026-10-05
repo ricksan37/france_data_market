@@ -8,6 +8,7 @@ Working rules: [CLAUDE.md](CLAUDE.md).
 - Fix `8c0b38a`: retry waits of 5, 15, 45 and 90 s (was 2, 4, 8 and 16 s), `Retry-After` honoured when sent.
 - A manual rerun the same evening (816 offers, 262 DINUM offers) had 0 HTTP error, 0 retry, a 90.5 % match rate, and ran in 7 min 41 s (39 min in the morning). The fix itself was not exercised.
 - Commit `ea31b10`: `upload-artifact` v7, `upload-pages-artifact` v5, `deploy-pages` v5 (Node 24), runners pinned to `ubuntu-24.04` (`ubuntu-latest` moves to Ubuntu 26 on 2026-10-19). The rerun showed no warning.
+- CI scans the whole git history for secrets with gitleaks 8.30.1 on every push (public repository).
 
 ## Data history
 - Dumps collected before 2026-09-29 used a different scope (ROME codes plus keywords) and are not comparable with later ones.
