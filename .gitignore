@@ -11,3 +11,4 @@ logs/
 dashboard/report.html
 CLAUDE.local.md
 .claude/settings.local.json
+.user.yml
