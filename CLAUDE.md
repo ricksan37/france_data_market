@@ -66,7 +66,7 @@ CI: `.github/workflows/ci.yml` runs on every push (compile scripts, `dbt build` 
 - A matching rule that adds under about 2 % of offers with doubtful matches is removed rather than kept for a marginal gain.
 - Visual deliverables (report, charts, slides) follow the `millimeter-visual-identity` skill.
 - One shell command at a time; never chain several on one line.
-- Git: never run `git commit` or `git push`. Prepare the commit message and the commands; the user runs them. A one-line message without quotes can go through `git commit -m`; a multi-line message goes through `git commit` (editor) or `git commit -F <file>`, because pasting multi-line quoted text breaks zsh quote parsing.
+- Git: never run `git commit` or `git push`, unless the user explicitly asks for it in the same message. Otherwise prepare the commit message and the commands; the user runs them. A one-line message without quotes can go through `git commit -m`; a multi-line message goes through `git commit` (editor) or `git commit -F <file>`, because pasting multi-line quoted text breaks zsh quote parsing.
 - The weekly workflow commits to `main`: the local copy is often behind. `git pull` (configured to rebase and autostash) before `git push`.
 
 Language-specific rules live in `.claude/rules/` (Python, dbt).

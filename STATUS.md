@@ -10,6 +10,7 @@ Working rules: [CLAUDE.md](CLAUDE.md).
 - Commit `ea31b10`: `upload-artifact` v7, `upload-pages-artifact` v5, `deploy-pages` v5 (Node 24), runners pinned to `ubuntu-24.04` (`ubuntu-latest` moves to Ubuntu 26 on 2026-10-19). The rerun showed no warning.
 - CI scans the whole git history for secrets with gitleaks 8.30.1 on every push (public repository).
 - CI dataset: the versioned job offers dump is now the 2026-10-05 pull (eight-ROME-code scope, 814 offers, 3.6 MB). The 2026-07-17 dump left the repository on 2026-10-05; it stays in the git history.
+- README findings 2 to 4 re-measured on the 2026-10-05 pull (eight-ROME-code scope, 814 offers, 792 distinct listings); the GitHub profile README carries the same figures.
 
 ## Data history
 - Dumps collected before 2026-09-29 used a different scope (ROME codes plus keywords) and are not comparable with later ones.
@@ -17,10 +18,13 @@ Working rules: [CLAUDE.md](CLAUDE.md).
 
 ## Known gaps
 - No dbt model yet qualifies an offer as data / not data.
-- The README still describes the former scope, and still mentions a DuckDB optimizer bug on multi-value `IN()` that does not reproduce on DuckDB 1.5.4 (tested on real views): `IN()` is fine.
+- 20 commits (2026-09-04 to 2026-09-30) carry a Co-Authored-By line. The history is left as is: the repository is public, and rewriting it would need a force-push and change every later hash.
 
 ## Open points
-- Monday 2026-10-12, 06:00 UTC, first scheduled run since the fix: count the `HTTP error for` lines (expected 0) and the `retry n/4` lines (403 on 2026-10-05), and check whether a 429 carries a `Retry-After` header (the log does not print headers). If `technical_error` persists: requeue the failed offers after a 60 s pause.- Review the 5 matches flagged by the quality audit of 2026-10-05 (227 matches); word inclusion adds 0.4 % of matches, under the 2 % bar in `CLAUDE.md`.
+- Monday 2026-10-12, 06:00 UTC, first scheduled run since the fix: count the `HTTP error for` lines (expected 0) and the `retry n/4` lines (403 on 2026-10-05), and check whether a 429 carries a `Retry-After` header (the log does not print headers). If `technical_error` persists: requeue the failed offers after a 60 s pause.
+- Review the 5 matches flagged by the quality audit of 2026-10-05 (227 matches); word inclusion adds 0.4 % of matches, under the 2 % bar in `CLAUDE.md`.
+- Decide what to do with the locally modified notebook `notebooks/01_market_exploration.ipynb` (commit or discard).
+- Open the published GitHub Pages report and check that it is up to date.
 
 ## How to resume
 - `source .venv/bin/activate`. Python scripts run from the repo root, dbt commands from `france_data_market/`.
