@@ -71,9 +71,12 @@ DELAY_BETWEEN_CALLS = 1 / 7
 # Transient failures: the 2026-09-26 run (929 offers, 4x the July population)
 # died at offer 61 on a "connection reset by peer" during the TLS handshake,
 # with nothing written -- the API answered normally seconds later. Retried
-# with growing waits (2, 4, 8, 16 s) on network errors, 429 and 5xx; any
+# with growing waits (5, 15, 45, 90 s) on network errors, 429 and 5xx; any
 # other HTTP error, or a failure persisting past the last try, still raises.
+# The 2026-10-05 CI run (263 offers) left 14 offers in 429 through waits of
+# 2 to 16 s: the limit is shared by the runner's IP and outlasts 30 s.
 MAX_ATTEMPTS = 5
+RETRY_WAITS_SECONDS = (5, 15, 45, 90)
 REQUEST_TIMEOUT_SECONDS = 30
 
 STOP_WORDS = {"DE", "LA", "LE", "DU", "DES", "ET", "D", "L"}
@@ -233,6 +236,7 @@ def search(name, geo_params):
     """
     params = {"q": name, **geo_params}
     for attempt in range(1, MAX_ATTEMPTS + 1):
+        retry_after = ""
         try:
             resp = requests.get(DINUM_URL, params=params,
                                 timeout=REQUEST_TIMEOUT_SECONDS)
@@ -248,12 +252,17 @@ def search(name, geo_params):
                     )
                 break
             reason = f"HTTP {resp.status_code}"
+            retry_after = resp.headers.get("Retry-After", "")
         except (requests.exceptions.ConnectionError,
                 requests.exceptions.Timeout) as err:
             if attempt == MAX_ATTEMPTS:
                 raise
             reason = type(err).__name__
-        wait = 2 ** attempt
+        wait = RETRY_WAITS_SECONDS[attempt - 1]
+        # Not observed on a 200 (checked 2026-10-05): honoured if the API
+        # sends it on a 429, ignored otherwise.
+        if retry_after.isdigit():
+            wait = max(wait, int(retry_after))
         print(f"  {reason} for '{name}', retry {attempt}/{MAX_ATTEMPTS - 1} in {wait}s")
         time.sleep(wait)
     time.sleep(DELAY_BETWEEN_CALLS)
