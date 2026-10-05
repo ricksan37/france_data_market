@@ -1,31 +1,30 @@
 # get_referentiel.py
 """
-Script d'exploration : récupérer un référentiel de l'API et pré-filtrer les
-appellations liées à la data.
+Exploration script: fetch a reference list from the API and pre-filter the
+data-related appellations.
 
-L'API expose des référentiels (communes, appellations, etc.). Ici on récupère
-le référentiel "appellations" (la liste officielle des intitulés de métiers)
-et on le tamise sur quelques mots-clés data pour repérer, en amont, tous les
-libellés susceptibles de nous intéresser. Ça sert à cadrer le périmètre avant
-d'interroger les offres.
+The API exposes reference lists (communes, appellations, etc.). Here we fetch
+the "appellations" list (the official list of job titles) and sift it on a few
+data keywords to spot, upstream, all the labels likely to interest us. It
+serves to frame the scope before querying the offers.
 
-Script jetable, gardé dans exploration/ pour tracer la démarche.
+Throwaway script, kept in exploration/ to trace the approach.
 """
 
 from auth import get_access_token
 import requests
 
-# URL paramétrable par type de référentiel ({type} formaté à l'appel).
+# URL parameterized by reference type ({type} formatted at call time).
 REFERENTIEL_URL = "https://api.francetravail.io/partenaire/offresdemploi/v2/referentiel/{type}"
 
 
 def get_referentiel(type_referentiel: str) -> list[dict] | None:
     """
-    Récupère un référentiel complet de l'API.
+    Fetches a complete reference list from the API.
 
-    type_referentiel : str, ex. "appellations". Retourne le JSON décodé
-    (liste de dicts) en cas de succès, ou None si l'appel échoue, auquel
-    cas le corps de la réponse est affiché pour diagnostic.
+    type_referentiel: str, e.g. "appellations". Returns the decoded JSON
+    (list of dicts) on success, or None if the call fails, in which case the
+    response body is printed for diagnosis.
     """
     token, _ = get_access_token()
     headers = {"Authorization": f"Bearer {token}"}
@@ -35,7 +34,7 @@ def get_referentiel(type_referentiel: str) -> list[dict] | None:
     print(f"Statut HTTP : {response.status_code}")
 
     if response.status_code != 200:
-        print(response.text)  # utile pour voir le message d'erreur exact
+        print(response.text)  # useful to see the exact error message
         return None
 
     return response.json()
@@ -47,13 +46,13 @@ if __name__ == "__main__":
     if appellations:
         print(f"Total appellations dans le référentiel : {len(appellations)}")
 
-        # Pré-filtre : on ne garde que les libellés contenant un de ces mots.
+        # Pre-filter: keep only the labels containing one of these words.
         mots_cles = ["data", "analytic", "décisionnel", "business intelligence"]
         matches = [
             a for a in appellations
             if any(mot in a["libelle"].lower() for mot in mots_cles)
         ]
-        matches.sort(key=lambda a: a["libelle"])  # tri alphabétique pour la lecture
+        matches.sort(key=lambda a: a["libelle"])  # alphabetical sort for readability
 
         print(f"\n{len(matches)} appellations pré-filtrées :\n")
         for a in matches:

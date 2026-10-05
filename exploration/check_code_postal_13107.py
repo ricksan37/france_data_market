@@ -1,11 +1,11 @@
 """
 check_code_postal_13107.py
 
-Objectif : identifier l'offre portant le code postal 13107, absent du
-référentiel officiel (arrondissements marseillais : 13001-13016 uniquement),
-avant de décider si c'est une coquille isolée ou un vrai souci de source.
+Goal: identify the offer carrying postal code 13107, absent from the official
+reference (Marseille arrondissements: 13001-13016 only), before deciding
+whether it is an isolated typo or a real source problem.
 
-Lancement : depuis france_data_market/ -> python3 ../exploration/check_code_postal_13107.py
+Run: from france_data_market/ -> python3 ../exploration/check_code_postal_13107.py
 """
 
 import duckdb

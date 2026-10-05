@@ -1,22 +1,22 @@
 """
-Enrichissement DINUM : diagnostic de matching (Phase 3).
+DINUM enrichment: matching diagnostic (Phase 3).
 
-Mesure le taux de matching des offres EMPLOYEUR_DIRECT contre l'API
-Recherche d'entreprises (DINUM), conformément à FR-014 / FR-015.
+Measures the matching rate of DIRECT_EMPLOYER offers against the Recherche
+d'entreprises API (DINUM), in line with FR-014 / FR-015.
 
-Stratégie construite par paliers mesurés (19,2% -> 80,8%) :
-  - Clé géographique = code INSEE commune (§4.1), pas le code postal.
-  - Cascade géographique : commune -> département -> national.
-  - Comparaison sur variantes de nom (DINUM concatène raison sociale et
-    enseignes entre parenthèses).
-  - Normalisation : accents, ponctuation, mots vides, formes juridiques.
-  - Correspondances souples : préfixe sur frontière de mot, inclusion de mots.
-  - Disambiguant NAF, puis consolidation groupe sur homonymes.
+Strategy built in measured steps (19.2% -> 80.8%):
+  - Geographic key = commune INSEE code (§4.1), not the postal code.
+  - Geographic cascade: commune -> department -> national.
+  - Comparison on name variants (DINUM concatenates the legal name and the
+    trade names in parentheses).
+  - Normalization: accents, punctuation, stop words, legal forms.
+  - Loose matches: prefix on a word boundary, word inclusion.
+  - NAF tiebreaker, then group consolidation on homonyms.
 
-Limites connues et assumées :
-  - "EY" (28 offres) : sigle sans correspondance dans SIRENE.
-  - Consolidation groupe : rattache à tort les homonymes sans lien capitalistique.
-  - Repêchage NAF sans nom : voie la plus risquée, réduite à 1 cas.
+Known and accepted limits:
+  - "EY" (28 offers): acronym with no counterpart in SIRENE.
+  - Group consolidation: wrongly attaches homonyms with no capital link.
+  - NAF recovery without a name: the riskiest route, reduced to 1 case.
 """
 
 import duckdb
@@ -28,8 +28,8 @@ import unicodedata
 URL_DINUM = "https://recherche-entreprises.api.gouv.fr/search"
 MOTS_VIDES = {"DE", "LA", "LE", "DU", "DES", "ET", "D", "L"}
 
-# Formes juridiques accolées à la raison sociale dans SIRENE, quasi jamais
-# écrites par l'employeur dans l'offre (ex. "Keolis" vs "KEOLIS SA").
+# Legal forms attached to the legal name in SIRENE, almost never written by
+# the employer in the offer (e.g. "Keolis" vs "KEOLIS SA").
 FORMES_JURIDIQUES = {
     "SA", "SAS", "SASU", "SARL", "EURL", "SNC", "SCS", "SCA",
     "SE", "SCOP", "SCIC", "GIE", "GEIE", "EARL", "SCI", "SEM",
@@ -39,14 +39,14 @@ FORMES_JURIDIQUES = {
 
 def normaliser_nom(nom):
     """
-    Neutralise ce qui varie entre le nom saisi par l'employeur et la raison
-    sociale SIRENE : casse, accents, ponctuation, mots vides, forme juridique.
+    Neutralizes what varies between the name typed by the employer and the
+    SIRENE legal name: case, accents, punctuation, stop words, legal form.
 
-    Les accents sont critiques : SIRENE stocke sans accents ("DEFI RH")
-    alors que l'offre les conserve.
+    Accents are critical: SIRENE stores names without accents ("DEFI RH")
+    while the offer keeps them.
 
-    Garde-fou : on ne retire mots vides et formes juridiques que s'il reste
-    au moins un mot. Certaines entreprises s'appellent littéralement "LTd".
+    Safeguard: stop words and legal forms are only removed if at least one
+    word remains. Some companies are literally called "LTd".
     """
     nom = nom.strip().upper()
 
@@ -64,9 +64,9 @@ def normaliser_nom(nom):
 
 def variantes_nom(nom_complet):
     """
-    DINUM concatène raison sociale ET enseignes/sigles entre parenthèses :
+    DINUM concatenates the legal name AND trade names/acronyms in parentheses:
     "LEIHIA (LEIHIA) (LEIHIA)", "AGENCE FRANCAISE DE DEVELOPPEMENT (AFD)".
-    Comparer la chaîne entière échoue sur des correspondances parfaites.
+    Comparing the whole string fails on perfect matches.
     """
     formes = {normaliser_nom(nom_complet)}
     formes.add(normaliser_nom(re.sub(r"\([^)]*\)", " ", nom_complet)))
@@ -80,10 +80,10 @@ def variantes_nom(nom_complet):
 
 def est_prefixe_sur_mot(court, long):
     """
-    Vrai si `court` est un préfixe de `long` s'arrêtant sur un mot entier.
+    True if `court` is a prefix of `long` ending on a whole word.
 
-    "STEP UP" est préfixe de "STEP UP LILLE" (suivi d'un espace).
-    "FED" n'est PAS préfixe de "FEDERATION SPORTIVE" (coupe en plein mot).
+    "STEP UP" is a prefix of "STEP UP LILLE" (followed by a space).
+    "FED" is NOT a prefix of "FEDERATION SPORTIVE" (cuts mid-word).
     """
     if not court or not long:
         return False
@@ -94,13 +94,13 @@ def est_prefixe_sur_mot(court, long):
 
 def mots_inclus(nom_court, nom_long):
     """
-    Vrai si TOUS les mots de `nom_court` sont présents dans `nom_long`.
+    True if ALL the words of `nom_court` are present in `nom_long`.
 
-    Gère les mots insérés au milieu : "CAISSE EPARGNE LANGUEDOC ROUSSILLON"
-    est inclus dans "CAISSE EPARGNE PREVOYANCE LANGUEDOC ROUSSILLON".
+    Handles words inserted in the middle: "CAISSE EPARGNE LANGUEDOC ROUSSILLON"
+    is included in "CAISSE EPARGNE PREVOYANCE LANGUEDOC ROUSSILLON".
 
-    Garde-fou : au moins 2 mots, pour éviter qu'un nom d'un seul mot
-    générique soit inclus dans des dizaines de candidats.
+    Safeguard: at least 2 words, to prevent a single generic word from being
+    included in dozens of candidates.
     """
     mots_court = set(nom_court.split())
     if len(mots_court) < 2:
@@ -109,7 +109,7 @@ def mots_inclus(nom_court, nom_long):
 
 
 def departement_depuis_commune(code_commune):
-    """Code département depuis le code INSEE. DOM : 97x/98x sur 3 chiffres."""
+    """Department code from the INSEE code. Overseas: 97x/98x on 3 digits."""
     if not code_commune:
         return None
     if code_commune.startswith("97") or code_commune.startswith("98"):
@@ -118,7 +118,7 @@ def departement_depuis_commune(code_commune):
 
 
 def chercher(nom, params_geo):
-    """Un appel API avec un jeu de paramètres géographiques donné."""
+    """One API call with a given set of geographic parameters."""
     params = {"q": nom, **params_geo}
     resp = requests.get(URL_DINUM, params=params)
     resp.raise_for_status()
@@ -128,14 +128,14 @@ def chercher(nom, params_geo):
 
 def consolider_groupe(candidats):
     """
-    Départage des homonymes par nombre d'établissements.
+    Tiebreak among homonyms by number of establishments.
 
-    Objectif analytique du projet = caractériser le TYPE de structure qui
-    recrute (secteur, taille, âge). Rattacher une offre d'une filiale
-    régionale à sa maison mère est donc le comportement souhaité.
+    The project's analytical goal = characterize the TYPE of organization that
+    hires (sector, size, age). Attaching an offer from a regional subsidiary to
+    its parent company is therefore the desired behavior.
 
-    Angle mort assumé : les homonymes SANS lien capitalistique sont
-    rattachés à tort -> statut distinct pour mesurer ces cas en aval.
+    Accepted blind spot: homonyms WITH NO capital link are wrongly attached
+    -> distinct status to measure these cases downstream.
     """
     avec_etabs = [r for r in candidats if r.get('nombre_etablissements') is not None]
     if not avec_etabs:
@@ -145,13 +145,13 @@ def consolider_groupe(candidats):
 
 def selectionner(nom_offre, naf_code_on_offer, candidats_actifs):
     """
-    Cascade sur des candidats déjà filtrés géographiquement.
-    Retourne (statut, nom_matché) ou None.
-    Le NAF sert UNIQUEMENT de disambiguant entre candidats déjà retenus par
-    le nom. La voie "NAF seul, sans correspondance de nom" a été supprimée
-    après audit : elle produisait 2 matchs sur 172, dont 2 douteux
+    Cascade over candidates already filtered geographically.
+    Returns (status, matched_name) or None.
+    The NAF serves ONLY as a tiebreaker among candidates already retained by
+    name. The "NAF alone, without a name match" route was removed after audit:
+    it produced 2 matches out of 172, of which 2 doubtful
     (TCCONCEPT-LRI -> TCRI GROUP, ECOLE DES MINES -> INSTITUT MINES-TELECOM).
-    Règle retenue : le nom doit toujours corroborer le match.
+    Rule kept: the name must always corroborate the match.
     """
     if not candidats_actifs:
         return None
@@ -175,7 +175,7 @@ def selectionner(nom_offre, naf_code_on_offer, candidats_actifs):
             return ("match_consolide_groupe", principal.get('nom_complet'))
         return None
 
-    # Préfixe dans les deux sens, sur frontière de mot
+    # Prefix in both directions, on a word boundary
     par_prefixe = [
         r for r in candidats_actifs
         if any(est_prefixe_sur_mot(nom_cible, v) or est_prefixe_sur_mot(v, nom_cible)
@@ -196,7 +196,7 @@ def selectionner(nom_offre, naf_code_on_offer, candidats_actifs):
         if principal:
             return ("match_consolide_groupe_prefixe", principal.get('nom_complet'))
 
-    # Inclusion de mots : mots insérés au milieu de la raison sociale
+    # Word inclusion: words inserted in the middle of the legal name
     par_inclusion = [
         r for r in candidats_actifs
         if any(mots_inclus(nom_cible, v)
@@ -223,8 +223,8 @@ def selectionner(nom_offre, naf_code_on_offer, candidats_actifs):
 
 def selectionner_national(nom_offre, candidats_actifs, suffixe):
     """
-    Sélection sans ancrage géographique. Plus prudente : jamais de repêchage
-    par NAF seul, qui matcherait n'importe quelle entreprise du secteur.
+    Selection without a geographic anchor. More cautious: never a recovery by
+    NAF alone, which would match any company in the sector.
     """
     if not candidats_actifs:
         return None
@@ -274,8 +274,8 @@ def selectionner_national(nom_offre, candidats_actifs, suffixe):
     return None
 
 
-# --- Population cible ---
-# À lancer depuis france_data_market/ (chemin relatif ../data/)
+# --- Target population ---
+# Run from france_data_market/ (relative path ../data/)
 
 con = duckdb.connect('../data/warehouse.duckdb', read_only=True)
 offres = con.execute("""
@@ -294,7 +294,7 @@ resultats_audit = []
 for i, (nom, commune, naf_code) in enumerate(offres, start=1):
 
     if nom.strip().upper() == "EY":
-        # Déjà diagnostiqué : sigle sans correspondance légale.
+        # Already diagnosed: acronym with no legal counterpart.
         statut, detail = "pas_de_resultat_sigle_connu", None
     else:
         issue = None
@@ -303,14 +303,14 @@ for i, (nom, commune, naf_code) in enumerate(offres, start=1):
 
         try:
             if commune:
-                # NIVEAU 1 : commune exacte
+                # LEVEL 1: exact commune
                 resultats = chercher(nom, {"code_commune": commune})
                 actifs = [r for r in resultats
                           if r.get('siege', {}).get('commune') == commune
                           and r.get('siege', {}).get('etat_administratif') == 'A']
                 issue = selectionner(nom, naf_code, actifs)
 
-                # NIVEAU 2 : élargissement au département
+                # LEVEL 2: widening to the department
                 if issue is None:
                     dept = departement_depuis_commune(commune)
                     if dept:
@@ -321,7 +321,7 @@ for i, (nom, commune, naf_code) in enumerate(offres, start=1):
                         if issue:
                             issue = (issue[0] + "_dept", issue[1])
 
-            # NIVEAU 3 : national, dernier recours (et seul recours sans géo)
+            # LEVEL 3: national, last resort (and the only one without geo)
             if issue is None:
                 resultats_n = chercher(nom, {})
                 actifs_n = [r for r in resultats_n
@@ -345,7 +345,7 @@ for i, (nom, commune, naf_code) in enumerate(offres, start=1):
     if len(exemples[statut]) < 70:
         exemples[statut].append((nom, detail))
 
-    # Collecte pour l'audit qualité
+    # Collection for the quality audit
     if statut and statut.startswith("match") and isinstance(detail, str):
         resultats_audit.append({
             "nom_offre": nom,
@@ -357,7 +357,7 @@ for i, (nom, commune, naf_code) in enumerate(offres, start=1):
     print(f"[{i}/{len(offres)}] {nom} -> {statut}")
 
 
-# --- Métrique de qualité (FR-015) ---
+# --- Quality metric (FR-015) ---
 
 print("\n--- Résultat détaillé ---")
 total_match = 0
@@ -369,7 +369,7 @@ for statut, count in sorted(compteurs.items(), key=lambda x: -x[1]):
 print(f"\nTOTAL MATCH : {total_match} ({100 * total_match / len(offres):.1f}%)")
 
 
-# --- Audit qualité : détection des matchs suspects ---
+# --- Quality audit: detection of suspicious matches ---
 
 print("\n" + "=" * 60)
 print("AUDIT QUALITÉ")

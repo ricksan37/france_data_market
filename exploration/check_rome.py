@@ -1,17 +1,17 @@
 # check_rome.py
 """
-Script d'exploration : quels codes ROME se cachent derrière un mot-clé ?
+Exploration script: which ROME codes hide behind a keyword?
 
-Le miroir de check_codeROME.py. Ici on part d'un mot-clé (ex: "data architect")
-et on compte la répartition des codes ROME parmi les offres qui matchent. Ça
-répond à la question : "ce mot-clé tombe-t-il dans un code ROME unique et
-propre, ou est-il éparpillé sur plein de codes ?".
+The mirror of check_codeROME.py. Here we start from a keyword (e.g. "data
+architect") and count the distribution of ROME codes among the matching
+offers. It answers the question: "does this keyword fall into a single clean
+ROME code, or is it scattered over many codes?".
 
-C'est ce comptage qui a montré que certains intitulés data n'ont pas de code
-ROME dédié et sont dispersés dans des métiers fourre-tout, d'où le recours
-au filtrage par motsCles pour ces cas (stratégie hybride, cf. full_pull.py).
+This count is what showed that some data job titles have no dedicated ROME
+code and are scattered across catch-all jobs, hence the use of motsCles
+filtering for these cases (hybrid strategy, see full_pull.py).
 
-Script jetable, gardé dans exploration/ pour tracer la démarche.
+Throwaway script, kept in exploration/ to trace the approach.
 """
 
 from search import search_offers
@@ -20,25 +20,26 @@ from collections import Counter
 
 def check_rome(mots_cles: str) -> None:
     """
-    Affiche la répartition (code ROME, libellé) des offres d'un mot-clé.
+    Prints the distribution of (ROME code, label) for the offers matching a
+    keyword.
 
-    mots_cles : str passé à l'API en paramètre motsCles. Un seul appel
-    (search_offers, non paginé) : l'échantillon de la 1re page suffit à
-    voir la dispersion. Trie du plus fréquent au moins fréquent.
+    mots_cles: str passed to the API as the motsCles parameter. A single call
+    (search_offers, unpaginated): the sample from the first page is enough to
+    see the dispersion. Sorted from most to least frequent.
     """
-    # search_offers attend un dict de paramètres API : on enveloppe le mot-clé.
+    # search_offers expects a dict of API parameters: we wrap the keyword.
     data = search_offers({"motsCles": mots_cles})
     resultats = data.get("resultats", [])
 
-    # Compte les couples (code, libellé) : une entrée = un code ROME distinct.
+    # Counts (code, label) pairs: one entry = one distinct ROME code.
     counts = Counter(
         (o.get("romeCode"), o.get("romeLibelle")) for o in resultats
     )
 
-    # Alignement à droite du compte (>3) pour une lecture en colonnes propre.
+    # Right-align the count (>3) so the columns read cleanly.
     for (code, libelle), n in counts.most_common():
         print(f"{n:>3}  {code}  {libelle}")
 
 
 if __name__ == "__main__":
-    check_rome("data architect")  # cas testé : mot-clé dispersé sur plusieurs ROME
+    check_rome("data architect")  # case tested: keyword scattered over several ROME codes

@@ -1,11 +1,11 @@
 """
 check_anonymes_masques.py
 
-Objectif : mesurer le volume d'offres ANONYME reclassifiables en INTERMEDIAIRE
-via end_client_masked (Phase 4), avant d'écrire la moindre logique de
-reclassification dans int_employers_classified.
+Goal: measure how many ANONYMOUS offers can be reclassified as INTERMEDIARY
+through end_client_masked (Phase 4), before writing any reclassification
+logic in int_employers_classified.
 
-Lancement : depuis france_data_market/ -> python3 ../exploration/check_anonymes_masques.py
+Run: from france_data_market/ -> python3 ../exploration/check_anonymes_masques.py
 """
 
 import duckdb

@@ -1,16 +1,16 @@
 """
-Premier appel d'extraction réel : une offre, un modèle, le schéma complet.
+First real extraction call: one offer, one model, the full schema.
 
-DÉCOUVERTE : les `description` des Field Pydantic ne parviennent PAS au
-modèle. Ollama compile le JSON Schema en grammaire, laquelle n'encode que la
-structure (clés, types, imbrication) ; les descriptions sont écartées. Toute
-consigne de SENS doit donc vivre dans le prompt. Les descriptions du schéma
-restent en place comme documentation du code, mais elles ne pilotent rien.
+DISCOVERY: the Pydantic Field `description`s do NOT reach the model. Ollama
+compiles the JSON Schema into a grammar, which only encodes the structure
+(keys, types, nesting); descriptions are dropped. Any instruction about
+MEANING must therefore live in the prompt. The schema descriptions stay in
+place as code documentation, but they drive nothing.
 
-ATTENTION : stg_raw__ft_job_offers est une vue -> lancement obligatoire depuis
-france_data_market/, sinon son chemin relatif vers le JSON ne se résout pas.
+WARNING: stg_raw__ft_job_offers is a view -> must be run from
+france_data_market/, otherwise its relative path to the JSON does not resolve.
 
-Lancement : depuis france_data_market/  ->  python3 ../exploration/test_extraction_une_offre.py
+Run: from france_data_market/  ->  python3 ../exploration/test_extraction_une_offre.py
 """
 
 import sys
@@ -119,8 +119,8 @@ Texte de l'offre :
 
 
 def main() -> None:
-    # read_only=True : ne jamais verrouiller la base pendant la lecture
-    # (piège du verrou mono-écrivain DuckDB).
+    # read_only=True: never lock the database while reading (DuckDB
+    # single-writer lock trap).
     con = duckdb.connect(CHEMIN_DB, read_only=True)
     job_offer_id, job_title, description = con.execute("""
         select job_offer_id, job_title, job_description

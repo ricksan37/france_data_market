@@ -2,7 +2,7 @@ import duckdb
 
 con = duckdb.connect('../data/warehouse.duckdb', read_only=True)
 
-# Croisement du remplissage des deux clés géographiques sur la population cible
+# Cross-tab of how filled the two geographic keys are, on the target population
 q = con.execute("""
     select
         case when postal_code is null then 'CP absent' else 'CP présent' end as cp,

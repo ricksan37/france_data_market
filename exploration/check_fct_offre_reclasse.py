@@ -1,11 +1,11 @@
 """
 check_fct_offre_reclasse.py
 
-Objectif : vérifier que fct_job_offer.employer_name est bien rempli sur les 21
-offres INTERMEDIAIRE_reclasse (chiffre attendu), et vide
-nulle part ailleurs par erreur.
+Goal: check that fct_job_offer.employer_name is filled on the 21
+INTERMEDIAIRE_reclasse offers (expected figure), and empty nowhere else by
+mistake.
 
-Lancement : depuis france_data_market/ -> python3 ../exploration/check_fct_offre_reclasse.py
+Run: from france_data_market/ -> python3 ../exploration/check_fct_offre_reclasse.py
 """
 
 import duckdb

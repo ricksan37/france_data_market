@@ -1,19 +1,19 @@
 """
-Validation du prompt sur un échantillon avant le run complet.
+Prompt validation on a sample before the full run.
 
-Pourquoi un échantillon : le prompt n'a été validé que sur UNE offre, riche et
-bien structurée (Opteven). Les 552 offres contiennent des cas très différents :
-annonces courtes, offres non-data mal taguées par ROME (limite connue),
-annonces d'intermédiaires sans aucune technologie. Vingt offres coûtent 4 minutes
-et évitent de découvrir un défaut systématique après 1h45 de calcul.
+Why a sample: the prompt was only validated on ONE offer, rich and well
+structured (Opteven). The 552 offers contain very different cases: short ads,
+non-data offers badly tagged by ROME (known limit), intermediary ads without
+any technology. Twenty offers cost 4 minutes and avoid discovering a
+systematic flaw after 1h45 of compute.
 
-L'échantillon est tiré avec un ordre déterministe (order by job_offer_id) plutôt
-qu'aléatoire : deux exécutions doivent porter sur les mêmes offres, sinon on ne
-peut pas comparer l'effet d'un changement de prompt.
+The sample is drawn in a deterministic order (order by job_offer_id) rather
+than at random: two runs must cover the same offers, otherwise the effect of
+a prompt change cannot be compared.
 
-ATTENTION : stg_raw__ft_job_offers est une vue -> lancement depuis france_data_market/.
+WARNING: stg_raw__ft_job_offers is a view -> run from france_data_market/.
 
-Lancement : depuis france_data_market/  ->  python3 ../exploration/test_extraction_echantillon.py
+Run: from france_data_market/  ->  python3 ../exploration/test_extraction_echantillon.py
 """
 
 import sys
@@ -67,8 +67,8 @@ def main() -> None:
             print(f"        domaines = {extraction.domaines}")
 
         except Exception as err:
-            # Un échec de validation est un fait à compter, pas une raison
-            # d'interrompre : on veut connaître le TAUX d'échec sur l'échantillon.
+            # A validation failure is a fact to count, not a reason to stop:
+            # we want to know the failure RATE on the sample.
             echecs.append((job_offer_id, str(err)[:120]))
             print(f"[{i:2}/{len(offres)}] {job_offer_id} -> ECHEC : {str(err)[:120]}")
 

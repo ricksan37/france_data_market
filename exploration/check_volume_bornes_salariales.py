@@ -1,11 +1,11 @@
 """
 check_volume_bornes_salariales.py
 
-Objectif : vérifier si le volume horaire/mensuel a évolué depuis la mesure
-initiale (19 offres horaires, 1 mensuelle) avant de statuer sur la
-dette différée des bornes de plausibilité salariale.
+Goal: check whether the hourly/monthly volume has changed since the initial
+measurement (19 hourly offers, 1 monthly) before ruling on the deferred debt
+of the salary plausibility bounds.
 
-Lancement : depuis france_data_market/ -> python3 ../exploration/check_volume_bornes_salariales.py
+Run: from france_data_market/ -> python3 ../exploration/check_volume_bornes_salariales.py
 """
 
 import duckdb

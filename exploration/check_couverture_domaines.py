@@ -1,11 +1,11 @@
 """
 check_couverture_domaines.py
 
-Objectif : lire le taux de couverture réel du mapping_domaines (mesuré à
-19,7%), pour vérifier s'il a dérivé avant de rouvrir la
-décision de ne pas mapper la longue traîne.
+Goal: read the actual coverage rate of mapping_domaines (measured at 19.7%),
+to check whether it has drifted before reopening the decision not to map the
+long tail.
 
-Lancement : depuis france_data_market/ -> python3 ../exploration/check_couverture_domaines.py
+Run: from france_data_market/ -> python3 ../exploration/check_couverture_domaines.py
 """
 
 import duckdb

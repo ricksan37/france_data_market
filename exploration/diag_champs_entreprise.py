@@ -7,7 +7,7 @@ with open('../data/raw/job_offers_2026-07-17_1403.json') as f:
 offres = d['resultats']
 print(f"Offres brutes : {len(offres)}")
 
-# 1. Quelles clés apparaissent dans le bloc "entreprise", et à quelle fréquence ?
+# 1. Which keys appear in the "entreprise" block, and how often?
 cles_entreprise = Counter()
 for o in offres:
     for cle in o.get('entreprise', {}).keys():
@@ -17,8 +17,8 @@ print("\nClés présentes dans 'entreprise' :")
 for cle, n in cles_entreprise.most_common():
     print(f"  {cle} : {n}")
 
-# 2. Quelles clés existent au niveau racine de l'offre (pour repérer
-#    tout champ identifiant qu'on n'aurait jamais remonté) ?
+# 2. Which keys exist at the root level of the offer (to spot any
+#    identifying field we never surfaced)?
 cles_racine = Counter()
 for o in offres:
     for cle in o.keys():

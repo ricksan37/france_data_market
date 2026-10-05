@@ -1,14 +1,14 @@
 """
-Test à blanc du décodage contraint Ollama, avant tout travail sur les offres.
+Dry test of Ollama constrained decoding, before any work on the offers.
 
-Objectif unique : vérifier que le paramètre `format` contraint réellement la
-sortie au schéma Pydantic, et non qu'on obtient du JSON "par chance" via le
-prompt. C'est la distinction exigée par le schéma JSON contraint (grammaire contrainte,
-pas JSON mode). Deux inconnues à ne pas mélanger : "Ollama tourne-t-il ?" et
-"le schéma est-il bien respecté ?" : d'où un cas trivial, sans rapport avec
-le métier, pour isoler la seconde.
+Single goal: verify that the `format` parameter really constrains the output
+to the Pydantic schema, rather than getting JSON "by luck" through the prompt.
+This is the distinction required by constrained JSON schema (constrained
+grammar, not JSON mode). Two unknowns not to mix up: "is Ollama running?" and
+"is the schema actually respected?": hence a trivial case, unrelated to the
+business, to isolate the second.
 
-Lancement : depuis france_data_market/  ->  python3 ../exploration/test_ollama_structured.py
+Run: from france_data_market/  ->  python3 ../exploration/test_ollama_structured.py
 """
 
 from ollama import chat
@@ -16,7 +16,7 @@ from pydantic import BaseModel
 
 
 class Ville(BaseModel):
-    """Schéma volontairement minimal : 3 champs, 3 types différents."""
+    """Deliberately minimal schema: 3 fields, 3 different types."""
     nom: str
     pays: str
     habitants: int

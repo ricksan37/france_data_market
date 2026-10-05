@@ -10,11 +10,11 @@ MOTS_VIDES = {"DE", "LA", "LE", "DU", "DES", "ET", "D", "L"}
 
 def normaliser_nom(nom):
     """
-    Nettoyage renforcé pour comparaison souple :
-    - majuscule, espaces superflus retirés
-    - ponctuation (apostrophes, tirets, points) remplacée par un espace
-    - mots vides français retirés (articles/prépositions qui varient
-      selon que l'offre cite le nom complet ou une forme raccourcie)
+    Stronger cleaning for loose comparison:
+    - uppercase, superfluous spaces removed
+    - punctuation (apostrophes, hyphens, dots) replaced by a space
+    - French stop words removed (articles/prepositions that vary depending
+      on whether the offer cites the full name or a shortened form)
     """
     nom = nom.strip().upper()
     nom = re.sub(r"[.,'\-]", " ", nom)
@@ -60,8 +60,8 @@ for i, (nom, code_commune) in enumerate(offres, start=1):
     if code_commune is None or code_commune == '':
         statut, detail = "sans_cle_geo", None
     elif nom.strip().upper() == "EY":
-        # Déjà diagnostiqué : sigle sans correspondance légale.
-        # On ne refait pas l'appel API, la conclusion est connue.
+        # Already diagnosed: acronym with no legal counterpart.
+        # We do not redo the API call, the conclusion is known.
         statut, detail = "pas_de_resultat_sigle_connu", None
     else:
         params = {"q": nom, "code_commune": code_commune}

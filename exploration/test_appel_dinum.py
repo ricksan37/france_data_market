@@ -1,17 +1,17 @@
 """
-Enrichissement DINUM : exploration Phase 3.
+DINUM enrichment: Phase 3 exploration.
 
-Mesure le taux de matching des offres EMPLOYEUR_DIRECT contre l'API
-Recherche d'entreprises (DINUM).
+Measures the matching rate of DIRECT_EMPLOYER offers against the Recherche
+d'entreprises API (DINUM).
 
-Décision d'architecture : le filtre géographique utilise le
-code INSEE (lieuTravail.commune) et non le code postal, contrairement à
-ce qu'indiquait §7.5. Justification mesurée sur les 213 offres cibles :
-  - postal_code renseigné      : 166 / 213
-  - code INSEE renseigné       : 198 / 213  (sur-ensemble strict du CP)
-  - ni l'un ni l'autre         :  15 / 213
-Le code INSEE offre donc +32 offres de couverture, et une relation 1:1
-avec la commune (§4.1) là où un code postal peut couvrir plusieurs communes.
+Architecture decision: the geographic filter uses the INSEE code
+(lieuTravail.commune) and not the postal code, contrary to what §7.5
+indicated. Justification measured on the 213 target offers:
+  - postal_code filled         : 166 / 213
+  - INSEE code filled          : 198 / 213  (strict superset of the postal code)
+  - neither                    :  15 / 213
+The INSEE code thus brings +32 offers of coverage, and a 1:1 relationship with
+the commune (§4.1) where a postal code can cover several communes.
 """
 
 import duckdb
@@ -23,17 +23,18 @@ URL_DINUM = "https://recherche-entreprises.api.gouv.fr/search"
 
 def matcher_entreprise(nom_offre, code_commune_offre, resultats):
     """
-    Tente d'identifier une entreprise unique parmi les résultats de l'API DINUM.
+    Tries to identify a single company among the DINUM API results.
 
-    Stratégie (validée à la main sur Grant Thornton, Virbac, SM Haute Saône) :
-    1. Filtrer les candidats dont le siège est dans la bonne commune ET actif.
-    2. Parmi eux, ne garder que ceux dont le nom correspond EXACTEMENT.
-    3. Décider selon le nombre de survivants.
+    Strategy (validated by hand on Grant Thornton, Virbac, SM Haute Saône):
+    1. Filter the candidates whose head office is in the right commune AND
+       active.
+    2. Among them, keep only those whose name matches EXACTLY.
+    3. Decide according to the number of survivors.
 
-    Retourne (statut, résultat) où statut vaut :
-    - "pas_de_resultat" : aucun candidat actif dans la commune
-    - "ambigu"          : candidats présents, mais le nom ne discrimine pas
-    - "match"           : un seul candidat au nom exact -> résultat = son dict
+    Returns (status, result) where status is:
+    - "pas_de_resultat": no active candidate in the commune
+    - "ambigu"         : candidates present, but the name does not discriminate
+    - "match"          : a single candidate with the exact name -> result = its dict
     """
     nom_nettoye = nom_offre.strip().upper()
 
@@ -57,8 +58,8 @@ def matcher_entreprise(nom_offre, code_commune_offre, resultats):
         return ("ambigu", None)
 
 
-# --- Étape 1 : population cible depuis DuckDB ---
-# Note : à lancer depuis france_data_market/ (chemin relatif ../data/)
+# --- Step 1: target population from DuckDB ---
+# Note: run from france_data_market/ (relative path ../data/)
 
 con = duckdb.connect('../data/warehouse.duckdb', read_only=True)
 
@@ -73,7 +74,7 @@ con.close()
 print(f"Population cible : {len(offres)} offres")
 
 
-# --- Étape 2 : boucle d'enrichissement, rate limit 7 req/s ---
+# --- Step 2: enrichment loop, rate limit 7 req/s ---
 
 compteurs = {
     "match": 0,
@@ -85,8 +86,8 @@ compteurs = {
 
 for i, (nom, code_commune) in enumerate(offres, start=1):
 
-    # Sans clé géographique, le filtre ne peut pas s'appliquer :
-    # on ne devine pas, on comptabilise à part (15 cas attendus).
+    # Without a geographic key, the filter cannot apply: we do not guess,
+    # we count them separately (15 cases expected).
     if code_commune is None or code_commune == '':
         compteurs["sans_cle_geo"] += 1
         print(f"[{i}/{len(offres)}] {nom} -> sans_cle_geo")
@@ -109,7 +110,7 @@ for i, (nom, code_commune) in enumerate(offres, start=1):
     time.sleep(1 / 7)
 
 
-# --- Étape 3 : métrique de qualité ---
+# --- Step 3: quality metric ---
 
 print("\n--- Résultat du matching ---")
 for statut, count in compteurs.items():

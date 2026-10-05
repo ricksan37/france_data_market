@@ -1,15 +1,14 @@
 """
-Inventaire du dump d'enrichissement DINUM avant déclaration en source dbt.
+Inventory of the DINUM enrichment dump before declaring it as a dbt source.
 
-Pourquoi ce script : read_json_auto infère un schéma unique pour tout le
-tableau `resultats`. Or ce tableau est hétérogène : 171 lignes portent un
-résultat d'entreprise, 42 n'en portent aucun. Si les clés entreprise sont
-ABSENTES (et non présentes à null) sur les lignes non matchées, l'inférence
-peut produire un STRUCT incomplet et perdre des champs silencieusement.
-On mesure donc, par clé, la présence ET le remplissage avant d'écrire
-la moindre ligne de SQL.
+Why this script: read_json_auto infers a single schema for the whole
+`resultats` array. But this array is heterogeneous: 171 rows carry a company
+result, 42 carry none. If the company keys are ABSENT (rather than present
+as null) on the unmatched rows, the inference can produce an incomplete
+STRUCT and silently lose fields. So we measure, per key, presence AND fill
+rate before writing a single line of SQL.
 
-Lancement : depuis france_data_market/  ->  python3 ../exploration/inspect_dump_dinum.py
+Run: from france_data_market/  ->  python3 ../exploration/inspect_dump_dinum.py
 """
 
 import glob
@@ -20,12 +19,11 @@ MOTIF_DUMP = "../data/raw/enrich_dinum_*.json"
 
 
 def charger_dump_le_plus_recent(motif: str) -> tuple[str, dict]:
-    """Retourne (chemin, contenu) du dump le plus récent.
+    """Returns (path, content) of the most recent dump.
 
-    Le tri lexicographique suffit : l'horodatage AAAA-MM-JJ_HHMM est
-    naturellement ordonnable. Tous les fichiers trouvés sont affichés,
-    car la décision « source sur fichier fixe ou sur glob » dépend
-    directement de leur nombre.
+    Lexicographic sort is enough: the YYYY-MM-DD_HHMM timestamp sorts
+    naturally. All matching files are printed, because the decision "source
+    on a fixed file or on a glob" depends directly on how many there are.
     """
     fichiers = sorted(glob.glob(motif))
     if not fichiers:
@@ -43,12 +41,12 @@ def charger_dump_le_plus_recent(motif: str) -> tuple[str, dict]:
 
 
 def inventorier_cles(resultats: list[dict]) -> None:
-    """Affiche, pour chaque clé rencontrée : présence, remplissage, types.
+    """Prints, for each key encountered: presence, fill rate, types.
 
-    La distinction présence / remplissage est le coeur du diagnostic :
-    - presente == len(resultats)  -> clé toujours là, DuckDB la verra
-    - presente < len(resultats)   -> clé absente sur certaines lignes,
-                                     risque d'inférence incomplète
+    The presence / fill distinction is the heart of the diagnosis:
+    - presente == len(resultats)  -> key always there, DuckDB will see it
+    - presente < len(resultats)   -> key absent on some rows,
+                                     risk of incomplete inference
     """
     presence = Counter()
     remplissage = Counter()
@@ -69,7 +67,7 @@ def inventorier_cles(resultats: list[dict]) -> None:
         types = ",".join(sorted(types_vus[cle])) or "toujours null"
         print(f"{cle:<38} {presence[cle]:>9} {remplissage[cle]:>10}  {types}{drapeau}")
 
-    # Sous-structures : si une valeur est un dict, ses sous-clés comptent aussi.
+    # Sub-structures: if a value is a dict, its sub-keys count too.
     for cle in presence:
         sous_cles = set()
         for r in resultats:
@@ -81,7 +79,7 @@ def inventorier_cles(resultats: list[dict]) -> None:
 
 
 def trouver_cle_siren(resultats: list[dict]) -> str | None:
-    """Localise la clé portant le SIREN sans présumer de son nom exact."""
+    """Locates the key carrying the SIREN without presuming its exact name."""
     for r in resultats:
         for cle in r:
             if cle.lower() == "siren" or cle.lower().endswith("_siren"):
@@ -113,7 +111,7 @@ def main() -> None:
     else:
         print("Aucune cle 'siren' trouvee au premier niveau des resultats.")
 
-    # Répartition des statuts : confirme la volumétrie par voie de matching.
+    # Distribution of statuses: confirms the volume per matching route.
     cle_statut = next(
         (c for r in resultats for c in r if "statut" in c.lower()), None
     )

@@ -8,7 +8,7 @@ MOTS_VIDES = {"DE", "LA", "LE", "DU", "DES", "ET", "D", "L"}
 
 
 def normaliser_nom(nom):
-    """Normalisation souple : casse, ponctuation, mots vides français retirés."""
+    """Loose normalization: case, punctuation, French stop words removed."""
     nom = nom.strip().upper()
     nom = re.sub(r"[.,'\-]", " ", nom)
     return " ".join(m for m in nom.split() if m not in MOTS_VIDES)
@@ -16,11 +16,11 @@ def normaliser_nom(nom):
 
 def diagnostiquer(nom_offre, code_commune, naf_code_on_offer, resultats):
     """
-    Matching en cascade :
-    1. commune + établissement actif
-    2. nom normalisé identique
-    3. si toujours ambigu ET NAF disponible -> départage par NAF
-    4. si le nom ne matche jamais -> tentative de repêchage par NAF seul
+    Cascade matching:
+    1. commune + active establishment
+    2. identical normalized name
+    3. if still ambiguous AND NAF available -> tiebreak by NAF
+    4. if the name never matches -> attempt to recover by NAF alone
     """
     candidats = [
         r for r in resultats
@@ -37,7 +37,7 @@ def diagnostiquer(nom_offre, code_commune, naf_code_on_offer, resultats):
     if len(par_nom) == 1:
         return "match_nom", par_nom[0].get('nom_complet')
 
-    # Cas ambigu sur le nom -> on tente le départage par NAF
+    # Ambiguous on the name -> try the NAF tiebreak
     if len(par_nom) > 1 and naf_code_on_offer:
         par_naf = [r for r in par_nom if r.get('activite_principale') == naf_code_on_offer]
         if len(par_naf) == 1:
@@ -47,7 +47,7 @@ def diagnostiquer(nom_offre, code_commune, naf_code_on_offer, resultats):
     if len(par_nom) > 1:
         return "ambigu_multiple_exact", [r.get('nom_complet') for r in par_nom]
 
-    # Le nom ne matche aucun candidat -> repêchage par NAF seul (piste C)
+    # The name matches no candidate -> recovery by NAF alone (lead C)
     if naf_code_on_offer:
         par_naf = [r for r in candidats if r.get('activite_principale') == naf_code_on_offer]
         if len(par_naf) == 1:

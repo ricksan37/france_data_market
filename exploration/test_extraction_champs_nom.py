@@ -1,14 +1,14 @@
 """
-Test cible des deux nouveaux champs (entreprise_nom_texte, end_client_masked)
-sur 4 offres à vérité terrain déjà lue manuellement.
+Targeted test of the two new fields (entreprise_nom_texte, end_client_masked)
+on 4 offers whose ground truth was already read by hand.
 
-Attendu :
-  5076918 (Framatome)  -> nom="Framatome", masque=False (parle d'elle-même)
-  4893934 (CIMPA)       -> nom="CIMPA", masque=True (accompagne Airbus)
-  4888800 (Wavestone)   -> nom="Wavestone", masque=False (parle d'elle-même)
-  4319968 (BRAINLOGIC)  -> nom="BRAINLOGIC", masque=True (accompagne un client)
+Expected:
+  5076918 (Framatome)  -> nom="Framatome", masque=False (talks about itself)
+  4893934 (CIMPA)       -> nom="CIMPA", masque=True (supports Airbus)
+  4888800 (Wavestone)   -> nom="Wavestone", masque=False (talks about itself)
+  4319968 (BRAINLOGIC)  -> nom="BRAINLOGIC", masque=True (supports a client)
 
-Lancement : depuis france_data_market/ -> python3 ../exploration/test_extraction_champs_nom.py
+Run: from france_data_market/ -> python3 ../exploration/test_extraction_champs_nom.py
 """
 
 import sys

@@ -1,11 +1,11 @@
 """
 check_repartition_categorie.py
 
-Objectif : vérifier après dbt build que la répartition réelle de
-employer_category correspond au chiffre attendu mesuré en exploration
-(187 ANONYME, 21 INTERMEDIAIRE_reclasse, total inchangé à 552).
+Goal: check after dbt build that the actual distribution of employer_category
+matches the expected figure measured during exploration (187 ANONYMOUS, 21
+INTERMEDIAIRE_reclasse, total unchanged at 552).
 
-Lancement : depuis france_data_market/ -> python3 ../exploration/check_repartition_categorie.py
+Run: from france_data_market/ -> python3 ../exploration/check_repartition_categorie.py
 """
 
 import duckdb

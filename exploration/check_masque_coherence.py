@@ -1,11 +1,11 @@
 """
 check_masque_coherence.py
 
-Objectif : expliquer l'écart entre le pattern texte "notre client" (29/208)
-et end_client_masked=true (21/208, mesuré) avant toute décision d'architecture.
-Vérifie aussi la nature des 178 NULL.
+Goal: explain the gap between the text pattern "notre client" (29/208) and
+end_client_masked=true (21/208, measured) before any architecture decision.
+Also checks the nature of the 178 NULLs.
 
-Lancement : depuis france_data_market/ -> python3 ../exploration/check_masque_coherence.py
+Run: from france_data_market/ -> python3 ../exploration/check_masque_coherence.py
 """
 
 import duckdb
