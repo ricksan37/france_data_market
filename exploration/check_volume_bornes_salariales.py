@@ -17,8 +17,8 @@ print("--- Répartition salary_period sur int_job_offer_salary_parsed ---")
 res = con.execute("""
     select salary_period, count(*) as nb
     from int_job_offer_salary_parsed
-    where salary_period = 'horaire'
-        or salary_period = 'mensuel'
+    where salary_period = 'hourly'
+        or salary_period = 'monthly'
         or salary_period = 'annual'
     group by salary_period
     order by nb desc
