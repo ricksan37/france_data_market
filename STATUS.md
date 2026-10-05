@@ -20,8 +20,10 @@ Working rules: [CLAUDE.md](CLAUDE.md).
 ## Open points
 - Monday 2026-10-12, 06:00 UTC, first scheduled run since the fix: count the `HTTP error for` lines (expected 0) and the `retry n/4` lines (403 on 2026-10-05), and check whether a 429 carries a `Retry-After` header (the log does not print headers). If `technical_error` persists: requeue the failed offers after a 60 s pause.
 - CI dataset: replace the versioned 2026-07-17 job offers dump with one collected on the current scope.
+- Review the 5 matches flagged by the quality audit of 2026-10-05 (227 matches); word inclusion adds 0.4 % of matches, under the 2 % bar in `CLAUDE.md`.
 
 ## How to resume
 - `source .venv/bin/activate`. Python scripts run from the repo root, dbt commands from `france_data_market/`.
 - `git pull` before any push: the weekly workflow commits to `main`.
 - Last weekly run: `gh run list --workflow=weekly_pull.yml`, then `gh run view <id> --log`.
+- Long local extraction: `caffeinate -i python3 extract_skills.py` keeps the Mac awake. Never start two instances: both read the same already-extracted ids at launch and extract the same offers twice, and two launches in the same minute write the same dump file.

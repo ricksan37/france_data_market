@@ -1,7 +1,8 @@
 {#
     Indicates whether we're running in an environment without LLM extraction (CI).
     Read from the env var CI_WITHOUT_EXTRACTION, set only in
-    .github/workflows/pull_hebdo.yml (Ollama doesn't run on a GitHub runner).
+    .github/workflows/ci.yml and weekly_pull.yml (Ollama doesn't run on a
+    GitHub runner).
     Absent locally -> defaults to 'false'.
 #}
 {% macro in_ci_without_extraction() %}
