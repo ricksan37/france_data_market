@@ -2,6 +2,8 @@
 
 Analytics engineering pipeline on French data job offers: France Travail API ingestion (Python), transformation in dbt + DuckDB, company enrichment (DINUM / SIRENE API), skill extraction with a local LLM (Ollama, mistral-nemo), static HTML report.
 
+State and resume: [STATUS.md](STATUS.md).
+
 ## Environment
 
 - Always activate the venv before any `python3` or `dbt` command: `source .venv/bin/activate`. If `dbt debug` shows an unexpected python path despite a correct `which`, run `hash -r`.
@@ -30,8 +32,7 @@ CI: `.github/workflows/ci.yml` runs on every push (compile scripts, `dbt build` 
 - Scope = 8 ROME codes, listed in `CATEGORIES` in `full_pull.py`: M1405, M1811, M1419, M1868, M1851, M1824, M1872, M1423. An offer has a single ROME code, so categories never overlap.
 - ROME codes are declared by recruiters and are never 100 % clean (BI codes also catch business developers). Collection aims at recall; precision belongs to a dbt qualification model (not built yet).
 - Out of scope after measurement: M1889 (AI / ML engineer), M1894 (DBA), M1414 (statistician).
-- Dumps collected before 2026-09-29 used a different scope (ROME codes plus keywords) and are not comparable with later ones.
-- `weekly_market.csv` points before 2026-10-05 also counted the versioned 2026-07-17 dump and are not comparable with later ones.
+- Data history (which dumps and weekly points are comparable) and known gaps: [STATUS.md](STATUS.md).
 
 ## France Travail API facts (measured)
 
@@ -65,8 +66,3 @@ CI: `.github/workflows/ci.yml` runs on every push (compile scripts, `dbt build` 
 - The weekly workflow commits to `main`: the local copy is often behind. `git pull` (configured to rebase and autostash) before `git push`.
 
 Language-specific rules live in `.claude/rules/` (Python, dbt).
-
-## Known gaps
-
-- No dbt model yet qualifies an offer as data / not data.
-- The README still describes the former scope, and still mentions a DuckDB optimizer bug on multi-value `IN()` that does not reproduce on DuckDB 1.5.4 (tested on real views): `IN()` is fine.
