@@ -30,7 +30,8 @@ concurrency:
 
 jobs:
   pull-and-snapshot:
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moves to Ubuntu 26 on 2026-10-19, untested here.
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout the repo
         uses: actions/checkout@v5  # v5 = Node 24. NOT v6: v6.0.0 persists
@@ -105,7 +106,7 @@ jobs:
         # polluting the git history on every weekly run.
         run: python3 dashboard/generate_report.py
       - name: Upload the report as an artifact
-        uses: actions/upload-artifact@v5  # Node 24
+        uses: actions/upload-artifact@v7  # Node 24 (v5 still ran on Node 20)
         with:
           name: france-data-market-report
           path: dashboard/report.html
@@ -118,7 +119,7 @@ jobs:
           mkdir -p _site
           cp dashboard/report.html _site/index.html
       - name: Upload the Pages artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5  # bundles upload-artifact v7
         with:
           path: _site
 
@@ -136,7 +137,7 @@ jobs:
   # ingestion job has no reason to hold.
   deploy-pages:
     needs: pull-and-snapshot
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       pages: write
       id-token: write
@@ -146,4 +147,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5  # Node 24
