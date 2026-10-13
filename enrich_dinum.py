@@ -251,8 +251,10 @@ def search(name, geo_params):
                         response=resp,
                     )
                 break
-            reason = f"HTTP {resp.status_code}"
             retry_after = resp.headers.get("Retry-After", "")
+            # Logged so the CI log shows whether the API sends the header.
+            reason = (f"HTTP {resp.status_code} "
+                      f"(Retry-After: {retry_after or 'absent'})")
         except (requests.exceptions.ConnectionError,
                 requests.exceptions.Timeout) as err:
             if attempt == MAX_ATTEMPTS:
