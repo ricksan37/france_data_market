@@ -1,4 +1,4 @@
-# France Data Market: status as of 2026-10-05
+# France Data Market: status as of 2026-10-13
 
 Working rules: [CLAUDE.md](CLAUDE.md).
 
@@ -11,6 +11,9 @@ Working rules: [CLAUDE.md](CLAUDE.md).
 - CI scans the whole git history for secrets with gitleaks 8.30.1 on every push (public repository).
 - CI dataset: the versioned job offers dump is now the 2026-10-05 pull (eight-ROME-code scope, 814 offers, 3.6 MB). The 2026-07-17 dump left the repository on 2026-10-05; it stays in the git history.
 - README findings 2 to 4 re-measured on the 2026-10-05 pull (eight-ROME-code scope, 814 offers, 792 distinct listings); the GitHub profile README carries the same figures.
+- 2026-10-12 scheduled run (started 14:20 UTC, not 06:00): 751 offers, 32 retries (all HTTP 429, none past the second attempt), 0 `technical_error`, 90.0 % match rate (217/241), DINUM dump adopted, enrichment in 13 min 42 s. The fix held, though not in the 06:00 slot of 2026-10-05.
+- 2026-10-13: the report no longer states the withdrawn July exit figure (552 / 463) and gives the eight-ROME-code scope; retried DINUM calls now log the `Retry-After` header.
+- 2026-10-13: `notebooks/01_market_exploration.ipynb` removed; recoverable from the Git history. Its HTML export and the rest of `notebooks/` stay.
 
 ## Data history
 - Dumps collected before 2026-09-29 used a different scope (ROME codes plus keywords) and are not comparable with later ones.
@@ -21,10 +24,9 @@ Working rules: [CLAUDE.md](CLAUDE.md).
 - 20 commits (2026-09-04 to 2026-09-30) carry a Co-Authored-By line. The history is left as is: the repository is public, and rewriting it would need a force-push and change every later hash.
 
 ## Open points
-- Monday 2026-10-12, 06:00 UTC, first scheduled run since the fix: count the `HTTP error for` lines (expected 0) and the `retry n/4` lines (403 on 2026-10-05), and check whether a 429 carries a `Retry-After` header (the log does not print headers). If `technical_error` persists: requeue the failed offers after a 60 s pause.
+- Monday 2026-10-19 run (also the day `ubuntu-latest` moves to Ubuntu 26; runners are pinned): read the `Retry-After` value in the retry lines. On 2026-10-12 every wait matched the base wait, so the header was absent or at most 5 s. If `technical_error` comes back: requeue the failed offers after a 60 s pause.
 - Review the 5 matches flagged by the quality audit of 2026-10-05 (227 matches); word inclusion adds 0.4 % of matches, under the 2 % bar in `CLAUDE.md`.
-- Decide what to do with the locally modified notebook `notebooks/01_market_exploration.ipynb` (commit or discard).
-- Open the published GitHub Pages report and check that it is up to date.
+- Weekly flow chart: the weeks before 2026-09-28 come from truncated pulls (463 exits on 2026-08-24); check whether the chart marks the `series_breaks.csv` break.
 
 ## How to resume
 - `source .venv/bin/activate`. Python scripts run from the repo root, dbt commands from `france_data_market/`.
