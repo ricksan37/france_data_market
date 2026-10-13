@@ -22,11 +22,18 @@ select round(100.0 * count(case when salary_mentioned then 1 end)
              / nullif(count(*), 0), 1) as pct
 from fct_job_offer;
 
+-- LATEST_BREAK: first week of the current collection method or scope
+-- (seeds/series_breaks.csv). Earlier weeks are not comparable with later
+-- ones, so both weekly series below restart there. Read once, so the chart
+-- note and both filters share the same date.
+select max(week_start_date) as d from series_breaks;
+
 -- KPI_ANONYMITY: latest known value of the masked-employer rate.
 -- Comes from fct_weekly_market rather than a direct computation on
 -- fct_job_offer: the KPI must be the same last point as the series
 -- displayed just below it, otherwise the two figures could diverge from one
 -- run to the next.
+-- The report keeps the weeks from LATEST_BREAK onward.
 select week_start_date, total_offer_count, anonymous_rate_pct
 from fct_weekly_market
 order by week_start_date;
@@ -34,6 +41,8 @@ order by week_start_date;
 -- KPI_EXITS: exit rate, latest week where it's measurable.
 -- NULL on the first recorded week, for lack of a comparison point: the
 -- report then falls back to "N/A" rather than showing zero.
+-- The report keeps the weeks strictly after LATEST_BREAK: on the break week
+-- itself, new offers and exits compare two different methods or scopes.
 select week_start_date, weeks_since_previous, active_offer_count,
        new_offer_count, exit_count, exit_rate_pct
 from fct_weekly_market_flow

@@ -211,11 +211,23 @@ def generate() -> None:
         where is_canonical_listing
     """)[0]["pct"]
 
+    # ---------- Series breaks ----------
+    # seeds/series_breaks.csv lists each change of collection method or
+    # scope. Weeks before the latest one are not comparable with later ones,
+    # so both series restart there: the level measured on a break week is
+    # valid, the change since the previous week is not. Read once from the
+    # seed, so the note and both filters share the same date.
+    latest_break = execute(con, """
+        select max(week_start_date) as d from series_breaks
+    """)[0]["d"]
+
     weekly = execute(con, """
         select week_start_date, total_offer_count, anonymous_rate_pct
         from fct_weekly_market
         order by week_start_date
     """)
+    if latest_break:
+        weekly = [r for r in weekly if r["week_start_date"] >= latest_break]
     anonymous_rate = weekly[-1]["anonymous_rate_pct"] if weekly else None
 
     flow = execute(con, """
@@ -224,6 +236,10 @@ def generate() -> None:
         from fct_weekly_market_flow
         order by week_start_date
     """)
+    if latest_break:
+        # Strictly after: on the break week, new offers and exits compare two
+        # different methods or scopes.
+        flow = [r for r in flow if r["week_start_date"] > latest_break]
     # The last row carrying an exit rate: NULL on the first week, for lack of
     # a comparison point.
     exits = next((r for r in reversed(flow) if r["exit_rate_pct"] is not None), None)
@@ -246,11 +262,11 @@ def generate() -> None:
             f"week{'s' if exits['weeks_since_previous'] > 1 else ''}",
         )
         if exits
-        else big_stat_html("N/A", "Flow, only one week measured")
+        else big_stat_html("N/A", "Exits, not yet measurable on the current series")
     )
 
     # ---------- 01 Flow ----------
-    if len(flow) >= 2:
+    if flow:
         # Categorical axis rather than temporal: two measurements six weeks
         # apart would give two thin bars lost in empty space.
         flow_labeled = [{**r, "week_start_date": r["week_start_date"].strftime("%d/%m")} for r in flow]
@@ -260,7 +276,7 @@ def generate() -> None:
             "WEEKLY OFFER FLOW",
         )
     else:
-        flow_fig = empty_figure("Flow available from two measured weeks onward")
+        flow_fig = empty_figure("Flow available from the first week after a method change")
 
     # Categorical axis, like the flow. On a temporal axis, Plotly places its
     # own ticks: it showed "Aug 9, Aug 16, Aug 23, Aug 30" when the measured
@@ -271,6 +287,12 @@ def generate() -> None:
         weekly_labeled, "week_start_date", "anonymous_rate_pct",
         "SHARE OF OFFERS WITH A MASKED EMPLOYER", suffix=" %",
     )
+
+    if latest_break:
+        restart_note = (f"Series restart at the {latest_break.strftime('%d/%m')} change "
+                        "of collection method: earlier weeks are not comparable.")
+        for fig in (flow_fig, anonymity_fig):
+            fig.update_layout(meta={**fig.layout.meta, "note": restart_note})
 
     # ---------- 02 Compensation ----------
     # Filters on annual_salary_plausible rather than a hardcoded
