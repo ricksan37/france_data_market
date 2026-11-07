@@ -62,6 +62,7 @@ CI: `.github/workflows/ci.yml` runs on every push (compile scripts, `dbt build` 
 
 - Comments, docstrings and module headers follow the `standards-de-code` skill: `~/Developer/personal_agent/.claude/skills/standards-de-code/SKILL.md`, then the reference for the language (`references/python.md`, `references/sql-dbt.md`). Project choices on top of it: English everywhere (commit messages included), descriptive docstring voice ("Fetches rows."), measured facts that justify the code are welcome ("the API answers 204 with an empty body"), history goes in commit messages and STATUS.md.
 - Verify rather than assume: every step has an expected figure; if it does not land, stop and find out why.
+- The public README never presents the project as a portfolio piece, and every figure it cites is either recomputable or dated.
 - Before relying on a regex, pattern or mapping, check it on real cases for obvious false positives.
 - A matching rule that adds under about 2 % of offers with doubtful matches is removed rather than kept for a marginal gain.
 - Visual deliverables (report, charts, slides) follow the `millimeter-visual-identity` skill.

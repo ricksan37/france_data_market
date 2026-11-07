@@ -34,10 +34,15 @@ Measured on the pull of 5 October 2026: 792 distinct listings (814 offers) retur
 
 ## Results
 
-1. **Offers are short-lived.** Of the 816 offers live on 5 October 2026, 33.7% had left France Travail a week later, 55.0% after two weeks, 70.6% after three and 78.7% after four; only 2 came back. Leaving France Travail doesn't prove a position was filled. An earlier figure (84% after six weeks) was withdrawn: it came from truncated pulls, see the history break below.
+1. **Offers are short-lived.** Of the 816 offers live on 5 October 2026, 33.7% had left France Travail a week later, 55.0% after two weeks, 70.6% after three and 78.7% after four; only 2 came back. Speed depends on who posts: after four weeks, 96.6% of Collective.work offers had gone, against 83.5% for direct employers, 76.8% for agencies and consultancies and 64.5% for masked employers. Leaving France Travail doesn't prove a position was filled. An earlier figure (84% after six weeks) was withdrawn: it came from truncated pulls, see the history break below.
 2. **Salaries are rarely shown, and almost never when the employer is hidden.** 25.8% of listings disclose a salary: 45.0% for recruitment agencies and IT consultancies (Collective.work excluded, see finding 4), 37.7% for direct employers, 8.3% when the employer's name is masked (about 1 listing in 3).
 3. **Where a salary is shown, it sits in a narrow band.** The median annual salary (lower bound) is €45k for direct employers (n=74) and masked employers (n=19), €43k for agencies and consultancies (n=54), €50k for Collective.work missions (n=23). Required experience is what moves it: €45k when experience is required (n=131) vs €40k when beginners are accepted (n=39).
 4. **Nearly a fifth of the market is freelance missions from a single platform.** Collective.work, which relays missions for unnamed clients, posted 144 of the 792 listings (18%), all created from 11 September. They rarely fill the salary field (16%) and state a daily rate in the text instead (53 listings mention a TJM), so they're counted as intermediaries and left out of the agency figure above.
+5. **Data engineers lead, and analytics engineers barely appear.** Among the 571 qualified listings, 24.3% of titles name a data engineer, 17.2% a data analyst, 15.1% a data scientist, and only 9 listings (1.6%) an analytics engineer.
+6. **SQL is named in under half of the listings, and no platform dominates.** SQL appears in 47.3% of descriptions, Python in 41.3%, Power BI in 25.0%, dbt in 11.0%. Cloud is split between GCP (15.1%), Azure (14.5%) and AWS (11.2%), platforms between Snowflake (12.1%), Databricks (11.9%) and BigQuery (9.8%). These are text searches, so they count what a listing names, not what the job uses.
+7. **Mostly permanent contracts, mostly around Paris.** 62.2% of listings are permanent (CDI), 18.0% self-employed missions (almost all from Collective.work), 10.2% temporary agency work, 9.6% fixed-term. 51.8% are in Île-de-France, 27.5% in Paris itself; 36 listings give no commune.
+
+`exploration/market_figures.py` recomputes findings 1 and 5 to 7.
 
 ## Limits and next steps
 
@@ -56,13 +61,13 @@ Measured on the pull of 5 October 2026: 792 distinct listings (814 offers) retur
 
 The project is closed. The weekly workflow keeps the live report up to date, and no new feature is planned: the report stays a static HTML page, and the domain mapping stops at 17 clusters covering 30.7% of mentions.
 
-Following the market I actually target moves to a separate project, not named yet: France Travail listings don't show the positions at the SaaS companies I'm aiming for. On the 5 October pull, 27 of 792 listings (3.4%) come from SMEs or mid-sized companies under 10 years old, IT consultancies included. That is an order of magnitude: 114 listings from direct employers have no company data.
+Following the market I actually target moves to a separate project, not named yet: France Travail listings don't show the positions at the SaaS companies I'm aiming for. On the 5 October pull, 27 of 792 listings (3.4%) come from SMEs or mid-sized companies under 10 years old, IT consultancies included. That is an order of magnitude: 114 listings from direct employers have no company data. That project will compare these results with SaaS job postings on the same indicators (roles, stack, contracts), to show how far France Travail is from that market.
 
 ## Reference
 
 ### Repository layout
 
-The Python scripts at the root are the pipeline's stages and their helpers (ingestion, enrichment, extraction, snapshots). The 24 scripts in `exploration/` are diagnostic scripts, kept for traceability.
+The Python scripts at the root are the pipeline's stages and their helpers (ingestion, enrichment, extraction, snapshots). The 25 scripts in `exploration/` are diagnostic scripts, kept for traceability.
 
 ### Architecture
 
