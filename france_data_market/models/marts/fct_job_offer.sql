@@ -26,6 +26,21 @@ select
     f.job_offer_last_updated_date,
     f.rome_code,
     f.rome_label,
+
+    -- Qualification: ROME codes are declared by recruiters and collect wide;
+    -- this flag restores precision from the title alone, so it also runs in
+    -- CI, without the LLM extraction. Measured on 100 random listings of the
+    -- 2026-10-05 pull (exploration/check_qualification.py): precision 100%,
+    -- recall 94.9%. Known limit: a title with no data term stays false even
+    -- when the description is about data.
+    regexp_matches(
+        lower(f.job_title),
+        '\b(data|datas|donn[ée]es?|bi|business intelligence|d[ée]cisionnel(le)?|analytics|machine learning|ml|mlops|dataops|dataviz|datascientist|sql|statisticien(ne)?)\b'
+    )
+    and not regexp_matches(
+        lower(f.job_title),
+        '(data[ -]?centers?|protection des donn|data protection)'
+    ) as is_data_job,
     f.contract_type,
     f.required_experience,
     f.postal_code,

@@ -48,6 +48,14 @@ models:
       - name: rome_label
         description: France Travail's label of rome_code.
 
+      - name: is_data_job
+        description: >
+          True when the job title names a data role. Title-based rule that
+          adds precision to the wide ROME collection; filter on it to leave
+          out business developers, system architects and data center jobs.
+        data_tests:
+          - not_null
+
       - name: contract_type
         description: >
           France Travail contract type code: CDI (permanent), CDD (fixed
@@ -193,3 +201,41 @@ models:
               arguments:
                 to: ref('dim_company')
                 field: siren
+
+unit_tests:
+  - name: test_is_data_job_title_rule
+    description: Data titles pass; data centers, data protection and titles with no data term do not.
+    model: fct_job_offer
+    given:
+      - input: ref('stg_raw__ft_job_offers')
+        rows:
+          - {job_offer_id: '1', job_title: 'Senior Data Engineer Snowflake F/H'}
+          - {job_offer_id: '2', job_title: 'Développeur BI (H/F)'}
+          - {job_offer_id: '3', job_title: 'Chargé de traitement de données (H/F)'}
+          - {job_offer_id: '4', job_title: 'Analyste décisionnel'}
+          - {job_offer_id: '5', job_title: 'Senior HSE Manager - Construction Data Center (H/F)'}
+          - {job_offer_id: '6', job_title: 'Data Protection Officer'}
+          - {job_offer_id: '7', job_title: 'Business Developer H/F'}
+          - {job_offer_id: '8', job_title: 'Architecte système (H/F)'}
+          - {job_offer_id: '9', job_title: 'Chef de Projet (H/F)'}
+      - input: ref('int_job_offer_salary_parsed')
+        rows: []
+      - input: ref('int_employers_classified')
+        rows: []
+      - input: ref('stg_dinum__companies')
+        rows: []
+      - input: ref('stg_extraction__skills')
+        rows: []
+      - input: ref('int_job_offers_clustered')
+        rows: []
+    expect:
+      rows:
+        - {job_offer_id: '1', is_data_job: true}
+        - {job_offer_id: '2', is_data_job: true}
+        - {job_offer_id: '3', is_data_job: true}
+        - {job_offer_id: '4', is_data_job: true}
+        - {job_offer_id: '5', is_data_job: false}
+        - {job_offer_id: '6', is_data_job: false}
+        - {job_offer_id: '7', is_data_job: false}
+        - {job_offer_id: '8', is_data_job: false}
+        - {job_offer_id: '9', is_data_job: false}

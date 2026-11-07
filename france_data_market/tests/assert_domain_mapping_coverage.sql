@@ -5,10 +5,10 @@
 
 -- Coverage of the domain normalization mapping (seeds/mapping_domaines.csv):
 -- share of domain mentions whose raw value is a mapped variant.
--- Measured: 19.6% (1144 of 5828 mentions, 2026-09-26 dump), ~20% when the
--- mapping was built. Warns under 15%: new clusters have appeared, or new
--- volume dilutes the mapped ones, and the mapping needs reworking. Above
--- it, the test passes, so a warning is always a signal to act on.
+-- Measured: 30.7% (1041 of 3396 mentions, 2026-10-05 dump). Warns under 15%:
+-- new clusters have appeared, or new volume dilutes the mapped ones, and the
+-- mapping needs reworking. Above it, the test passes, so a warning is always
+-- a signal to act on.
 --
 -- SEVERITY: WARN. Low coverage degrades the domain breakdown without making
 -- it wrong (unmapped values stay as raw_domain), so it doesn't block.
