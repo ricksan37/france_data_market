@@ -5,7 +5,7 @@ paths:
 
 # Python conventions
 
-- Comments, docstrings and module headers: `standards-de-code` skill (`~/Developer/personal_agent/.claude/skills/standards-de-code/references/python.md`). Project choices: descriptive voice; every script opens with a module docstring (what it does, why it exists, how to run it); `Raises:` lists what the function raises on purpose.
+- Comments, docstrings and module headers: `geek-guy` skill (`~/Developer/personal_agent/.claude/skills/geek-guy/references/python.md`). Project choices: descriptive voice; every script opens with a module docstring (what it does, why it exists, how to run it); `Raises:` lists what the function raises on purpose.
 - Every `requests` call has `timeout=REQUEST_TIMEOUT_SECONDS` (30 s across the project).
 - No bare `raise_for_status()` on external APIs: raise `requests.HTTPError` with the status code, `response.text` and, for auth errors, the `WWW-Authenticate` header.
 - Credentials come from the environment through `os.environ[...]` (fail fast with the variable name), loaded by `python-dotenv` locally and injected as secrets in CI. Never print a full token or secret.

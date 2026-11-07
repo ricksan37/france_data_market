@@ -30,7 +30,7 @@ CI: `.github/workflows/ci.yml` runs on every push (compile scripts, `dbt build` 
 ## Collection scope
 
 - Scope = 8 ROME codes, listed in `CATEGORIES` in `full_pull.py`: M1405, M1811, M1419, M1868, M1851, M1824, M1872, M1423. An offer has a single ROME code, so categories never overlap.
-- ROME codes are declared by recruiters and are never 100 % clean (BI codes also catch business developers). Collection aims at recall; precision belongs to a dbt qualification model (not built yet).
+- ROME codes are declared by recruiters and are never 100 % clean (BI codes also catch business developers). Collection aims at recall; precision belongs to `is_data_job` in `fct_job_offer` (title rule, measured by `exploration/check_qualification.py`).
 - Out of scope after measurement: M1889 (AI / ML engineer), M1894 (DBA), M1414 (statistician).
 - Data history (which dumps and weekly points are comparable) and known gaps: [STATUS.md](STATUS.md).
 
@@ -60,7 +60,7 @@ CI: `.github/workflows/ci.yml` runs on every push (compile scripts, `dbt build` 
 
 ## Conventions
 
-- Comments, docstrings and module headers follow the `standards-de-code` skill: `~/Developer/personal_agent/.claude/skills/standards-de-code/SKILL.md`, then the reference for the language (`references/python.md`, `references/sql-dbt.md`). Project choices on top of it: English everywhere (commit messages included), descriptive docstring voice ("Fetches rows."), measured facts that justify the code are welcome ("the API answers 204 with an empty body"), history goes in commit messages and STATUS.md.
+- Comments, docstrings and module headers follow the `geek-guy` skill: `~/Developer/personal_agent/.claude/skills/geek-guy/SKILL.md`, then the reference for the language (`references/python.md`, `references/sql-dbt.md`). Project choices on top of it: English everywhere (commit messages included), descriptive docstring voice ("Fetches rows."), measured facts that justify the code are welcome ("the API answers 204 with an empty body"), history goes in commit messages and STATUS.md.
 - Verify rather than assume: every step has an expected figure; if it does not land, stop and find out why.
 - The public README never presents the project as a portfolio piece, and every figure it cites is either recomputable or dated.
 - Before relying on a regex, pattern or mapping, check it on real cases for obvious false positives.

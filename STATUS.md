@@ -1,4 +1,4 @@
-# France Data Market: status as of 2026-10-13
+# France Data Market: status as of 2026-11-07
 
 Working rules: [CLAUDE.md](CLAUDE.md).
 
@@ -15,19 +15,24 @@ Working rules: [CLAUDE.md](CLAUDE.md).
 - 2026-10-13: the report no longer states the withdrawn July exit figure (552 / 463) and gives the eight-ROME-code scope; retried DINUM calls now log the `Retry-After` header.
 - 2026-10-13: `notebooks/01_market_exploration.ipynb` removed; recoverable from the Git history. Its HTML export and the rest of `notebooks/` stay.
 - 2026-10-13: the report's weekly series restart at the latest series break (`seeds/series_breaks.csv`), commit `f429e52`; checked locally, live with the next scheduled run.
+- 2026-11-07: project closed; the weekly workflow keeps running.
+- Weekly runs of 2026-10-19, 10-26 and 11-02 were green (807 offers, 794 listings on 11-02). The 10-26 run spent 5 h 19 in the DINUM step, cause unknown: the step is now capped at 90 minutes.
+- `Retry-After` read on the 10-26 run: 4 s on 48 of 49 retries, under the 5 s base wait.
+- Published page checked on 2026-11-07: flow from 12/10, masked employers from 05/10, new subtitle and section 01. `report_preview.png` regenerated.
+- `is_data_job` added to `fct_job_offer`: 571 of 792 listings; precision 100%, recall 94.9% on 100 labelled listings.
+- `mapping_domaines` extended to 17 clusters, 30.7% of mentions.
 
 ## Data history
 - Dumps collected before 2026-09-29 used a different scope (ROME codes plus keywords) and are not comparable with later ones.
 - `weekly_market.csv` points before 2026-10-05 also counted the versioned 2026-07-17 dump and are not comparable with later ones.
 
 ## Known gaps
-- No dbt model yet qualifies an offer as data / not data.
+- `is_data_job` reads the title only: a title with no data term stays false.
+- The 5 matches flagged by the 2026-10-05 quality audit stay a known limit (0.4% of matches, under the 2% bar).
 - 20 commits (2026-09-04 to 2026-09-30) carry a Co-Authored-By line. The history is left as is: the repository is public, and rewriting it would need a force-push and change every later hash.
 
 ## Open points
-- Monday 2026-10-19 run (also the day `ubuntu-latest` moves to Ubuntu 26; runners are pinned): read the `Retry-After` value in the retry lines. On 2026-10-12 every wait matched the base wait, so the header was absent or at most 5 s. If `technical_error` comes back: requeue the failed offers after a 60 s pause.
-- Review the 5 matches flagged by the quality audit of 2026-10-05 (227 matches); word inclusion adds 0.4 % of matches, under the 2 % bar in `CLAUDE.md`.
-- 2026-10-19 run: check on the published page that the masked-employer series starts at 05/10, the flow at 12/10, and that the subtitle and section 01 text are the new ones; then regenerate `dashboard/report_preview.png` for the README.
+- None. The six-week exit rate can be measured from 2026-11-16.
 
 ## How to resume
 - `source .venv/bin/activate`. Python scripts run from the repo root, dbt commands from `france_data_market/`.
