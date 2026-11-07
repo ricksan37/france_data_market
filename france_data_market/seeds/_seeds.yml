@@ -25,9 +25,8 @@ seeds:
   - name: mapping_domaines
     description: >
       Normalization mapping for LLM-extracted domain values (see
-      fct_job_offer_domain). Covers 12 clusters chosen for having more than
-      60 cumulative occurrences each; they cover 19.6% of mentions (1144 of
-      5828 on the 2026-09-26 dump). assert_domain_mapping_coverage warns if
+      fct_job_offer_domain). Covers 17 clusters chosen for their frequency;
+      they cover 30.7% of mentions (1041 of 3396 on the 2026-10-05 dump). assert_domain_mapping_coverage warns if
       coverage falls under 15%, the signal to rework the mapping rather than
       extend it blindly. The long tail (1-10 occurrences per value) is
       deliberately not mapped: no rule built on a sample too thin to defend.

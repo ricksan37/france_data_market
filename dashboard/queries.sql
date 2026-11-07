@@ -153,9 +153,7 @@ group by normalized_domain
 order by offer_count desc;
 
 -- DOMAIN_COVERAGE
--- Measured 2026-08-31 on 960 offers: 19.7%, identical to the 19.7% measured
--- previously on 552 offers. The long tail grows at the same pace as the
--- twelve top clusters, so the mapping isn't being diluted.
+-- Measured on the 2026-10-05 pull (814 offers): 30.7%.
 select round(100.0 * count(case when normalized_domain in
              (select distinct canonical_domain from mapping_domaines)
            then 1 end) / nullif(count(*), 0), 1) as pct

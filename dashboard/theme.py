@@ -96,7 +96,7 @@ def horizontal_bar_chart(rows, cat_col, val_col, title, suffix="",
                          labels=None):
     """Horizontal bars: the default format as soon as labels get long.
 
-    Vertical bars forced labels to tilt at 45 degrees; on the twelve domain
+    Vertical bars forced labels to tilt at 45 degrees; on the seventeen domain
     clusters, they overlapped and overflowed the card. Horizontally, a label
     reads without rotation regardless of its length, and descending order
     becomes a natural top-to-bottom read.

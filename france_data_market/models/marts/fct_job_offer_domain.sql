@@ -13,8 +13,8 @@
 -- 2026-09-26 dump: lexical fragmentation (case, language, acronyms:
 -- "BI"/"Business Intelligence", "Data Governance"/"gouvernance des
 -- données") that makes the raw field unusable for a group by. A mapping
--- (seeds/mapping_domaines.csv) normalizes the 12 most frequent clusters
--- (>60 cumulative occurrences each) to a canonical form. The long tail
+-- (seeds/mapping_domaines.csv) normalizes 17 frequent clusters to a
+-- canonical form. The long tail
 -- (values with 1-10 occurrences) is NOT mapped: no rule built on a sample
 -- too thin to defend (project principle, cf. assert_annual_salary_bounds).
 -- raw_domain stays the audit source; normalized_domain equals raw_domain
