@@ -85,7 +85,10 @@ jobs:
         # is public, no secret needed. continue-on-error: on a failure the
         # report goes out with the SIRENs of the versioned DINUM dump
         # instead of not going out.
+        # timeout-minutes: the step usually takes minutes; it spent 5 h 19 on
+        # 2026-10-26, close to GitHub's 6 h job limit, cause unknown.
         continue-on-error: true
+        timeout-minutes: 90
         run: python3 enrich_dinum.py
 
       - name: Adopt the fresh DINUM dump
